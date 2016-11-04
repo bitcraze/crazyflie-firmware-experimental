@@ -23,6 +23,8 @@
  *
  *
  */
+#define DEBUG_MODULE "STAB"
+
 #include <math.h>
 
 #include "FreeRTOS.h"
@@ -31,6 +33,8 @@
 #include "system.h"
 #include "log.h"
 #include "param.h"
+#include "debug.h"
+#include "motors.h"
 
 #include "stabilizer.h"
 
@@ -55,7 +59,11 @@ static sensorData_t sensorData;
 static state_t state;
 static control_t control;
 
+typedef enum { measureNoiseFloor, measureProp, measureDone } TestState;
+static TestState testState = measureNoiseFloor;
+
 static void stabilizerTask(void* param);
+static void testProps(sensorData_t *sensors);
 
 void stabilizerInit(void)
 {
@@ -108,27 +116,124 @@ static void stabilizerTask(void* param)
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
   }
 
+  sensorsEnableAccPropVibrationSettings();
+
   while(1) {
     vTaskDelayUntil(&lastWakeTime, F2T(RATE_MAIN_LOOP));
 
-    getExtPosition(&state);
-#ifdef ESTIMATOR_TYPE_kalman
-    stateEstimatorUpdate(&state, &sensorData, &control);
-#else
-    sensorsAcquire(&sensorData, tick);
-    stateEstimator(&state, &sensorData, tick);
-#endif
+    if (testState != measureDone) {
+      sensorsAcquire(&sensorData, tick);
+      testProps(&sensorData);
+    } else {
+      getExtPosition(&state);
+  #ifdef ESTIMATOR_TYPE_kalman
+      stateEstimatorUpdate(&state, &sensorData, &control);
+  #else
+      stateEstimator(&state, &sensorData, tick);
+  #endif
+      commanderGetSetpoint(&setpoint, &state);
 
-    commanderGetSetpoint(&setpoint, &state);
+      sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
 
-    sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
+      stateController(&control, &sensorData, &state, &setpoint, tick);
+      powerDistribution(&control);
 
-    stateController(&control, &sensorData, &state, &setpoint, tick);
-    powerDistribution(&control);
-
-    tick++;
+      tick++;
+    }
   }
 }
+
+static float variance(float *buffer, uint32_t length)
+{
+  uint32_t i;
+  float sum = 0;
+  float sumSq = 0;
+
+  for (i = 0; i < length; i++)
+  {
+    sum += buffer[i];
+    sumSq += buffer[i] * buffer[i];
+  }
+
+  return sumSq - (sum * sum) / length;
+}
+
+
+static void testProps(sensorData_t *sensors)
+{
+  static uint32_t i = 0;
+  static float accX[500];
+  static float accY[500];
+  static float accZ[500];
+  static float accVarX;
+  static float accVarY;
+  static float accVarZ;
+  static int motorToTest = 0;
+
+  if (testState == measureNoiseFloor)
+  {
+    accX[i] = sensors->acc.x;
+    accY[i] = sensors->acc.y;
+    accZ[i] = sensors->acc.z;
+
+    if (++i >= 100)
+    {
+      i = 0;
+      accVarX = variance(accX, 100);
+      accVarY = variance(accY, 100);
+      accVarZ = variance(accZ, 100);
+      DEBUG_PRINT("Acc noise floor variance X:%f, Y:%f, Z:%f\n",
+                  accVarX, accVarY, accVarZ);
+      testState = measureProp;
+    }
+
+  }
+  else if (testState == measureProp)
+  {
+    if (i < 100)
+    {
+      accX[i] = sensors->acc.x;
+      accY[i] = sensors->acc.y;
+      accZ[i] = sensors->acc.z;
+    }
+    i++;
+
+    if (i == 1)
+    {
+      motorsSetRatio(motorToTest, 0xFFFF);
+    }
+    else if (i == 50)
+    {
+      motorsSetRatio(motorToTest, 0);
+    }
+    else if (i == 100)
+    {
+      accVarX = variance(accX, 100);
+      accVarY = variance(accY, 100);
+      accVarZ = variance(accZ, 100);
+
+      DEBUG_PRINT("Motor M%d variance X:%f, Y:%f, Z:%f\n",
+                   motorToTest+1, accVarX, accVarY, accVarZ);
+    }
+    else if (i >= 1000)
+    {
+      i = 0;
+      motorToTest++;
+      if (motorToTest >= 4)
+      {
+        motorToTest = 0;
+        testState = measureDone;
+        sensorsEnableAccNormalSettings();
+//        testState = measureProp;
+      }
+    }
+  }
+  else
+  {
+
+  }
+}
+
 
 LOG_GROUP_START(ctrltarget)
 LOG_ADD(LOG_FLOAT, roll, &setpoint.attitude.roll)
