@@ -28,24 +28,50 @@
 #include <stdlib.h>
 #include "stm32fxxx.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "system.h"
 #include "deck.h"
+#include "pm.h"
 
-#define GLOW_PWM_FREQ   10000
+#define GLOW_UPDATE_PERIOD_MS   100
+#define GLOW_PWM_FREQ           10000
+#define GLOW_MAX_DUTY_CYCLE
+#define GLOW_LED_MAX_AMP        0.50f
+#define GLOW_AMP_AT_3p7_VOLT    1.35f
 
-static void glowOn(uint8_t percent)
+
+static uint8_t power;
+
+static void glowOn(uint8_t newPower)
 {
-  uint16_t duty;
-
-  if (percent > 0 && percent <= 100)
-  {
-    duty = ((uint32_t)percent * 0xFFFF) / 100;
-    TIM_SetCompare2(TIM3, duty);
-  }
+  power = newPower;
 }
 
 static void glowOff()
 {
   TIM_SetCompare2(TIM3, 0);
+  power = 0;
+}
+
+void glowTask(void* parameters)
+{
+  TickType_t xLastWakeTime;
+  uint16_t maxDuty;
+
+  systemWaitStart();
+
+  while (1)
+  {
+    xLastWakeTime = xTaskGetTickCount();
+
+    // TODO: Safety handling
+    maxDuty = ((GLOW_LED_MAX_AMP / GLOW_AMP_AT_3p7_VOLT) * (3.7f / pmGetBatteryVoltage()) * 0xFFFF);
+    TIM_SetCompare2(TIM3, ((uint32_t)power * maxDuty) / 256);
+
+    vTaskDelayUntil(&xLastWakeTime, M2T(GLOW_UPDATE_PERIOD_MS));
+  }
 }
 
 static void glowInit(DeckInfo *info)
@@ -91,7 +117,11 @@ static void glowInit(DeckInfo *info)
 
   TIM_Cmd(TIM3, ENABLE);
 
-  glowOn(10);
+  xTaskCreate(glowTask, "glow", configMINIMAL_STACK_SIZE, NULL, 1/*priority*/, NULL);
+
+  glowOff();
+  glowOn(100);
+
 }
 
 static const DeckDriver glow_deck = {
