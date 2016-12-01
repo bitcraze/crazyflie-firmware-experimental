@@ -34,15 +34,19 @@
 #include "system.h"
 #include "deck.h"
 #include "pm.h"
+#include "log.h"
+#include "param.h"
 
-#define GLOW_UPDATE_PERIOD_MS   100
-#define GLOW_PWM_FREQ           10000
-#define GLOW_MAX_DUTY_CYCLE
+#define GLOW_UPDATE_PERIOD_MS   10
+#define GLOW_PWM_FREQ           20000
+#define GLOW_TIM_PERIOD
 #define GLOW_LED_MAX_AMP        0.50f
 #define GLOW_AMP_AT_3p7_VOLT    1.35f
+#define GLOW_AMP_AT_4p2_VOLT    1.80f
 
 
 static uint8_t power;
+static uint16_t duty;
 
 static void glowOn(uint8_t newPower)
 {
@@ -59,6 +63,8 @@ void glowTask(void* parameters)
 {
   TickType_t xLastWakeTime;
   uint16_t maxDuty;
+  float batComp;
+  int inc = 1;;
 
   systemWaitStart();
 
@@ -67,8 +73,15 @@ void glowTask(void* parameters)
     xLastWakeTime = xTaskGetTickCount();
 
     // TODO: Safety handling
-    maxDuty = ((GLOW_LED_MAX_AMP / GLOW_AMP_AT_3p7_VOLT) * (3.7f / pmGetBatteryVoltage()) * 0xFFFF);
-    TIM_SetCompare2(TIM3, ((uint32_t)power * maxDuty) / 256);
+    batComp = (((4.2f / pmGetBatteryVoltage()) - 1.0) * 4.0) + 1.0;
+    maxDuty = ((GLOW_LED_MAX_AMP / GLOW_AMP_AT_3p7_VOLT) * 0xFFFF) * batComp;
+    duty = ((uint32_t)power * maxDuty) / 256;
+
+    TIM_SetCompare2(TIM3, duty);
+
+    power += inc;
+    if (power >= 100) inc = -1;
+    if (power <= 0) inc = 1;
 
     vTaskDelayUntil(&xLastWakeTime, M2T(GLOW_UPDATE_PERIOD_MS));
   }
@@ -96,9 +109,9 @@ static void glowInit(DeckInfo *info)
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource5, GPIO_AF_TIM3);
 
   /* Time base configuration */
-  TIM_TimeBaseStructure.TIM_Period = (SystemCoreClock / 2) / GLOW_PWM_FREQ;
-  TIM_TimeBaseStructure.TIM_Prescaler = TIM_CKD_DIV1;
-  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_Period = 0xFFFF;
+  TIM_TimeBaseStructure.TIM_Prescaler = 0;
+  TIM_TimeBaseStructure.TIM_ClockDivision = TIM_CKD_DIV1;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
   TIM_TimeBaseInit(TIM3, &TIM_TimeBaseStructure);
@@ -107,7 +120,7 @@ static void glowInit(DeckInfo *info)
   TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
   TIM_OCInitStructure.TIM_Pulse = 0;
-  TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
+  TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;
   TIM_OC2Init(TIM3, &TIM_OCInitStructure);
 
   TIM_OC2PreloadConfig(TIM3, TIM_OCPreload_Enable);
@@ -120,7 +133,7 @@ static void glowInit(DeckInfo *info)
   xTaskCreate(glowTask, "glow", configMINIMAL_STACK_SIZE, NULL, 1/*priority*/, NULL);
 
   glowOff();
-  glowOn(100);
+  glowOn(0);
 
 }
 
@@ -136,3 +149,12 @@ static const DeckDriver glow_deck = {
 };
 
 DECK_DRIVER(glow_deck);
+
+LOG_GROUP_START(glow)
+LOG_ADD(LOG_UINT16, duty, &duty)
+LOG_GROUP_STOP(glow)
+
+PARAM_GROUP_START(glow)
+PARAM_ADD(PARAM_UINT8, power, &power)
+PARAM_GROUP_STOP(glow)
+
