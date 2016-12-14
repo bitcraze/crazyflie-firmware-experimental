@@ -64,7 +64,6 @@ void glowTask(void* parameters)
   TickType_t xLastWakeTime;
   uint16_t maxDuty;
   float batComp;
-  int inc = 1;;
 
   systemWaitStart();
 
@@ -78,10 +77,6 @@ void glowTask(void* parameters)
     duty = ((uint32_t)power * maxDuty) / 256;
 
     TIM_SetCompare2(TIM3, duty);
-
-    power += inc;
-    if (power >= 100) inc = -1;
-    if (power <= 0) inc = 1;
 
     vTaskDelayUntil(&xLastWakeTime, M2T(GLOW_UPDATE_PERIOD_MS));
   }
@@ -133,7 +128,7 @@ static void glowInit(DeckInfo *info)
   xTaskCreate(glowTask, "glow", configMINIMAL_STACK_SIZE, NULL, 1/*priority*/, NULL);
 
   glowOff();
-  glowOn(0);
+  glowOn(20);
 
 }
 

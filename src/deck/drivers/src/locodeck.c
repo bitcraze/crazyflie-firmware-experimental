@@ -354,7 +354,7 @@ static void dwm1000Init(DeckInfo *info)
   }
 
   dwEnableAllLeds(dwm);
-  dwEnableRXTXIndication(dwm);
+//  dwEnableRXTXIndication(dwm);
 
   dwTime_t delay = {.full = 0};
   dwSetAntenaDelay(dwm, delay);
