@@ -41,6 +41,8 @@
 #define BIGQUAD_BAT_CURR_PIN       DECK_GPIO_SCK
 #define BIGQUAD_BAT_AMP_PER_VOLT   1.0f
 
+#ifdef ENABLE_BQ_DECK
+
 //Hardware configuration
 static bool isInit;
 
@@ -83,6 +85,5 @@ static const DeckDriver bigquad_deck = {
   .test = bigquadTest,
 };
 
-#ifdef ENABLE_BQ_DECK
 DECK_DRIVER(bigquad_deck);
 #endif
