@@ -32,6 +32,7 @@
 
 void retraceInit(void);
 bool retraceTest(void);
+void retraceTiggerLowBat();
 
 #endif /* __RETRACE_H__ */
 
