@@ -121,7 +121,7 @@ typedef enum {
   MODE_PRE_RECORDED
 } playMode_t;
 
-playMode_t playMode = MODE_PRE_RECORDED;
+playMode_t playMode = MODE_RETRACE;
 
 #define XB 4.7
 #define YB 1.9
@@ -505,16 +505,21 @@ static void exitStateRecordTrace() {
 
 static void enterStateRetrace() {
     ledseqRun(LED_RETRACE, seq_lps_retrace);
-    sequenceReset(&sequence);
+    sequenceResetReverse(&sequence);
 }
 
 static void handleStateRetrace() {
-  if (sequenceHasNext(&sequence)) {
-    point_t* point = sequenceReplay(&sequence);
-    moveSetPoint(point);
-  } else {
-    DEBUG_PRINT("End of retrace\n");
+  if (lowBat) {
+    DEBUG_PRINT("Out of battery\n");
     changeState(ST_LAND);
+  } else {
+    if (sequenceHasNext(&sequence)) {
+      point_t* point = sequenceReplay(&sequence);
+      moveSetPoint(point);
+    } else {
+      DEBUG_PRINT("End of retrace\n");
+      changeState(ST_STOP);
+    }
   }
 }
 

@@ -36,6 +36,7 @@ typedef struct {
   point_t* curr;
   point_t* last;
   point_t* first;
+  bool reverseMode;
 } sequence_t;
 
 void sequenceInit(sequence_t* seq, uint32_t length, point_t* data);
@@ -44,5 +45,6 @@ void sequenceRecord(sequence_t* seq, point_t* point);
 point_t* sequenceReplay(sequence_t* seq);
 bool sequenceHasNext(sequence_t* seq);
 void sequenceReset(sequence_t* seq);
+void sequenceResetReverse(sequence_t* seq);
 
 #endif // __SEQUENCE_H__
