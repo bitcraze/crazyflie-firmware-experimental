@@ -112,9 +112,11 @@ static sequence_t preRecorded;
 static sequence_t takeOffSeq;
 static sequence_t LandSeq;
 
-static int lockCount = 0;
-static float lXMin, lYMin, lZMin, lXMax, lYMax, lZMax;
+#define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
+static uint32_t lockWriteIndex;
+static float lockData[LOCK_LENGTH][3];
+static void resetLockData();
 
 static bool repeatSeq = true;
 static bool startReplay = false;
@@ -255,17 +257,6 @@ static point_t circleSeqData[] = {
     {x: XB + 0.497094805686, y: YB + -0.0538215027628, z: ZB + 1.0},
 };
 
-static void resetLockData() {
-    lXMax = FLT_MIN;
-    lYMax = FLT_MIN;
-    lZMax = FLT_MIN;
-
-    lXMin = FLT_MAX;
-    lYMin = FLT_MAX;
-    lZMin = FLT_MAX;
-}
-
-
 void retraceInit(void)
 {
   if (isInit) {
@@ -330,28 +321,52 @@ static void freeFallDetected() {
 static bool hasLock() {
   bool result = false;
 
-  if (lockCount < 50) {
-    float x = getVarPX();
-    float y = getVarPY();
-    float z = getVarPZ();
+  // Store current state
+  lockData[lockWriteIndex][0] = getVarPX();
+  lockData[lockWriteIndex][1] = getVarPY();
+  lockData[lockWriteIndex][2] = getVarPZ();
 
-    lXMax = fmaxf(lXMax, x);
-    lYMax = fmaxf(lYMax, y);
-    lZMax = fmaxf(lZMax, z);
-
-    lXMin = fminf(lXMax, x);
-    lYMin = fminf(lYMin, y);
-    lZMin = fminf(lZMin, z);
-  } else {
-    result = ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD);
-
-    lockCount = 0;
-    resetLockData();
+  lockWriteIndex++;
+  if (lockWriteIndex >= LOCK_LENGTH) {
+    lockWriteIndex = 0;
   }
 
-  lockCount++;
+  // Check if we have a lock
+  int count = 0;
 
+  float lXMax = FLT_MIN;
+  float lYMax = FLT_MIN;
+  float lZMax = FLT_MIN;
+
+  float lXMin = FLT_MAX;
+  float lYMin = FLT_MAX;
+  float lZMin = FLT_MAX;
+
+  for (int i = 0; i < LOCK_LENGTH; i++) {
+    if (lockData[i][0] != FLT_MAX) {
+      count++;
+
+      lXMax = fmaxf(lXMax, lockData[i][0]);
+      lYMax = fmaxf(lYMax, lockData[i][1]);
+      lZMax = fmaxf(lZMax, lockData[i][2]);
+
+      lXMin = fminf(lXMax, lockData[i][0]);
+      lYMin = fminf(lYMin, lockData[i][1]);
+      lZMin = fminf(lZMin, lockData[i][2]);
+    }
+  }
+
+  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD);
   return result;
+}
+
+static void resetLockData() {
+    lockWriteIndex = 0;
+    for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
+      lockData[i][0] = FLT_MAX;
+      lockData[i][1] = FLT_MAX;
+      lockData[i][2] = FLT_MAX;
+    }
 }
 
 static void recordPosition() {
@@ -371,7 +386,7 @@ static void moveSetPoint(point_t* point) {
   setpoint.position.y = point->y;
   setpoint.position.z = point->z;
 
-  DEBUG_PRINT("Set (%d, %d, %d)\n", (int)(point->x * 100.0f), (int)(point->y * 100.0f), (int)(point->z * 100.0f));
+  // DEBUG_PRINT("Set (%d, %d, %d)\n", (int)(point->x * 100.0f), (int)(point->y * 100.0f), (int)(point->z * 100.0f));
 
   commanderSetSetpoint(&setpoint, 3);
 }
