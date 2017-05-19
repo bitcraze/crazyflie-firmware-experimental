@@ -13,6 +13,8 @@
 #include "sequencer.h"
 #include "pm.h"
 #include "sensors.h"
+#include "deck_digital.h"
+#include "deck_constants.h"
 
 #define DEBUG_MODULE "RETRACE"
 
@@ -121,7 +123,7 @@ typedef enum {
   MODE_PRE_RECORDED
 } playMode_t;
 
-playMode_t playMode = MODE_RETRACE;
+playMode_t playMode = MODE_MANUAL;
 
 #define XB 4.7
 #define YB 1.9
@@ -257,6 +259,24 @@ static point_t circleSeqData[] = {
     {x: XB + 0.497094805686, y: YB + -0.0538215027628, z: ZB + 1.0},
 };
 
+static bool isRecButtonPressed() {
+  return digitalRead(DECK_GPIO_IO2) == 0;
+}
+
+static bool isPlayButtonPressed() {
+  return digitalRead(DECK_GPIO_IO3) == 0;
+}
+
+static void scanButtons() {
+  if (MODE_MANUAL == playMode) {
+    if (isRecButtonPressed()) {
+      playMode = MODE_RETRACE;
+    } else if (isPlayButtonPressed()) {
+      playMode = MODE_PRE_RECORDED;
+    }
+  }
+}
+
 void retraceInit(void)
 {
   if (isInit) {
@@ -285,6 +305,9 @@ void retraceInit(void)
   timer = xTimerCreate("RetraceTimer", M2T(100), pdTRUE, NULL, retraceTimer);
   xTimerStart(timer, 100);
 
+  pinMode(DECK_GPIO_IO2, INPUT_PULLUP);
+  pinMode(DECK_GPIO_IO3, INPUT_PULLUP);
+
   isInit = true;
 }
 
@@ -302,6 +325,8 @@ static void retraceTimer(xTimerHandle timer) {
   if (isBatLow()) {
     lowBat = true;
   }
+
+  scanButtons();
 
   stateHandlers[state].handle();
 }
@@ -391,7 +416,7 @@ static void recordPosition() {
   point.y = getY();
   point.z = getZ();
 
-  DEBUG_PRINT("Rec (%d, %d, %d)\n", (int)(point.x * 100.0f), (int)(point.y * 100.0f), (int)(point.z * 100.0f));
+  // DEBUG_PRINT("Rec (%d, %d, %d)\n", (int)(point.x * 100.0f), (int)(point.y * 100.0f), (int)(point.z * 100.0f));
 
   sequenceRecord(&sequence, &point);
 }
