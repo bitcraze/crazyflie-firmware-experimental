@@ -18,23 +18,16 @@
 
 #define LED_RETRACE LED_GREEN_R
 
-typedef enum {
-  ST_UNINIT = 0,
-  ST_WAIT_POS_LOCK,
-  ST_TAKE_OFF,
-  ST_RECORD_TRACE,
-  ST_RETRACE,
-  ST_PLAY_PRE_RECORDED,
-  ST_LAND,
-  ST_STOP
-} rt_state_t;
-
 
 static void exitStateUninit() {}
 
 static void enterStateWaitPosLock();
 static void handleStateWaitPosLock();
 static void exitStateWaitPosLock();
+
+static void enterStatePosLocked();
+static void handleStatePosLocked();
+static void exitStatePosLocked();
 
 static void enterStateTakeOff();
 static void handleStateTakeOff();
@@ -60,37 +53,34 @@ static void enterStateStop();
 static void handleStateStop();
 static void exitStateStop();
 
-void (*stateEnter[])() = {
-  0,
-  enterStateWaitPosLock,
-  enterStateTakeOff,
-  enterStateRecordTrace,
-  enterStateRetrace,
-  enterStatePlayPreRecorded,
-  enterStateLand,
-  enterStateStop,
-};
+typedef struct {
+  void (*enter)();
+  void (*handle)();
+  void (*exit)();
+} state_handler_t;
 
-void (*stateHandle[])() = {
-  0,
-  handleStateWaitPosLock,
-  handleStateTakeOff,
-  handleStateRecordTrace,
-  handleStateRetrace,
-  handleStatePlayPreRecorded,
-  handleStateLand,
-  handleStateStop,
-};
+typedef enum {
+  ST_UNINIT = 0,
+  ST_WAIT_POS_LOCK,
+  ST_POS_LOCKED,
+  ST_TAKE_OFF,
+  ST_RECORD_TRACE,
+  ST_RETRACE,
+  ST_PLAY_PRE_RECORDED,
+  ST_LAND,
+  ST_STOP
+} rt_state_t;
 
-void (*stateExit[])() = {
-  exitStateUninit,
-  exitStateWaitPosLock,
-  exitStateTakeOff,
-  exitStateRecordTrace,
-  exitStateRetrace,
-  exitStatePlayPreRecorded,
-  exitStateLand,
-  exitStateStop,
+state_handler_t stateHandlers[] = {
+  {enter: 0,                         handle: 0,                          exit: exitStateUninit},
+  {enter: enterStateWaitPosLock,     handle: handleStateWaitPosLock,     exit: exitStateWaitPosLock},
+  {enter: enterStatePosLocked,       handle: handleStatePosLocked,       exit: exitStatePosLocked},
+  {enter: enterStateTakeOff,         handle: handleStateTakeOff,         exit: exitStateTakeOff},
+  {enter: enterStateRecordTrace,     handle: handleStateRecordTrace,     exit: exitStateRecordTrace},
+  {enter: enterStateRetrace,         handle: handleStateRetrace,         exit: exitStateRetrace},
+  {enter: enterStatePlayPreRecorded, handle: handleStatePlayPreRecorded, exit: exitStatePlayPreRecorded},
+  {enter: enterStateLand,            handle: handleStateLand,            exit: exitStateLand},
+  {enter: enterStateStop,            handle: handleStateStop,            exit: exitStateStop},
 };
 
 static xTimerHandle timer;
@@ -125,6 +115,13 @@ static bool startReplay = false;
 static bool lowBat = false;
 static bool tumbleStop = false;
 
+typedef enum {
+  MODE_MANUAL,
+  MODE_RETRACE,
+  MODE_PRE_RECORDED
+} playMode_t;
+
+playMode_t playMode = MODE_PRE_RECORDED;
 
 #define XB 4.7
 #define YB 1.9
@@ -306,15 +303,15 @@ static void retraceTimer(xTimerHandle timer) {
     lowBat = true;
   }
 
-  stateHandle[state]();
+  stateHandlers[state].handle();
 }
 
 static void changeState(rt_state_t newState) {
   if (state != newState) {
     DEBUG_PRINT("Go to state %d\n", newState);
-    stateExit[state]();
+    stateHandlers[state].exit();
     state = newState;
-    stateEnter[state]();
+    stateHandlers[state].enter();
   }
 }
 
@@ -419,11 +416,42 @@ static void enterStateWaitPosLock() {
 static void handleStateWaitPosLock() {
   if (hasLock()) {
     DEBUG_PRINT("Position lock OK\n");
-    changeState(ST_TAKE_OFF);
+    changeState(ST_POS_LOCKED);
   }
 }
 
 static void exitStateWaitPosLock() {
+}
+
+
+// POSITION LOCKED ----------------------------
+
+
+static void enterStatePosLocked() {
+    ledseqRun(LED_RETRACE, seq_lps_lock);
+}
+
+static void handleStatePosLocked() {
+  switch (playMode) {
+    case MODE_MANUAL:
+      break;
+
+    case MODE_RETRACE:
+      changeState(ST_RECORD_TRACE);
+      break;
+
+    case MODE_PRE_RECORDED:
+      changeState(ST_TAKE_OFF);
+      break;
+
+    default:
+      DEBUG_PRINT("Unexpected mode\n");
+      break;
+  }
+}
+
+static void exitStatePosLocked() {
+    ledseqStop(LED_RETRACE, seq_lps_lock);
 }
 
 
