@@ -66,7 +66,7 @@
 #endif
 
 
-#define ANTENNA_OFFSET 154.6   // In meter
+#define ANTENNA_OFFSET 154.3   // In meter
 
 // The anchor position can be set using parameters
 // As an option you can set a static position in this file and set
