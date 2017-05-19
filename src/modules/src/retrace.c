@@ -505,7 +505,13 @@ static void exitStateRecordTrace() {
 
 static void enterStateRetrace() {
     ledseqRun(LED_RETRACE, seq_lps_retrace);
-    sequenceResetReverse(&sequence);
+    if (sequenceIsClosedLoop(&sequence)) {
+        sequenceReset(&sequence);
+        repeatSeq = true;
+    } else {
+        sequenceResetReverse(&sequence);
+        repeatSeq = false;
+    }
 }
 
 static void handleStateRetrace() {
@@ -517,8 +523,12 @@ static void handleStateRetrace() {
       point_t* point = sequenceReplay(&sequence);
       moveSetPoint(point);
     } else {
-      DEBUG_PRINT("End of retrace\n");
-      changeState(ST_STOP);
+      if (repeatSeq) {
+        sequenceReset(&sequence);
+      } else {
+        DEBUG_PRINT("End of retrace\n");
+        changeState(ST_STOP);
+      }
     }
   }
 }

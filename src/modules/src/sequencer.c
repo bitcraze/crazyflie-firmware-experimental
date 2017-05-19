@@ -1,4 +1,7 @@
+#include <math.h>
 #include "sequencer.h"
+
+#define CLOSE_THRESHOLD 0.3f
 
 void sequenceInit(sequence_t* seq, uint32_t length, point_t* data){
     seq->first = data;
@@ -52,6 +55,20 @@ void sequenceReset(sequence_t* seq){
 }
 
 void sequenceResetReverse(sequence_t* seq){
-    seq->reverseMode = true;
-    seq->curr = seq->last + 1;
+  seq->reverseMode = true;
+  seq->curr = seq->last + 1;
+}
+
+bool sequenceIsClosedLoop(sequence_t* seq) {
+  bool result = false;
+
+  point_t* lastPos = seq->last - 1;
+
+  if ((lastPos - seq->first) >= 2) {
+    float dx = fabs(seq->first->x - lastPos->x);
+    float dy = fabs(seq->first->y - lastPos->y);
+    float dz = fabs(seq->first->z - lastPos->z);
+    result = (dx < CLOSE_THRESHOLD && dy < CLOSE_THRESHOLD && dz < CLOSE_THRESHOLD);
+  }
+  return result;
 }
