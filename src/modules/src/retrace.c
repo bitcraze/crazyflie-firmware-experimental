@@ -12,6 +12,7 @@
 #include "estimator_kalman.h"
 #include "sequencer.h"
 #include "pm.h"
+#include "sensors.h"
 
 #define DEBUG_MODULE "RETRACE"
 
@@ -100,6 +101,7 @@ static setpoint_t setpoint;
 
 static void retraceTimer(xTimerHandle timer);
 static void freeFallDetected();
+static void tumbleDetected();
 static void changeState(rt_state_t newState);
 static rt_state_t state = ST_UNINIT;
 
@@ -121,6 +123,7 @@ static void resetLockData();
 static bool repeatSeq = true;
 static bool startReplay = false;
 static bool lowBat = false;
+static bool tumbleStop = false;
 
 
 #define XB 4.7
@@ -276,6 +279,8 @@ void retraceInit(void)
   setpoint.mode.pitch = modeDisable;
 
   sitAwRegisterFFCallback(freeFallDetected, 0);
+  sitAwRegisterTumbleCallback(tumbleDetected, 0);
+
   resetLockData();
 
   changeState(ST_WAIT_POS_LOCK);
@@ -292,6 +297,11 @@ bool retraceTest(void)
 }
 
 static void retraceTimer(xTimerHandle timer) {
+  if (tumbleStop) {
+    DEBUG_PRINT("Tumble stop!\n");
+    changeState(ST_STOP);
+  }
+
   if (isBatLow()) {
     lowBat = true;
   }
@@ -300,10 +310,12 @@ static void retraceTimer(xTimerHandle timer) {
 }
 
 static void changeState(rt_state_t newState) {
-  DEBUG_PRINT("Go to state %d\n", newState);
-  stateExit[state]();
-  state = newState;
-  stateEnter[state]();
+  if (state != newState) {
+    DEBUG_PRINT("Go to state %d\n", newState);
+    stateExit[state]();
+    state = newState;
+    stateEnter[state]();
+  }
 }
 
 static void freeFallDetected() {
@@ -317,6 +329,12 @@ static void freeFallDetected() {
 
   moveSetPoint(&point);
 }
+
+static void tumbleDetected() {
+  tumbleStop = true;
+}
+
+
 
 static bool hasLock() {
   bool result = false;
@@ -356,7 +374,7 @@ static bool hasLock() {
     }
   }
 
-  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD);
+  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD && sensorsAreCalibrated());
   return result;
 }
 
@@ -532,6 +550,11 @@ static void exitStateLand() {
 // STOP ----------------------------
 
 static void enterStateStop() {
+  if (tumbleStop) {
+    ledseqStop(SYS_LED, seq_calibrated);
+    ledseqStop(SYS_LED, seq_alive);
+    ledseqRun(SYS_LED, seq_lps_tumble);
+  }
 }
 
 static void handleStateStop() {

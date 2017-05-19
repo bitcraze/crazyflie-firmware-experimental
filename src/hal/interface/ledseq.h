@@ -79,5 +79,6 @@ extern const ledseq_t seq_bootloader[];
 extern const ledseq_t seq_testPassed[];
 extern const ledseq_t seq_lps_lock[];
 extern const ledseq_t seq_lps_retrace[];
+extern const ledseq_t seq_lps_tumble[];
 
 #endif

@@ -57,7 +57,8 @@ static ledseq_t const * sequences[] = {
   seq_alive,
   seq_linkup,
   seq_lps_lock,
-  seq_lps_retrace
+  seq_lps_retrace,
+  seq_lps_tumble,
 };
 
 /* Led sequences */
@@ -112,6 +113,30 @@ const ledseq_t seq_lps_lock[] = {
 const ledseq_t seq_lps_retrace[] = {
   { true, LEDSEQ_WAITMS(150)},
   { false, LEDSEQ_WAITMS(150)},
+  {    0, LEDSEQ_LOOP},
+};
+
+const ledseq_t seq_lps_tumble[] = {
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(200)},
+
+  { true, LEDSEQ_WAITMS(300)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(300)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(300)},
+  { false, LEDSEQ_WAITMS(200)},
+
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(100)},
+  { true, LEDSEQ_WAITMS(100)},
+  { false, LEDSEQ_WAITMS(600)},
   {    0, LEDSEQ_LOOP},
 };
 

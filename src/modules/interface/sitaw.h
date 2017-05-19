@@ -45,6 +45,7 @@ void sitAwUpdateSetpoint(setpoint_t *setpoint, const sensorData_t *sensorData,
                                                const state_t *state);
 
 void sitAwRegisterFFCallback(triggerHandler_t handler, void *handlerArg);
+void sitAwRegisterTumbleCallback(triggerHandler_t handler, void *handlerArg);
 
 /* Enable the situation awareness framework. */
 //#define SITAW_ENABLED

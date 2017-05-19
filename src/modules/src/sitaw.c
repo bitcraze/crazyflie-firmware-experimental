@@ -330,3 +330,7 @@ void sitAwInit(void)
 void sitAwRegisterFFCallback(triggerHandler_t handler, void *handlerArg) {
   triggerRegisterHandler(&sitAwFFAccWZ, handler, handlerArg);
 }
+
+void sitAwRegisterTumbleCallback(triggerHandler_t handler, void *handlerArg) {
+  triggerRegisterHandler(&sitAwTuAngle, handler, handlerArg);
+}
