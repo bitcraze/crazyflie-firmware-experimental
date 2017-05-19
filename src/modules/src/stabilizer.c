@@ -138,6 +138,23 @@ static void stabilizerTask(void* param)
 
     sitAwUpdateSetpoint(&setpoint, &sensorData, &state);
 
+    // setpoint.setEmergency = false;
+    // setpoint.resetEmergency = true;
+    // setpoint.xmode = 0b0111;
+    // setpoint.ymode = 0b0111;
+    // setpoint.zmode = 0b0111;
+    // setpoint.x[0] = 5.0;
+    // setpoint.x[1] = 0;
+    // setpoint.x[2] = 0;
+    // setpoint.y[0] = 1.5;
+    // setpoint.y[1] = 0;
+    // setpoint.y[2] = 0;
+    // setpoint.z[0] = 1.0;
+    // setpoint.z[1] = 0;
+    // setpoint.z[3] = 0;
+    // setpoint.yaw[0] = 0;
+    // setpoint.yaw[1] = 0;
+
     stateController(&control, &setpoint, &sensorData, &state, tick);
 
     checkEmergencyStopTimeout();
