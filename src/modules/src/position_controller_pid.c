@@ -108,7 +108,7 @@ static struct this_s this = {
   .pidX = {
     .init = {
       .kp = 2.0f,
-      .ki = 0,
+      .ki = 1.0f,
       .kd = 0,
     },
     .pid.dt = DT,
@@ -117,7 +117,7 @@ static struct this_s this = {
   .pidY = {
     .init = {
       .kp = 2.0f,
-      .ki = 0,
+      .ki = 1.0f,
       .kd = 0,
     },
     .pid.dt = DT,
@@ -126,7 +126,7 @@ static struct this_s this = {
   .pidZ = {
     .init = {
       .kp = 2.0f,
-      .ki = 0,
+      .ki = 1.0f,
       .kd = 0,
     },
     .pid.dt = DT,
