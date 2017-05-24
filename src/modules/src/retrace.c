@@ -125,8 +125,8 @@ typedef enum {
 
 playMode_t playMode = MODE_MANUAL;
 
-#define XB 4.7
-#define YB 1.9
+#define XB 1.0
+#define YB 1.5
 #define ZB 0.0
 
 static point_t takeOffSeqData[] = {
