@@ -80,14 +80,14 @@ void powerDistribution(const control_t *control)
     return;
   }
 
-  // if the motors should be enabled after being disabled, spin them up first, this reduces the likelihood of flips on the ground
-  if (!enabled && xTaskGetTickCount() - lastEnableTime < M2T(200)) {
-    motorsSetRatio(MOTOR_M1, 10000);
-    motorsSetRatio(MOTOR_M2, 10000);
-    motorsSetRatio(MOTOR_M3, 10000);
-    motorsSetRatio(MOTOR_M4, 10000);
-    return;
-  }
+  // // if the motors should be enabled after being disabled, spin them up first, this reduces the likelihood of flips on the ground
+  // if (!enabled && xTaskGetTickCount() - lastEnableTime < M2T(200)) {
+  //   motorsSetRatio(MOTOR_M1, 10000);
+  //   motorsSetRatio(MOTOR_M2, 10000);
+  //   motorsSetRatio(MOTOR_M3, 10000);
+  //   motorsSetRatio(MOTOR_M4, 10000);
+  //   return;
+  // }
 
   // otherwise enable the motors and calculate required commands
   enabled = true;
