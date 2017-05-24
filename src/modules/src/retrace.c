@@ -555,6 +555,8 @@ static void handleStateRetrace() {
     } else {
       if (repeatSeq) {
         sequenceReset(&sequence);
+        point_t* point = sequenceReplay(&sequence);
+        moveSetPoint(point);
       } else {
         DEBUG_PRINT("End of retrace\n");
         changeState(ST_STOP);
@@ -586,6 +588,8 @@ static void handleStatePlayPreRecorded() {
     } else {
       if (repeatSeq) {
         sequenceReset(&preRecorded);
+        point_t* point = sequenceReplay(&preRecorded);
+        moveSetPoint(point);
       } else {
         DEBUG_PRINT("End of play pre recorded\n");
         changeState(ST_LAND);
