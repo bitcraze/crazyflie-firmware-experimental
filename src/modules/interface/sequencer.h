@@ -46,5 +46,6 @@ point_t* sequenceReplay(sequence_t* seq);
 bool sequenceHasNext(sequence_t* seq);
 void sequenceReset(sequence_t* seq);
 void sequenceResetReverse(sequence_t* seq);
+bool sequenceIsClosedLoop(sequence_t* seq);
 
 #endif // __SEQUENCE_H__
