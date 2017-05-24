@@ -66,7 +66,8 @@
 #endif
 
 
-#define ANTENNA_OFFSET 154.3   // In meter
+#define ANTENNA_OFFSET 154.45   // In meter
+static float antennaOffset = ANTENNA_OFFSET;
 
 // The anchor position can be set using parameters
 // As an option you can set a static position in this file and set
@@ -150,6 +151,7 @@ static void uwbTask(void* parameters)
   algorithm->init(dwm, &algoOptions);
 
   while(1) {
+    algoOptions.antennaDelay = ((double)antennaOffset*499.2e6*128)/299792458.0;
     if (xSemaphoreTake(irqSemaphore, timeout/portTICK_PERIOD_MS)) {
       do{
           dwHandleInterrupt(dwm);
@@ -477,3 +479,8 @@ void lpsHandleLppShortPacket(uint8_t srcId, uint8_t *data, int length)
     }
   }
 }
+
+
+PARAM_GROUP_START(lpshw)
+PARAM_ADD(PARAM_FLOAT, antoffs, &antennaOffset)
+PARAM_GROUP_STOP(lpshw)

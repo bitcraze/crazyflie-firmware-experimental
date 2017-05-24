@@ -57,7 +57,7 @@ typedef enum uwbEvent_e {
 typedef uint64_t locoAddress_t;
 
 typedef struct {
-  const uint64_t antennaDelay;
+  uint64_t antennaDelay;
   const int rangingFailedThreshold;
 
   const locoAddress_t tagAddress;
