@@ -55,6 +55,12 @@ static void enterStateStop();
 static void handleStateStop();
 static void exitStateStop();
 
+#define SEQUENCE_DATA_CIRCLE
+//#define SEQUENCE_DATA_SPIRAL
+//#define SEQUENCE_DATA_SQUARE
+#include "sequences.h"
+
+
 typedef struct {
   void (*enter)();
   void (*handle)();
@@ -125,144 +131,7 @@ typedef enum {
 
 playMode_t playMode = MODE_MANUAL;
 
-#define XB 1.5
-#define YB 1.5
-#define ZB 0.0
 
-static point_t takeOffSeqData[] = {
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.0},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.05},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.1},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.15},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.2},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.25},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.3},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.35},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.4},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.45},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.55},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.6},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.65},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.7},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.75},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.8},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.85},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.9},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.95},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.0},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.1},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.2},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.3},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.4},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-};
-
-static point_t landSeqData[] = {
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.4},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.3},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.2},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.1},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 1.0},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.9},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.8},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.7},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.6},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.5},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.45},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.4},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.35},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.3},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.25},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.2},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.15},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.1},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.05},
-    {x: XB + 0.0, y: YB + 0.0, z: ZB + 0.0},
-};
-
-static point_t circleSeqData[] = {
-    {x: XB + 0.4, y: YB + 0.0, z: ZB + 1.5},
-    {x: XB + 0.397810977288, y: YB + 0.0417902661966, z: ZB + 1.5},
-    {x: XB + 0.391267868256, y: YB + 0.0831231331841, z: ZB + 1.5},
-    {x: XB + 0.380442287974, y: YB + 0.12354620804, z: ZB + 1.5},
-    {x: XB + 0.365452723648, y: YB + 0.162617055618, z: ZB + 1.5},
-    {x: XB + 0.346463237762, y: YB + 0.199908041057, z: ZB + 1.5},
-    {x: XB + 0.323681672395, y: YB + 0.235011010286, z: ZB + 1.5},
-    {x: XB + 0.297357374367, y: YB + 0.267541757319, z: ZB + 1.5},
-    {x: XB + 0.26777846611, y: YB + 0.297144229437, z: ZB + 1.5},
-    {x: XB + 0.235268692133, y: YB + 0.323494424221, z: ZB + 1.5},
-    {x: XB + 0.200183875603, y: YB + 0.346303935797, z: ZB + 1.5},
-    {x: XB + 0.162908023823, y: YB + 0.36532311147, z: ZB + 1.5},
-    {x: XB + 0.123849125223, y: YB + 0.380343784203, z: ZB + 1.5},
-    {x: XB + 0.0834346838829, y: YB + 0.391201551026, z: ZB + 1.5},
-    {x: XB + 0.0421070404533, y: YB + 0.39777757245, z: ZB + 1.5},
-    {x: XB + 0.000318530684293, y: YB + 0.399999873173, z: ZB + 1.5},
-    {x: XB + -0.0414734654392, y: YB + 0.397844129861, z: ZB + 1.5},
-    {x: XB + -0.0828115297738, y: YB + 0.391333937369, z: ZB + 1.5},
-    {x: XB + -0.123243212511, y: YB + 0.380540550494, z: ZB + 1.5},
-    {x: XB + -0.162325984292, y: YB + 0.36558210408, z: ZB + 1.5},
-    {x: XB + -0.199632079742, y: YB + 0.346622320023, z: ZB + 1.5},
-    {x: XB + -0.23475317941, y: YB + 0.323868715311, z: ZB + 1.5},
-    {x: XB + -0.26730487887, y: YB + 0.297570330732, z: ZB + 1.5},
-    {x: XB + -0.296930896077, y: YB + 0.268015005093, z: ZB + 1.5},
-    {x: XB + -0.323306970908, y: YB + 0.235526224787, z: ZB + 1.5},
-    {x: XB + -0.346144414228, y: YB + 0.200459583205, z: ZB + 1.5},
-    {x: XB + -0.365193267627, y: YB + 0.163198888722, z: ZB + 1.5},
-    {x: XB + -0.380245039241, y: YB + 0.124151963869, z: ZB + 1.5},
-    {x: XB + -0.391134985721, y: YB + 0.0837461816728, z: ZB + 1.5},
-    {x: XB + -0.397743915366, y: YB + 0.0424237880083, z: ZB + 1.5},
-    {x: XB + -0.399999492691, y: YB + 0.000637061166595, z: ZB + 1.5},
-    {x: XB + -0.397877030145, y: YB + -0.041156638382, z: ZB + 1.5},
-    {x: XB + -0.391399758322, y: YB + -0.0824998738498, z: ZB + 1.5},
-    {x: XB + -0.380638571698, y: YB + -0.12294013883, z: ZB + 1.5},
-    {x: XB + -0.365711252683, y: YB + -0.16203481003, z: ZB + 1.5},
-    {x: XB + -0.346781182477, y: YB + -0.199355991833, z: ZB + 1.5},
-    {x: XB + -0.32405555285, y: YB + -0.234495199668, z: ZB + 1.5},
-    {x: XB + -0.297783098397, y: YB + -0.267067830914, z: ZB + 1.5},
-    {x: XB + -0.268251374117, y: YB + -0.296717374422, z: ZB + 1.5},
-    {x: XB + -0.235783608086, y: YB + -0.323119312573, z: ZB + 1.5},
-    {x: XB + -0.200735163689, y: YB + -0.345984673156, z: ZB + 1.5},
-    {x: XB + -0.16348965013, y: YB + -0.365063192201, z: ZB + 1.5},
-    {x: XB + -0.124454723786, y: YB + -0.380146053153, z: ZB + 1.5},
-    {x: XB + -0.0840576263562, y: YB + -0.391068172383, z: ZB + 1.5},
-    {x: XB + -0.0427405086609, y: YB + -0.397710006059, z: ZB + 1.5},
-    {x: XB + -0.000955591244913, y: YB + -0.399998858555, z: ZB + 1.5},
-    {x: XB + 0.0408397852258, y: YB + -0.397909678121, z: ZB + 1.5},
-    {x: XB + 0.0821881656096, y: YB + -0.391465331075, z: ZB + 1.5},
-    {x: XB + 0.122636987188, y: YB + -0.380736351526, z: ZB + 1.5},
-    {x: XB + 0.161743533015, y: YB + -0.365840169374, z: ZB + 1.5},
-    {x: XB + 0.199079777505, y: YB + -0.346939825025, z: ZB + 1.5},
-    {x: XB + 0.234237071225, y: YB + -0.324242184893, z: ZB + 1.5},
-    {x: XB + 0.2668306136, y: YB + -0.297995677227, z: ZB + 1.5},
-    {x: XB + 0.296503664608, y: YB + -0.268487573034, z: ZB + 1.5},
-    {x: XB + 0.322931449338, y: YB + -0.236040841866, z: ZB + 1.5},
-    {x: XB + 0.345824712683, y: YB + -0.201010616879, z: ZB + 1.5},
-    {x: XB + 0.364932885276, y: YB + -0.163780307864, z: ZB + 1.5},
-    {x: XB + 0.380046826, y: YB + -0.124757404781, z: ZB + 1.5},
-    {x: XB + 0.391001111055, y: YB + -0.0843690177356, z: ZB + 1.5},
-    {x: XB + 0.397675844549, y: YB + -0.0430572022102, z: ZB + 1.5},
-};
 
 static bool isRecButtonPressed() {
   return digitalRead(DECK_GPIO_IO2) == 0;
@@ -282,16 +151,18 @@ static void scanButtons() {
   }
 }
 
+
 void retraceInit(void)
 {
   if (isInit) {
     return;
   }
 
+
   sequenceInit(&sequence, NR_OF_POSITIONS, positions);
-  sequenceInitStatic(&preRecorded, sizeof(circleSeqData) / sizeof(point_t), circleSeqData);
-  sequenceInitStatic(&takeOffSeq, sizeof(takeOffSeqData) / sizeof(point_t), takeOffSeqData);
-  sequenceInitStatic(&LandSeq, sizeof(landSeqData) / sizeof(point_t), landSeqData);
+  sequenceInitStatic(&preRecorded, sizeof(seqDataMain) / sizeof(point_t), seqDataMain);
+  sequenceInitStatic(&takeOffSeq, sizeof(seqDataTakeOff) / sizeof(point_t), seqDataTakeOff);
+  sequenceInitStatic(&LandSeq, sizeof(seqDataLand) / sizeof(point_t), seqDataLand);
 
   setpoint.mode.x = modeAbs;
   setpoint.mode.y = modeAbs;
