@@ -170,6 +170,10 @@ void retraceInit(void)
   setpoint.ymode = 0b0111;
   setpoint.zmode = 0b0111;
 
+  setpoint.mode.x = modeAbs;
+  setpoint.mode.y = modeAbs;
+  setpoint.mode.z = modeAbs;
+
   sitAwRegisterFFCallback(freeFallDetected, 0);
   sitAwRegisterTumbleCallback(tumbleDetected, 0);
 
@@ -312,6 +316,8 @@ static void moveSetPoint(point_t* point) {
   setpoint.yaw[0] = 0;
   setpoint.yaw[1] = 0;
   // DEBUG_PRINT("Set (%d, %d, %d)\n", (int)(point->x * 100.0f), (int)(point->y * 100.0f), (int)(point->z * 100.0f));
+
+  setpoint.position = *point;
 
   commanderSetSetpoint(&setpoint, 3);
 
@@ -522,6 +528,11 @@ static void enterStateStop() {
 static void handleStateStop() {
   setpoint.setEmergency = true;
   setpoint.resetEmergency = false;
+
+  setpoint.mode.x = modeDisable;
+  setpoint.mode.y = modeDisable;
+  setpoint.mode.z = modeDisable;
+  setpoint.thrust = 0;
 
   commanderSetSetpoint(&setpoint, 3);
 }
