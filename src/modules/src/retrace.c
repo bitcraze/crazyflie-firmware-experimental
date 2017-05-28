@@ -164,12 +164,15 @@ void retraceInit(void)
   sequenceInitStatic(&takeOffSeq, sizeof(seqDataTakeOff) / sizeof(point_t), seqDataTakeOff);
   sequenceInitStatic(&LandSeq, sizeof(seqDataLand) / sizeof(point_t), seqDataLand);
 
+  setpoint.setEmergency = false;
+  setpoint.resetEmergency = true;
+  setpoint.xmode = 0b0111;
+  setpoint.ymode = 0b0111;
+  setpoint.zmode = 0b0111;
+
   setpoint.mode.x = modeAbs;
   setpoint.mode.y = modeAbs;
   setpoint.mode.z = modeAbs;
-  setpoint.mode.yaw = modeAbs;
-  setpoint.mode.roll = modeDisable;
-  setpoint.mode.pitch = modeDisable;
 
   sitAwRegisterFFCallback(freeFallDetected, 0);
   sitAwRegisterTumbleCallback(tumbleDetected, 0);
@@ -298,13 +301,30 @@ static void recordPosition() {
 }
 
 static void moveSetPoint(point_t* point) {
-  setpoint.position.x = point->x;
-  setpoint.position.y = point->y;
-  setpoint.position.z = point->z;
+  static point_t lastpoint;
+  static point_t lastVelocity;
 
+  setpoint.x[0] = point->x;
+  setpoint.x[1] = (point->x - lastpoint.x)*0.1f;
+  setpoint.x[2] = (setpoint.x[1] - lastVelocity.x)*0.1f;
+  setpoint.y[0] = point->y;
+  setpoint.y[1] = (point->y - lastpoint.y)*0.1f;
+  setpoint.y[2] = (setpoint.y[1] - lastVelocity.y)*0.1f;
+  setpoint.z[0] = point->z;
+  setpoint.z[1] = (point->z - lastpoint.z)*0.1f;
+  setpoint.z[3] = (setpoint.z[1] - lastVelocity.z)*0.1f;
+  setpoint.yaw[0] = 0;
+  setpoint.yaw[1] = 0;
   // DEBUG_PRINT("Set (%d, %d, %d)\n", (int)(point->x * 100.0f), (int)(point->y * 100.0f), (int)(point->z * 100.0f));
 
+  setpoint.position = *point;
+
   commanderSetSetpoint(&setpoint, 3);
+
+  lastpoint = *point;
+  lastVelocity.x = setpoint.x[1];
+  lastVelocity.y = setpoint.y[1];
+  lastVelocity.z = setpoint.z[1];
 }
 
 
@@ -506,8 +526,13 @@ static void enterStateStop() {
 }
 
 static void handleStateStop() {
-  setpoint.thrust = 0;
+  setpoint.setEmergency = true;
+  setpoint.resetEmergency = false;
+
+  setpoint.mode.x = modeDisable;
+  setpoint.mode.y = modeDisable;
   setpoint.mode.z = modeDisable;
+  setpoint.thrust = 0;
 
   commanderSetSetpoint(&setpoint, 3);
 }
