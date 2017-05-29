@@ -198,7 +198,7 @@ static uint32_t rxcallback(dwDevice_t *dev) {
         dist.x = options->anchorPosition[current_anchor].x;
         dist.y = options->anchorPosition[current_anchor].y;
         dist.z = options->anchorPosition[current_anchor].z;
-        dist.stdDev = 0.25;
+        dist.stdDev = 0.50; //0.25;
         stateEstimatorEnqueueDistance(&dist);
       }
 #endif
