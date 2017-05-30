@@ -114,4 +114,6 @@ struct lppShortAnchorPos_s {
   float z;
 } __attribute__((packed));
 
+uint16_t locodeckGetAnchorState();
+
 #endif // __LOCODECK_H__

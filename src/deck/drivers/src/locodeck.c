@@ -364,6 +364,10 @@ static const DeckDriver dwm1000_deck = {
   .test = dwm1000Test,
 };
 
+uint16_t locodeckGetAnchorState() {
+  return algoOptions.rangingState;
+}
+
 DECK_DRIVER(dwm1000_deck);
 
 LOG_GROUP_START(ranging)

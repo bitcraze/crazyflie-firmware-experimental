@@ -15,6 +15,7 @@
 #include "sensors.h"
 #include "deck_digital.h"
 #include "deck_constants.h"
+#include "locodeck.h"
 
 #define DEBUG_MODULE "RETRACE"
 
@@ -275,7 +276,15 @@ static bool hasLock() {
     }
   }
 
-  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD && sensorsAreCalibrated());
+  uint16_t state = locodeckGetAnchorState();
+  int anchorCount = 0;
+  for (int i = 0; i < 8; i++) {
+    if ((1 << i) & state) {
+      anchorCount++;
+    }
+  }
+
+  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD && sensorsAreCalibrated() && anchorCount >= 4);
   return result;
 }
 
