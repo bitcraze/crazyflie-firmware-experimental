@@ -55,8 +55,8 @@ static void enterStateStop();
 static void handleStateStop();
 static void exitStateStop();
 
-#define SEQUENCE_DATA_CIRCLE
-//#define SEQUENCE_DATA_SPIRAL
+//#define SEQUENCE_DATA_CIRCLE
+#define SEQUENCE_DATA_SPIRAL
 //#define SEQUENCE_DATA_SQUARE
 #include "sequences.h"
 
