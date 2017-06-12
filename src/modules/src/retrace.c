@@ -306,7 +306,7 @@ static void recordPosition() {
   point.z = getZ();
 
   // DEBUG_PRINT("Rec (%d, %d, %d)\n", (int)(point.x * 100.0f), (int)(point.y * 100.0f), (int)(point.z * 100.0f));
-  DEBUG_PRINT("{x: %f, y: %f, z: %f},\n", (double)point.x, (double)point.y, (double)point.z);
+  // DEBUG_PRINT("{x: %f, y: %f, z: %f},\n", (double)point.x, (double)point.y, (double)point.z);
 
   sequenceRecord(&sequence, &point);
 }
