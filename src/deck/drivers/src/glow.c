@@ -45,6 +45,7 @@
 
 #define GLOW_STROBE_ON_TIME_CNT 20
 #define GLOW_UPDATE_PERIOD_MS   10
+#define GLOW_FADE_STEP          2
 
 #define GLOW_LED_MAX_AMP        0.50f
 #define GLOW_AMP_AT_3p0_VOLT    0.35f
@@ -52,22 +53,42 @@
 #define GLOW_AMP_AT_4p2_VOLT    1.80f
 
 typedef enum {PWM, STROBE } GlowState;
-GlowState glowState;
-static uint8_t power;
-static uint8_t freqDeciHz;
-static uint8_t prevFreqCentiHz;
+
+GlowState       glowState;
+static uint8_t  power;
+static uint8_t  fadePower;
+static uint8_t  freqDeciHz;
+static uint8_t  prevFreqCentiHz;
 static uint16_t duty;
 
-static void glowOn(uint8_t newPower)
+void glowOn(uint8_t newPower)
 {
-  power = newPower;
+  power = fadePower = newPower;
+  glowState = PWM;
+  freqDeciHz = 0;
 }
 
-static void glowOff()
+void glowOff()
 {
   TIM_SetCompare2(GLOW_TIM, 0);
   power = 0;
+  glowState = PWM;
+  freqDeciHz = 0;
 }
+
+void glowFade(uint8_t newPower)
+{
+  fadePower = newPower;
+  glowState = PWM;
+  freqDeciHz = 0;
+}
+
+void glowStrobe(uint8_t newFreqDeciHz)
+{
+  freqDeciHz = newFreqDeciHz;
+  glowState = STROBE;
+}
+
 
 static void glowUpdateTimerConfig(uint16_t duty, uint8_t frequencyDeciHz)
 {
@@ -92,22 +113,26 @@ static void glowUpdateTimerConfig(uint16_t duty, uint8_t frequencyDeciHz)
   }
 }
 
+static uint16_t calcDuty(uint8_t reqPower)
+{
+  uint16_t maxDuty;
+  float batComp;
+
+  batComp = (((4.2f / pmGetBatteryVoltage()) - 1.0f) * 4.0f) + 1.0f;
+  maxDuty = ((GLOW_LED_MAX_AMP / GLOW_AMP_AT_3p7_VOLT) * 0xFFFF) * batComp;
+
+  return ((uint32_t)reqPower * maxDuty) / 256;
+}
+
 void glowTask(void* parameters)
 {
   TickType_t xLastWakeTime;
-  uint16_t maxDuty;
-  float batComp;
 
   systemWaitStart();
 
   while (1)
   {
     xLastWakeTime = xTaskGetTickCount();
-
-    // TODO: Safety handling
-    batComp = (((4.2f / pmGetBatteryVoltage()) - 1.0) * 4.0) + 1.0;
-    maxDuty = ((GLOW_LED_MAX_AMP / GLOW_AMP_AT_3p7_VOLT) * 0xFFFF) * batComp;
-    duty = ((uint32_t)power * maxDuty) / 256;
 
     // Update timer settings and duty
     if ((glowState == PWM && freqDeciHz != 0) ||
@@ -119,11 +144,22 @@ void glowTask(void* parameters)
     }
     else if (glowState == STROBE && freqDeciHz == 0)
     {
+      duty = calcDuty(power);
       glowUpdateTimerConfig(duty, freqDeciHz);
       glowState = PWM;
     }
     else if (glowState == PWM)
     {
+      if (power < fadePower)
+      {
+        power += GLOW_FADE_STEP;
+      }
+      else if (power > fadePower)
+      {
+        power -= GLOW_FADE_STEP;
+      }
+
+      duty = calcDuty(power);
       TIM_SetCompare2(GLOW_TIM, duty);
     }
 
@@ -178,7 +214,7 @@ static void glowInit(DeckInfo *info)
 
   glowState = PWM;
   glowOff();
-  glowOn(20);
+//  glowOn(20);
 
 }
 
@@ -201,6 +237,7 @@ LOG_GROUP_STOP(glow)
 
 PARAM_GROUP_START(glow)
 PARAM_ADD(PARAM_UINT8, power, &power)
+PARAM_ADD(PARAM_UINT8, fadepower, &fadePower)
 PARAM_ADD(PARAM_UINT8, stobeFreqDeciHz, &freqDeciHz)
 PARAM_GROUP_STOP(glow)
 
