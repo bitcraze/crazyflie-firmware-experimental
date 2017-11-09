@@ -257,7 +257,7 @@ static arm_matrix_instance_f32 Pm = {STATE_DIM, STATE_DIM, (float *)P};
  */
 
 static bool isInit = false;
-static bool resetEstimation = true;
+bool resetEstimation = true;
 static int32_t lastPrediction;
 static int32_t lastBaroUpdate;
 static int32_t lastPNUpdate;
