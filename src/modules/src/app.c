@@ -11,6 +11,7 @@
 #include "commander.h"
 #include "pm.h"
 #include "stabilizer.h"
+#include "ledseq.h"
 
 #define DEBUG_MODULE "APP"
 #include "debug.h"
@@ -22,12 +23,15 @@ static bool isInit = false;
 
 static void appTimer(xTimerHandle timer);
 
+#define LED_LOCK         LED_GREEN_R
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
 static bool hasLock();
+
+static bool hasButtonBeenPressed = false;
 
 // duration, x0-x7, y0-y7, z0-z7, yaw0-yaw7
 static float sequence[] = {
@@ -89,6 +93,7 @@ static bool isButtonPressed() {
 enum State {
   STATE_IDLE = 0,
   STATE_WAIT_FOR_POSITION_LOCK,
+  STATE_WAIT_FOR_TAKE_OFF,
   STATE_TAKING_OFF,
   STATE_GOING_TO_INITIAL_POSITION,
   STATE_RUNNING_TRAJECTORY,
@@ -105,6 +110,13 @@ static enum State state = STATE_IDLE;
 #define SEQUENCE_SPEED 1.0
 
 static void appTimer(xTimerHandle timer) {
+  if (isButtonPressed()) {
+    if (! hasButtonBeenPressed) {
+      hasButtonBeenPressed = true;
+      ledseqRun(LED_LOCK, seq_armed);
+    }
+  }
+
   if (isBatLow() & (state < STATE_GOING_TO_PAD)) {
     DEBUG_PRINT("Battery low, going to pad...\n");
     crtpCommanderHighLevelGoTo(0.7, -0.7, 0.4, 0.0, 2.0, false, 0);
@@ -113,14 +125,19 @@ static void appTimer(xTimerHandle timer) {
 
   switch(state) {
     case STATE_IDLE:
-      if (isButtonPressed()) {
-        DEBUG_PRINT("Let's go! Waiting for position lock...\n");
-        state = STATE_WAIT_FOR_POSITION_LOCK;
-      }
+      DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+      state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
       if (hasLock()) {
-        DEBUG_PRINT("Position lock acquired, taking off..\n");
+        DEBUG_PRINT("Position lock acquired, ready for take off..\n");
+        ledseqRun(LED_LOCK, seq_lps_lock);
+        state = STATE_WAIT_FOR_TAKE_OFF;
+      }
+      break;
+    case STATE_WAIT_FOR_TAKE_OFF:
+      if (hasButtonBeenPressed) {
+        DEBUG_PRINT("Taking off!\n");
         crtpCommanderHighLevelTakeOff(TAKE_OFF_HEIGHT, 1.0, 0);
         state = STATE_TAKING_OFF;
       }
@@ -128,6 +145,8 @@ static void appTimer(xTimerHandle timer) {
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Hovering, going to initial position...\n");
+        ledseqStop(LED_LOCK, seq_lps_lock);
+        ledseqStop(LED_LOCK, seq_armed);
         crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], 2.0, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
