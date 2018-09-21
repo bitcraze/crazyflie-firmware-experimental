@@ -426,7 +426,7 @@ int crtpCommanderHighLevelDefineTrajectory(uint8_t trajectoryId, uint32_t offset
   return define_trajectory(&def);
 }
 
-bool crtpCommanderHighLevel§IsTrajectoryFinished() {
+bool crtpCommanderHighLevelIsTrajectoryFinished() {
   float t = usecTimestamp() / 1e6;
   return plan_is_finished(&planner, t);
 }
