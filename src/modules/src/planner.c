@@ -95,6 +95,10 @@ struct traj_eval plan_current_goal(struct planner *p, float t)
 }
 
 
+bool plan_is_finished(struct planner *p, float t) {
+  return piecewise_is_finished(p->trajectory, t);
+}
+
 int plan_takeoff(struct planner *p, struct vec pos, float yaw, float height, float duration, float t)
 {
 	if (p->state != TRAJECTORY_STATE_IDLE) {

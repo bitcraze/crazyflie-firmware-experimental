@@ -303,25 +303,33 @@ int set_group_mask(const struct data_set_group_mask* data)
   return 0;
 }
 
-int takeoff(const struct data_takeoff* data)
+int takeoff(const struct data_takeoff* data) {
+  return crtpCommanderHighLevelTakeOff(data->height, data->duration, data->groupMask);
+}
+
+int crtpCommanderHighLevelTakeOff(float height, float duration, uint8_t groupMask)
 {
   int result = 0;
-  if (isInGroup(data->groupMask)) {
+  if (isInGroup(groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
     float t = usecTimestamp() / 1e6;
-    result = plan_takeoff(&planner, pos, yaw, data->height, data->duration, t);
+    result = plan_takeoff(&planner, pos, yaw, height, duration, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
 }
 
-int land(const struct data_land* data)
+int land(const struct data_land* data){
+  return crtpCommanderHighLevelLand(data->height, data->duration, data->groupMask);
+}
+
+int crtpCommanderHighLevelLand(float height, float duration, uint8_t groupMask)
 {
   int result = 0;
-  if (isInGroup(data->groupMask)) {
+  if (isInGroup(groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
     float t = usecTimestamp() / 1e6;
-    result = plan_land(&planner, pos, yaw, data->height, data->duration, t);
+    result = plan_land(&planner, pos, yaw, height, duration, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
@@ -338,37 +346,45 @@ int stop(const struct data_stop* data)
   return result;
 }
 
-int go_to(const struct data_go_to* data)
+int go_to(const struct data_go_to* data) {
+  return crtpCommanderHighLevelGoTo(data->x, data->y, data->z, data->yaw, data->duration, data->relative, data->groupMask);
+}
+
+int crtpCommanderHighLevelGoTo(float x, float y, float z, float yaw, float duration, bool relative, uint8_t groupMask)
 {
   int result = 0;
-  if (isInGroup(data->groupMask)) {
-    struct vec hover_pos = mkvec(data->x, data->y, data->z);
+  if (isInGroup(groupMask)) {
+    struct vec hover_pos = mkvec(x, y, z);
     xSemaphoreTake(lockTraj, portMAX_DELAY);
     float t = usecTimestamp() / 1e6;
-    result = plan_go_to(&planner, data->relative, hover_pos, data->yaw, data->duration, t);
+    result = plan_go_to(&planner, relative, hover_pos, yaw, duration, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
 }
 
-int start_trajectory(const struct data_start_trajectory* data)
+int start_trajectory(const struct data_start_trajectory* data) {
+  return crtpCommanderHighLevelStartTrajectory(data->trajectoryId, data->timescale, data->relative, data->reversed, data->groupMask);
+}
+
+int crtpCommanderHighLevelStartTrajectory(uint8_t trajectoryId, float timescale, bool relative, bool reversed, uint8_t groupMask)
 {
   int result = 0;
-  if (isInGroup(data->groupMask)) {
-    if (data->trajectoryId < NUM_TRAJECTORY_DEFINITIONS) {
-      struct trajectoryDescription* trajDesc = &trajectory_descriptions[data->trajectoryId];
+  if (isInGroup(groupMask)) {
+    if (trajectoryId < NUM_TRAJECTORY_DEFINITIONS) {
+      struct trajectoryDescription* trajDesc = &trajectory_descriptions[trajectoryId];
       if (   trajDesc->trajectoryLocation == TRAJECTORY_LOCATION_MEM
           && trajDesc->trajectoryType == TRAJECTORY_TYPE_POLY4D) {
         xSemaphoreTake(lockTraj, portMAX_DELAY);
         float t = usecTimestamp() / 1e6;
         trajectory.t_begin = t;
-        trajectory.timescale = data->timescale;
+        trajectory.timescale = timescale;
         trajectory.n_pieces = trajDesc->trajectoryIdentifier.mem.n_pieces;
         trajectory.pieces = (struct poly4d*)&trajectories_memory[trajDesc->trajectoryIdentifier.mem.offset];
-        if (data->relative) {
+        if (relative) {
           trajectory.shift = vzero();
           struct traj_eval traj_init;
-          if (data->reversed) {
+          if (reversed) {
             traj_init = piecewise_eval_reversed(&trajectory, trajectory.t_begin);
           }
           else {
@@ -379,7 +395,7 @@ int start_trajectory(const struct data_start_trajectory* data)
         } else {
           trajectory.shift = vzero();
         }
-        result = plan_start_trajectory(&planner, &trajectory, data->reversed);
+        result = plan_start_trajectory(&planner, &trajectory, reversed);
         xSemaphoreGive(lockTraj);
       }
     }
@@ -394,4 +410,23 @@ int define_trajectory(const struct data_define_trajectory* data)
   }
   trajectory_descriptions[data->trajectoryId] = data->description;
   return 0;
+}
+
+int crtpCommanderHighLevelDefineTrajectory(uint8_t trajectoryId, uint32_t offset, float* data, uint32_t size) {
+  memcpy(trajectories_memory, data,  size);
+
+  struct data_define_trajectory def = {
+    .trajectoryId = trajectoryId,
+    .description.trajectoryLocation = TRAJECTORY_LOCATION_MEM,
+    .description.trajectoryType = TRAJECTORY_TYPE_POLY4D,
+    .description.trajectoryIdentifier.mem.offset = offset,
+    .description.trajectoryIdentifier.mem.n_pieces = size / (sizeof(float) * 33)
+  };
+
+  return define_trajectory(&def);
+}
+
+bool crtpCommanderHighLevel§IsTrajectoryFinished() {
+  float t = usecTimestamp() / 1e6;
+  return plan_is_finished(&planner, t);
 }

@@ -63,6 +63,7 @@
 #include "sysload.h"
 #include "deck.h"
 #include "extrx.h"
+#include "app.h"
 
 /* Private variable */
 static bool selftestPassed;
@@ -214,6 +215,8 @@ void systemTask(void *arg)
     }
   }
   DEBUG_PRINT("Free heap: %d bytes\n", xPortGetFreeHeapSize());
+
+  appInit();
 
   workerLoop();
 

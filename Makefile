@@ -218,8 +218,11 @@ PROJ_OBJ += version.o FreeRTOS-openocd.o
 PROJ_OBJ_CF2 += configblockeeprom.o crc_bosch.o
 PROJ_OBJ_CF2 += sleepus.o
 
+PROJ_OBJ_CF2 += app.o
+
 # Libs
 PROJ_OBJ_CF2 += libarm_math.a
+
 
 OBJ = $(FREERTOS_OBJ) $(PORT_OBJ) $(ST_OBJ) $(PROJ_OBJ)
 ifeq ($(PLATFORM), CF2)
