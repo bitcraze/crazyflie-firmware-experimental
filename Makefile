@@ -31,7 +31,7 @@ LPS_TDOA3_ENABLE  ?= 0
 ESTIMATOR          ?= any
 CONTROLLER         ?= Any # one of Any, PID, Mellinger
 POWER_DISTRIBUTION ?= stock
-SENSORS 					 ?= cf2
+SENSORS 					 ?= bmi088_bmp388
 
 ######### Test activation ##########
 FATFS_DISKIO_TESTS  ?= 0	# Set to 1 to enable FatFS diskio function tests. Erases card.
