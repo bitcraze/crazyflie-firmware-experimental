@@ -31,7 +31,7 @@ LPS_TDOA3_ENABLE  ?= 0
 ESTIMATOR          ?= any
 CONTROLLER         ?= Any # one of Any, PID, Mellinger
 POWER_DISTRIBUTION ?= stock
-SENSORS 					 ?= cf2
+SENSORS 					 = bmi088_bmp388
 
 ######### Test activation ##########
 FATFS_DISKIO_TESTS  ?= 0	# Set to 1 to enable FatFS diskio function tests. Erases card.
@@ -196,6 +196,9 @@ PROJ_OBJ_CF2 += multiranger.o
 PROJ_OBJ_CF2 += lighthouse.o
 PROJ_OBJ_CF2 += push.o
 
+# Force Push demo to start
+CFLAGS += -DDECK_FORCE=bcPush
+
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
 endif
@@ -306,7 +309,7 @@ CFLAGS += -Wdouble-promotion
 
 
 ASFLAGS = $(PROCESSOR) $(INCLUDES)
-LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority 
+LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority
 
 #Flags required by the ST library
 ifeq ($(CLOAD), 1)
