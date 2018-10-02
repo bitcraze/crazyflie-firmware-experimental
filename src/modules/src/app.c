@@ -164,7 +164,7 @@ static void appTimer(xTimerHandle timer) {
 
   if (isBatLow() && (state > STATE_TAKING_OFF) && (state < STATE_GOING_TO_PAD)) {
     DEBUG_PRINT("Battery low, going to pad...\n");
-    crtpCommanderHighLevelGoTo(0.7, -0.7, 0.4, 0.0, 2.0, false, 0);
+    crtpCommanderHighLevelGoTo(-0.4, -0.5, 0.4, 0.0, 2.0, false, 0);
     state = STATE_GOING_TO_PAD;
   }
 
