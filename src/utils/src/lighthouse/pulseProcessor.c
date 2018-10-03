@@ -6,7 +6,7 @@
 // Decoding contants
 // Times are expressed in a 48MHz clock
 #define FRAME_LENGTH 400000    // 8.333ms
-#define SWEEP_MAX_WIDTH 1024    // 20us
+#define SWEEP_MAX_WIDTH 2048    // 40us
 #define SWEEP_CENTER 192000    // 4ms
 #define SYNC_BASE_WIDTH 2750
 #define SYNC_DIVIDER 500

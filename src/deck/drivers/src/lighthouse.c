@@ -74,8 +74,11 @@ static bool getFrame(frame_t *frame)
 static vec3d position;
 
 baseStationGeometry_t baseStationsGeometry[] = {
-  {.origin = {-2.029516, 2.391417, -1.356382, }, .mat = {{-0.718327, 0.285313, -0.634511, }, {0.066982, 0.936164, 0.345125, }, {0.692474, 0.205412, -0.691582, }, }},
-  {.origin = {1.027486, 2.587440, 1.884445, }, .mat = {{0.846093, -0.256320, 0.467361, }, {-0.021730, 0.859477, 0.510712, }, {-0.532592, -0.442266, 0.721628, }, }},
+  // {.origin = {-2.029516, 2.391417, -1.356382, }, .mat = {{-0.718327, 0.285313, -0.634511, }, {0.066982, 0.936164, 0.345125, }, {0.692474, 0.205412, -0.691582, }, }},
+  // {.origin = {1.027486, 2.587440, 1.884445, }, .mat = {{0.846093, -0.256320, 0.467361, }, {-0.021730, 0.859477, 0.510712, }, {-0.532592, -0.442266, 0.721628, }, }},
+
+  {.origin = {0.600417, 0.008789, -0.756010, }, .mat = {{0.013716, -0.847748, 0.530221, }, {0.050397, 0.530183, 0.846384, }, {-0.998635, 0.015113, 0.049996, }, }},
+  {.origin = {0.000000, 0.000000, 0.000000, }, .mat = {{0.999948, 0.010235, 0.000000, }, {-0.006170, 0.602789, 0.797877, }, {0.008166, -0.797835, 0.602820, }, }},
 };
 
 static positionMeasurement_t ext_pos;
@@ -131,10 +134,10 @@ static void lighthouseTask(void *param)
           if (basestation == 1 && axis == 1) {
             lhgeometryGetPosition(baseStationsGeometry, (void*)angles, position, &delta);
 
-            ext_pos.x = position[0];
-            ext_pos.y = -position[2];
-            ext_pos.z = position[1];
-            ext_pos.stdDev = 0.01;
+            ext_pos.x = -position[0];
+            ext_pos.y = position[2] + 0.65f;
+            ext_pos.z = (2.17f +  position[1]) * 1.59f;
+            ext_pos.stdDev = 0.001;
             estimatorKalmanEnqueuePosition(&ext_pos);
           }
         }
