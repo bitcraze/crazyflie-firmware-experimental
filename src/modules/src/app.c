@@ -162,12 +162,6 @@ static void appTimer(xTimerHandle timer) {
     }
   }
 
-  if (isBatLow() && (state > STATE_TAKING_OFF) && (state < STATE_GOING_TO_PAD)) {
-    DEBUG_PRINT("Battery low, going to pad...\n");
-    crtpCommanderHighLevelGoTo(-0.4, -0.5, 0.4, 0.0, 2.0, false, 0);
-    state = STATE_GOING_TO_PAD;
-  }
-
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
@@ -204,9 +198,16 @@ static void appTimer(xTimerHandle timer) {
       }
       break;
     case STATE_RUNNING_TRAJECTORY:
-      if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Trajectory finished, restarting...\n");
-        crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, false, false, 0);
+      if (isBatLow()) {
+        DEBUG_PRINT("Battery low, going to pad...\n");
+        crtpCommanderHighLevelGoTo(-0.4, -0.5, 0.4, 0.0, 2.0, false, 0);
+        state = STATE_GOING_TO_PAD;
+      }
+      else {
+        if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+          DEBUG_PRINT("Trajectory finished, restarting...\n");
+          crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, false, false, 0);
+        }
       }
       break;
     case STATE_GOING_TO_PAD:
