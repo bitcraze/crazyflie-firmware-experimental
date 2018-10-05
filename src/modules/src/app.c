@@ -32,6 +32,7 @@ static void resetLockData();
 static bool hasLock();
 
 static bool hasButtonBeenPressed = false;
+static bool isBatLowDetected = false;
 
 // #define USE_MELLINGER
 
@@ -162,6 +163,10 @@ static void appTimer(xTimerHandle timer) {
     }
   }
 
+  if (isBatLow()) {
+    isBatLowDetected = true;
+  }
+
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
@@ -199,7 +204,7 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_RUNNING_TRAJECTORY:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (isBatLow()) {
+        if (isBatLowDetected) {
           DEBUG_PRINT("Battery low, going to pad...\n");
           crtpCommanderHighLevelGoTo(-0.4, -0.5, 0.4, 0.0, 2.0, false, 0);
           state = STATE_GOING_TO_PAD;
