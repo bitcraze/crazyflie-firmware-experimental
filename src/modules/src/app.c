@@ -31,7 +31,7 @@ static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
 static bool hasLock();
 
-static bool hasButtonBeenPressed = false;
+static bool hasButtonBeenPressed = true;
 static bool isBatLowDetected = false;
 
 // #define USE_MELLINGER
