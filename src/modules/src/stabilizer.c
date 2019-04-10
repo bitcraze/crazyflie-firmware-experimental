@@ -288,6 +288,12 @@ static void stabilizerTask(void* param)
   }
 }
 
+// This is an IROS hack that should not be permanent!
+// Never set a variable that is linked to a parameter
+void setControllerType(ControllerType newType) {
+  controllerType = newType;
+}
+
 void stabilizerSetEmergencyStop()
 {
   emergencyStop = true;

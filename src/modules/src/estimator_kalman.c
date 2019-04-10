@@ -1495,6 +1495,14 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
   pos->z = S[STATE_Z];
 }
 
+
+float getX() { return S[STATE_X]; }
+float getY() { return S[STATE_Y]; }
+float getZ() { return S[STATE_Z]; }
+float getVarPX() { return P[STATE_PX][STATE_PX]; }
+float getVarPY() { return P[STATE_PY][STATE_PY]; }
+float getVarPZ() { return P[STATE_PZ][STATE_PZ]; }
+
 // Temporary development groups
 LOG_GROUP_START(kalman_states)
   LOG_ADD(LOG_FLOAT, ox, &S[STATE_X])

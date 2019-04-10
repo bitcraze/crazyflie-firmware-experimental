@@ -56,6 +56,7 @@ static ledseq_t const * sequences[] = {
   seq_calibrated,
   seq_alive,
   seq_linkup,
+  seq_lps_lock,
 };
 
 /* Led sequences */
@@ -65,8 +66,8 @@ const ledseq_t seq_lowbat[] = {
 };
 
 const ledseq_t seq_armed[] = {
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(250)},
+  { true, LEDSEQ_WAITMS(150)},
+  {false, LEDSEQ_WAITMS(150)},
   {    0, LEDSEQ_LOOP},
 };
 
@@ -99,6 +100,11 @@ const ledseq_t seq_calibrated[] = {
 const ledseq_t seq_alive[] = {
   { true, LEDSEQ_WAITMS(50)},
   {false, LEDSEQ_WAITMS(1950)},
+  {    0, LEDSEQ_LOOP},
+};
+
+const ledseq_t seq_lps_lock[] = {
+  { true, LEDSEQ_WAITMS(1000)},
   {    0, LEDSEQ_LOOP},
 };
 

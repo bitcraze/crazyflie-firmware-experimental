@@ -234,6 +234,8 @@ PROJ_OBJ += SEGGER_RTT.o SEGGER_RTT_printf.o
 CFLAGS += -DDEBUG_PRINT_ON_SEGGER_RTT
 endif
 
+PROJ_OBJ += app.o
+
 # Libs
 PROJ_OBJ += libarm_math.a
 
