@@ -179,7 +179,7 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (isBatLowDetected) {
           DEBUG_PRINT("Battery low, going to pad...\n");
-          crtpCommanderHighLevelGoTo(-0.4, -0.5, 0.4, 0.0, 2.0, false, 0);
+          crtpCommanderHighLevelGoTo(0.0, 0.0, 0.4, 0.0, 2.0, false, 0);
           state = STATE_GOING_TO_PAD;
         } else {
           DEBUG_PRINT("Trajectory finished, restarting...\n");
