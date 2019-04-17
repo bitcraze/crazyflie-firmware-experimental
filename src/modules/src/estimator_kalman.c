@@ -526,12 +526,12 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
 }
 
 
-float getX() { return S[STATE_X]; }
-float getY() { return S[STATE_Y]; }
-float getZ() { return S[STATE_Z]; }
-float getVarPX() { return P[STATE_PX][STATE_PX]; }
-float getVarPY() { return P[STATE_PY][STATE_PY]; }
-float getVarPZ() { return P[STATE_PZ][STATE_PZ]; }
+float getX() { return coreData.S[KC_STATE_X]; }
+float getY() { return coreData.S[KC_STATE_Y]; }
+float getZ() { return coreData.S[KC_STATE_Z]; }
+float getVarPX() { return coreData.P[KC_STATE_PX][KC_STATE_PX]; }
+float getVarPY() { return coreData.P[KC_STATE_PY][KC_STATE_PY]; }
+float getVarPZ() { return coreData.P[KC_STATE_PZ][KC_STATE_PZ]; }
 
 // Temporary development groups
 LOG_GROUP_START(kalman_states)
