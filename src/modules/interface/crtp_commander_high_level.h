@@ -67,4 +67,12 @@ void crtpCommanderHighLevelStop();
 // True if we have landed or emergency-stopped.
 bool crtpCommanderHighLevelIsStopped();
 
+
+bool crtpCommanderHighLevelIsTrajectoryFinished();
+int crtpCommanderHighLevelTakeOff(float height, float duration, uint8_t groupMask);
+int crtpCommanderHighLevelLand(float height, float duration, uint8_t groupMask);
+int crtpCommanderHighLevelGoTo(float x, float y, float z, float yaw, float duration, bool relative, uint8_t groupMask);
+int crtpCommanderHighLevelStartTrajectory(uint8_t trajectoryId, float timescale, bool relative, bool reversed, uint8_t groupMask);
+int crtpCommanderHighLevelDefineTrajectory(uint8_t trajectoryId, uint32_t offset, float* data, uint32_t size);
+
 #endif /* CRTP_COMMANDER_HIGH_LEVEL_H_ */

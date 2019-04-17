@@ -158,4 +158,6 @@ void pmEnableExtBatteryCurrMeasuring(uint8_t pin, float ampPerVolt);
  */
 float pmMeasureExtBatteryCurrent(void);
 
+bool isBatLow();
+
 #endif /* PM_H_ */
