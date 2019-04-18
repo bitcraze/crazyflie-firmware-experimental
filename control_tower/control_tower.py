@@ -48,28 +48,33 @@ class TrafficController:
 
     def __init__(self, uri):
         self.uri = uri
+        self.reset_internal()
+
+    def reset_internal(self):
         self.connection_state = self.CS_DISCONNECTED
         self._cf = None
         self._log_conf = None
-        self._time_for_next_connection_attempt = 0
         self.copter_state = self.STATE_UNKNOWN
         self.vbat = -1.0
+        self._time_for_next_connection_attempt = 0
+
+        # Pre states are used to prevent multiple calls to a copter
+        # when waiting for the remote state to change
+        # Reset by timer to be roubust
         self._pre_state_taking_off = False
         self._pre_state_going_to_initial_position = False
+        self._pre_state_reset_time = 0
 
     def is_starting(self):
-        return self.copter_state == self.STATE_TAKING_OFF or \
-               (
-                           self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and self._pre_state_taking_off)
+        return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off
 
     def is_ready_for_flight(self):
-        return self.copter_state == self.STATE_HOVERING or \
-               (
-                           self.copter_state == self.STATE_HOVERING and self._pre_state_going_to_initial_position)
+        return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position
 
     def is_flying(self):
         return self.copter_state == self.STATE_RUNNING_TRAJECTORY or \
-               self.copter_state == self.STATE_GOING_TO_INITIAL_POSITION
+               self.copter_state == self.STATE_GOING_TO_INITIAL_POSITION or \
+               self._pre_state_going_to_initial_position
 
     def is_landing(self):
         if self.connection_state != self.CS_CONNECTED:
@@ -86,12 +91,15 @@ class TrafficController:
         if self.is_charging():
             if self._cf:
                 self._pre_state_taking_off = True
+                self._pre_state_reset_time = time.time() + 3.0
                 self._cf.param.set_value('app.takeoff', 1)
 
     def start_trajectory(self):
         if self.is_ready_for_flight():
-            self._pre_state_going_to_initial_position = True
-            self._cf.param.set_value('app.start', 1)
+            if self._cf:
+                self._pre_state_going_to_initial_position = True
+                self._pre_state_reset_time = time.time() + 3.0
+                self._cf.param.set_value('app.start', 1)
 
     def get_charge_level(self):
         return self.vbat
@@ -100,10 +108,8 @@ class TrafficController:
         if self.connection_state == self.CS_DISCONNECTED and time.time() > self._time_for_next_connection_attempt:
             self._connect()
 
-        if self._pre_state_taking_off and self.copter_state != self.STATE_WAIT_FOR_TAKE_OFF:
+        if self._pre_state_reset_time < time.time():
             self._pre_state_taking_off = False
-
-        if self._pre_state_going_to_initial_position and self.copter_state != self.STATE_HOVERING:
             self._pre_state_going_to_initial_position = False
 
     def _connected(self, link_uri):
@@ -124,12 +130,7 @@ class TrafficController:
         self._set_disconnected()
 
     def _set_disconnected(self, hold_back_time=0):
-        self.connection_state = self.CS_DISCONNECTED
-        self._cf = None
-        self._log_conf = None
-        self.copter_state = self.STATE_UNKNOWN
-        self.vbat = -1.0
-        self._time_for_next_connection_attempt = time.time() + hold_back_time
+        self.reset_internal()
 
     def _connect(self):
         if self.connection_state != self.CS_DISCONNECTED:
