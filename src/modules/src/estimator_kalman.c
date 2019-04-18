@@ -139,7 +139,7 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
  * Constants used in the estimator
  */
 
-#define CRAZYFLIE_WEIGHT_grams (27.0f)
+#define CRAZYFLIE_WEIGHT_grams (36.0f)
 
 //thrust is thrust mapped for 65536 <==> 60 GRAMS!
 #define CONTROL_TO_ACC (GRAVITY_MAGNITUDE*60.0f/CRAZYFLIE_WEIGHT_grams/65536.0f)
