@@ -12,6 +12,8 @@
 #include "pm.h"
 #include "stabilizer.h"
 #include "ledseq.h"
+#include "log.h"
+#include "param.h"
 
 #define DEBUG_MODULE "APP"
 #include "debug.h"
@@ -26,13 +28,21 @@ static void appTimer(xTimerHandle timer);
 #define LED_LOCK         LED_GREEN_R
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
+#define MAX_PAD_ERR 0.005
+
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
 static bool hasLock();
 
-static bool hasButtonBeenPressed = true;
-static bool isBatLowDetected = false;
+static bool takeOffWhenReady = false;
+static bool goToInitialPositionWhenReady = false;
+static bool terminateTrajectoryAndLand = false;
+
+static float padX = 0.0;
+static float padY = 0.0;
+
+static float stabilizeEndTime;
 
 #define USE_MELLINGER
 
@@ -87,8 +97,8 @@ void appInit() {
     return;
   }
 
-  timer = xTimerCreate("AppTimer", M2T(100), pdTRUE, NULL, appTimer);
-  xTimerStart(timer, 100);
+  timer = xTimerCreate("AppTimer", M2T(20), pdTRUE, NULL, appTimer);
+  xTimerStart(timer, 20);
 
   pinMode(DECK_GPIO_IO3, INPUT_PULLUP);
   reorganizeData(sequence, sizeof(sequence));
@@ -105,40 +115,28 @@ void appInit() {
   isInit = true;
 }
 
-static bool isButtonPressed() {
-  return !digitalRead(DECK_GPIO_IO3);
-}
-
 enum State {
+  // Initialization
   STATE_IDLE = 0,
   STATE_WAIT_FOR_POSITION_LOCK,
-  STATE_WAIT_FOR_TAKE_OFF,
+
+  STATE_WAIT_FOR_TAKE_OFF, // Charging
   STATE_TAKING_OFF,
+  STATE_HOVERING,
   STATE_GOING_TO_INITIAL_POSITION,
   STATE_RUNNING_TRAJECTORY,
-
-  // Low battery states
   STATE_GOING_TO_PAD,
-  STATE_LANDING,
-  STATE_EXHAUSTED,
+  STATE_WAITING_AT_PAD,
+  STATE_LANDING
 };
 
 static enum State state = STATE_IDLE;
 
-#define TAKE_OFF_HEIGHT 0.5
+#define TAKE_OFF_HEIGHT 0.2
 #define SEQUENCE_SPEED 1.0
 
 static void appTimer(xTimerHandle timer) {
-  if (isButtonPressed()) {
-    if (! hasButtonBeenPressed) {
-      hasButtonBeenPressed = true;
-      ledseqRun(LED_LOCK, seq_armed);
-    }
-  }
-
-  if (isBatLow()) {
-    isBatLowDetected = true;
-  }
+  uint32_t now = xTaskGetTickCount();
 
   switch(state) {
     case STATE_IDLE:
@@ -149,11 +147,17 @@ static void appTimer(xTimerHandle timer) {
       if (hasLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
         ledseqRun(LED_LOCK, seq_lps_lock);
+
+        padX = getX();
+        padY = getY();
+        DEBUG_PRINT("Base position: (%f, %f)", (double)padX, (double)padY);
+
         state = STATE_WAIT_FOR_TAKE_OFF;
       }
       break;
     case STATE_WAIT_FOR_TAKE_OFF:
-      if (hasButtonBeenPressed) {
+      if (takeOffWhenReady) {
+        takeOffWhenReady = false;
         DEBUG_PRINT("Taking off!\n");
         crtpCommanderHighLevelTakeOff(TAKE_OFF_HEIGHT, 1.0, 0);
         state = STATE_TAKING_OFF;
@@ -161,10 +165,18 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Hovering, going to initial position...\n");
+        DEBUG_PRINT("Hovering, waiting for command to start\n");
         ledseqStop(LED_LOCK, seq_lps_lock);
         ledseqStop(LED_LOCK, seq_armed);
-        crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], 2.0, false, 0);
+        state = STATE_HOVERING;
+      }
+      break;
+    case STATE_HOVERING:
+      if (goToInitialPositionWhenReady) {
+        goToInitialPositionWhenReady = false;
+        DEBUG_PRINT("Going to initial position\n");
+        float timeToInitialPosition = 2.0;
+        crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], timeToInitialPosition, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       break;
@@ -177,9 +189,15 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_RUNNING_TRAJECTORY:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (isBatLowDetected) {
-          DEBUG_PRINT("Battery low, going to pad...\n");
-          crtpCommanderHighLevelGoTo(0.0, 0.0, 0.4, 0.0, 2.0, false, 0);
+        if (isBatLow()) {
+          terminateTrajectoryAndLand = true;
+        }
+
+        if (terminateTrajectoryAndLand) {
+          terminateTrajectoryAndLand = false;
+          DEBUG_PRINT("Terminating trajectory, going to pad...\n");
+          float timeToPadPosition = 2.0;
+          crtpCommanderHighLevelGoTo(padX, padY, TAKE_OFF_HEIGHT, 0.0, timeToPadPosition, false, 0);
           state = STATE_GOING_TO_PAD;
         } else {
           DEBUG_PRINT("Trajectory finished, restarting...\n");
@@ -189,7 +207,18 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_GOING_TO_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("At pad, landing...\n");
+        DEBUG_PRINT("Over pad, stabalizing position\n");
+        stabilizeEndTime = now + 5000;
+        state = STATE_WAITING_AT_PAD;
+      }
+      break;
+    case STATE_WAITING_AT_PAD:
+      if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
+        if (now > stabilizeEndTime) {
+          DEBUG_PRINT("Warning: timeout!\n");
+        }
+
+        DEBUG_PRINT("Landing...\n");
         crtpCommanderHighLevelLand(0.02, 1.0, 0);
         state = STATE_LANDING;
       }
@@ -198,7 +227,7 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Landed. Feed me!\n");
         crtpCommanderHighLevelStop();
-        state = STATE_EXHAUSTED;
+        state = STATE_WAIT_FOR_TAKE_OFF;
       }
       break;
     default:
@@ -245,8 +274,6 @@ static bool hasLock() {
     }
   }
 
-  // TODO krri Check that all anchors are received?
-
   result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD && sensorsAreCalibrated());
   return result;
 }
@@ -259,3 +286,13 @@ static void resetLockData() {
       lockData[i][2] = FLT_MAX;
     }
 }
+
+PARAM_GROUP_START(app)
+  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
+  PARAM_ADD(PARAM_UINT8, start, &goToInitialPositionWhenReady)
+  PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
+PARAM_GROUP_STOP(app)
+
+LOG_GROUP_START(app)
+  LOG_ADD(LOG_UINT8, state, &state)
+LOG_GROUP_STOP(app)
