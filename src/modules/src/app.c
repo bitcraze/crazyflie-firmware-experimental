@@ -42,6 +42,8 @@ static bool terminateTrajectoryAndLand = false;
 static float padX = 0.0;
 static float padY = 0.0;
 
+static uint32_t landingTimeCheckCharge = 0;
+
 static float stabilizeEndTime;
 
 #define USE_MELLINGER
@@ -127,12 +129,14 @@ enum State {
   STATE_RUNNING_TRAJECTORY,
   STATE_GOING_TO_PAD,
   STATE_WAITING_AT_PAD,
-  STATE_LANDING
+  STATE_LANDING,
+  STATE_CHECK_CHARGING,
 };
 
 static enum State state = STATE_IDLE;
 
 #define TAKE_OFF_HEIGHT 0.2
+#define LANDING_HEIGHT 0.12
 #define SEQUENCE_SPEED 1.0
 
 static void appTimer(xTimerHandle timer) {
@@ -150,7 +154,7 @@ static void appTimer(xTimerHandle timer) {
 
         padX = getX();
         padY = getY();
-        DEBUG_PRINT("Base position: (%f, %f)", (double)padX, (double)padY);
+        DEBUG_PRINT("Base position: (%f, %f)\n", (double)padX, (double)padY);
 
         state = STATE_WAIT_FOR_TAKE_OFF;
       }
@@ -197,7 +201,7 @@ static void appTimer(xTimerHandle timer) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
-          crtpCommanderHighLevelGoTo(padX, padY, TAKE_OFF_HEIGHT, 0.0, timeToPadPosition, false, 0);
+          crtpCommanderHighLevelGoTo(padX, padY, LANDING_HEIGHT, 0.0, timeToPadPosition, false, 0);
           state = STATE_GOING_TO_PAD;
         } else {
           DEBUG_PRINT("Trajectory finished, restarting...\n");
@@ -227,7 +231,20 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Landed. Feed me!\n");
         crtpCommanderHighLevelStop();
-        state = STATE_WAIT_FOR_TAKE_OFF;
+        landingTimeCheckCharge = now + 3000;
+        state = STATE_CHECK_CHARGING;
+      }
+      break;
+    case STATE_CHECK_CHARGING:
+      if (now > landingTimeCheckCharge) {
+        DEBUG_PRINT("Check charge: %f V, isCharging: %d\n", (double)pmGetBatteryVoltage(), isCharging());
+        if (pmGetBatteryVoltage() < 3.8f && !isCharging()) {
+          DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
+          crtpCommanderHighLevelTakeOff(LANDING_HEIGHT, 1.0, 0);
+          state = STATE_GOING_TO_PAD;
+        } else {
+          state = STATE_WAIT_FOR_TAKE_OFF;
+        }
       }
       break;
     default:

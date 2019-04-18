@@ -279,6 +279,10 @@ bool isBatLow() {
   return pmState == lowPower;
 }
 
+bool isCharging() {
+  return pmState == charging;
+}
+
 void pmTask(void *param)
 {
   PMStates pmStateOld = battery;

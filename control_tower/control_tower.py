@@ -44,6 +44,7 @@ class TrafficController:
     STATE_GOING_TO_PAD = 7
     STATE_WAITING_AT_PAD = 8
     STATE_LANDING = 9
+    STATE_CHECK_CHARGING = 10
 
     def __init__(self, uri):
         self.uri = uri
@@ -75,7 +76,8 @@ class TrafficController:
             return False
         return self.copter_state == self.STATE_GOING_TO_PAD or \
                self.copter_state == self.STATE_WAITING_AT_PAD or \
-               self.copter_state == self.STATE_LANDING
+               self.copter_state == self.STATE_LANDING or \
+               self.copter_state == self.STATE_CHECK_CHARGING
 
     def is_charging(self):
         return self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and not self._pre_state_taking_off
@@ -173,7 +175,7 @@ class Tower:
     def fly_one(self):
         while True:
             if self.flying_count() < 1:
-                print("Want more copters")
+                # print("Want more copters")
                 self.prepare_copters(1)
                 self.fly_copters(1)
             time.sleep(0.1)
