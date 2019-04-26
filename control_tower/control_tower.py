@@ -108,6 +108,9 @@ class TrafficController:
     def get_charge_level(self):
         return self.vbat
 
+    def is_charged_for_flight(self):
+        return self.vbat > 4.0
+
     def get_traj_cycles(self):
         return self.traj_cycles
 
@@ -252,14 +255,21 @@ class Tower:
                     return
 
     def find_best_controllers(self):
+        too_low_battery = []
+
         charging_controllers = []
         for controller in self.controllers:
             if controller.is_charging():
                 charge = controller.get_charge_level()
-                charging_controllers.append((controller, charge))
+                if controller.is_charged_for_flight():
+                    charging_controllers.append((controller, charge))
+                else:
+                    too_low_battery.append("{} ({:.2f}V)".format(controller.uri, charge))
+
+        if len(too_low_battery) > 0:
+            print("Ready but must charge:", too_low_battery)
 
         charging_controllers.sort(key=lambda d: d[1], reverse=True)
-        # print("Charging controllers:", charging_controllers)
 
         return list(map(lambda d: d[0], charging_controllers))
 
@@ -320,4 +330,4 @@ class Tower:
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
 tower = Tower()
-tower.fly(3)
+tower.fly(4)
