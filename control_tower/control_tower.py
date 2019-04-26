@@ -65,12 +65,10 @@ class TrafficController:
 
         # Pre states are used to prevent multiple calls to a copter
         # when waiting for the remote state to change
-        # Reset by timer to be robust
         self._pre_state_taking_off = False
         self._pre_state_going_to_initial_position = False
-        self._pre_state_reset_time = 0
 
-    def is_starting(self):
+    def is_taking_off(self):
         return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off
 
     def is_ready_for_flight(self):
@@ -97,14 +95,12 @@ class TrafficController:
         if self.is_charging():
             if self._cf:
                 self._pre_state_taking_off = True
-                self._pre_state_reset_time = time.time() + 2.0
                 self._cf.param.set_value('app.takeoff', 1)
 
     def start_trajectory(self, trajectory_delay):
         if self.is_ready_for_flight():
             if self._cf:
                 self._pre_state_going_to_initial_position = True
-                self._pre_state_reset_time = time.time() + 2.0
                 self._cf.param.set_value('app.start', trajectory_delay)
 
     def get_charge_level(self):
@@ -116,10 +112,6 @@ class TrafficController:
     def process(self):
         if self.connection_state == self.CS_DISCONNECTED and time.time() > self._time_for_next_connection_attempt:
             self._connect()
-
-        if self._pre_state_reset_time < time.time():
-            self._pre_state_taking_off = False
-            self._pre_state_going_to_initial_position = False
 
     def _connected(self, link_uri):
         self.connection_state = self.CS_CONNECTED
@@ -171,11 +163,23 @@ class TrafficController:
 
     def _log_data(self, timestamp, data, logconf):
         self.copter_state = data['app.state']
+
+        if self.copter_state != self.STATE_WAIT_FOR_TAKE_OFF:
+            self._pre_state_taking_off = False
+
+        if self.copter_state != self.STATE_HOVERING:
+            self._pre_state_going_to_initial_position = False
+
         self.vbat = data['pm.vbat']
 
         self.traj_cycles = data['app.prgr']
         if self.traj_cycles <= self.NO_PROGRESS:
             self.traj_cycles = None
+
+    def dump(self):
+        print("***", self.uri)
+        print("  Connection state:", self.connection_state)
+        print("  Copter state:", self.copter_state)
 
 
 class Tower:
@@ -195,7 +199,7 @@ class Tower:
             currently_flying = self.flying_count()
             missing = wanted - currently_flying
             if missing > 0:
-                # print("Want", missing, "more copters")
+                print("Want", missing, "more copters")
                 self.prepare_copters(missing)
                 self.start_copters(missing, wanted)
             time.sleep(0.5)
@@ -212,18 +216,20 @@ class Tower:
     def prepare_copters(self, count):
         prepared_count = 0
         for controller in self.controllers:
-            # print(controller.copter_state)
-            if controller.is_starting() or controller.is_ready_for_flight():
+            if controller.is_taking_off() or controller.is_ready_for_flight():
                 prepared_count += 1
 
         missing = count - prepared_count
+        new_prepared_count = 0
         if missing > 0:
-            # print("Preparing", missing, "copter(s)")
+            print("Trying to prepare", missing, "copter(s)")
             best_controllers = self.find_best_controllers()
             for best_controller in best_controllers[:missing]:
                 if best_controller:
-                    # print("Preparing " + best_controller.uri)
+                    print("Preparing " + best_controller.uri)
+                    new_prepared_count += 1
                     best_controller.take_off()
+            print("Prepared", new_prepared_count, "copter(s)")
 
     def start_copters(self, count, total):
         unused_slot_times = self.find_unused_slot_times(total)
@@ -236,8 +242,8 @@ class Tower:
                     trajectory_delay = 1.0 - unused_slot_times[slot_index]
                     if trajectory_delay == 1.0:
                         trajectory_delay = 0.0
-                    # print("Starting prepared copter", controller.uri,
-                    #       'with a delay of', trajectory_delay)
+                    print("Starting prepared copter", controller.uri,
+                          'with a delay of', trajectory_delay)
                     controller.start_trajectory(trajectory_delay)
                     slot_index += 1
                 else:
@@ -300,6 +306,13 @@ class Tower:
     def process_controllers(self):
         for controller in self.controllers:
             controller.process()
+
+    def dump_state(self):
+        print()
+        print("Dumping state")
+        print()
+        for controller in self.controllers:
+            controller.dump()
 
 
 cflib.crtp.init_drivers(enable_debug_driver=False)
