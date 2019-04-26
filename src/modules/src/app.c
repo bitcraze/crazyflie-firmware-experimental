@@ -257,8 +257,10 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_CHECK_CHARGING:
       if (now > landingTimeCheckCharge) {
-        DEBUG_PRINT("Check charge: %f V, isCharging: %d\n", (double)pmGetBatteryVoltage(), isCharging());
-        if (pmGetBatteryVoltage() < 3.8f && !isCharging()) {
+        DEBUG_PRINT("isCharging: %d\n", isCharging());
+        if (isCharging()) {
+          state = STATE_WAIT_FOR_TAKE_OFF;
+        } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
           crtpCommanderHighLevelTakeOff(LANDING_HEIGHT, 1.0, 0);
           state = STATE_GOING_TO_PAD;
