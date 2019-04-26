@@ -40,13 +40,14 @@ class TrafficController:
     STATE_WAIT_FOR_TAKE_OFF = 2  # Charging
     STATE_TAKING_OFF = 3
     STATE_HOVERING = 4
-    STATE_GOING_TO_INITIAL_POSITION = 5
-    STATE_RUNNING_TRAJECTORY = 6
-    STATE_GOING_TO_PAD = 7
-    STATE_WAITING_AT_PAD = 8
-    STATE_LANDING = 9
-    STATE_CHECK_CHARGING = 10
-    STATE_REPOSITION_ON_PAD = 11
+    STATE_WAITING_TO_GO_TO_INITIAL_POSITION = 5
+    STATE_GOING_TO_INITIAL_POSITION = 6
+    STATE_RUNNING_TRAJECTORY = 7
+    STATE_GOING_TO_PAD = 8
+    STATE_WAITING_AT_PAD = 9
+    STATE_LANDING = 10
+    STATE_CHECK_CHARGING = 11
+    STATE_REPOSITION_ON_PAD = 12
 
     NO_PROGRESS = -1000.0
 
@@ -76,6 +77,7 @@ class TrafficController:
 
     def is_flying(self):
         return self.copter_state == self.STATE_RUNNING_TRAJECTORY or \
+               self.copter_state == self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION or \
                self.copter_state == self.STATE_GOING_TO_INITIAL_POSITION or \
                self._pre_state_going_to_initial_position
 
@@ -152,7 +154,7 @@ class TrafficController:
 
     def _setup_logging(self):
         # print("Setting up logging")
-        self._log_conf = LogConfig(name='Tower', period_in_ms=500)
+        self._log_conf = LogConfig(name='Tower', period_in_ms=100)
         self._log_conf.add_variable('app.state', 'uint8_t')
         self._log_conf.add_variable('app.prgr', 'float')
         self._log_conf.add_variable('pm.vbat', 'float')
@@ -318,4 +320,4 @@ class Tower:
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
 tower = Tower()
-tower.fly(1)
+tower.fly(3)

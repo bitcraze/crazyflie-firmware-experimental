@@ -29,6 +29,10 @@ static void appTimer(xTimerHandle timer);
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
 #define MAX_PAD_ERR 0.005
+#define TAKE_OFF_HEIGHT 0.2
+#define LANDING_HEIGHT 0.12
+#define SEQUENCE_SPEED 1.0
+#define DURATION_TO_INITIAL_POSITION 2.0
 
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
@@ -36,8 +40,8 @@ static void resetLockData();
 static bool hasLock();
 
 static bool takeOffWhenReady = false;
-static bool terminateTrajectoryAndLand = false;
 static float goToInitialPositionWhenReady = -1.0f;
+static bool terminateTrajectoryAndLand = false;
 
 static float padX = 0.0;
 static float padY = 0.0;
@@ -50,11 +54,32 @@ static float stabilizeEndTime;
 #define NO_PROGRESS -2000.0f
 static float currentProgressInTrajectory = NO_PROGRESS;
 static uint32_t trajectoryStartTime = 0;
+static uint32_t timeWhenToGoToInitialPosition = 0;
 static float trajectoryDurationMs = 0.0f;
 
 extern bool lightHouseDeckHasCalculateAPosition;
 
 #define USE_MELLINGER
+
+enum State {
+  // Initialization
+  STATE_IDLE = 0,
+  STATE_WAIT_FOR_POSITION_LOCK,
+
+  STATE_WAIT_FOR_TAKE_OFF, // Charging
+  STATE_TAKING_OFF,
+  STATE_HOVERING,
+  STATE_WAITING_TO_GO_TO_INITIAL_POSITION,
+  STATE_GOING_TO_INITIAL_POSITION,
+  STATE_RUNNING_TRAJECTORY,
+  STATE_GOING_TO_PAD,
+  STATE_WAITING_AT_PAD,
+  STATE_LANDING,
+  STATE_CHECK_CHARGING,
+  STATE_REPOSITION_ON_PAD,
+};
+
+static enum State state = STATE_IDLE;
 
 // duration, x0-x7, y0-y7, z0-z7, yaw0-yaw7
 static float sequence[] = {
@@ -130,29 +155,6 @@ void appInit() {
   isInit = true;
 }
 
-enum State {
-  // Initialization
-  STATE_IDLE = 0,
-  STATE_WAIT_FOR_POSITION_LOCK,
-
-  STATE_WAIT_FOR_TAKE_OFF, // Charging
-  STATE_TAKING_OFF,
-  STATE_HOVERING,
-  STATE_GOING_TO_INITIAL_POSITION,
-  STATE_RUNNING_TRAJECTORY,
-  STATE_GOING_TO_PAD,
-  STATE_WAITING_AT_PAD,
-  STATE_LANDING,
-  STATE_CHECK_CHARGING,
-  STATE_REPOSITION_ON_PAD,
-};
-
-static enum State state = STATE_IDLE;
-
-#define TAKE_OFF_HEIGHT 0.2
-#define LANDING_HEIGHT 0.12
-#define SEQUENCE_SPEED 1.0
-
 static void appTimer(xTimerHandle timer) {
   uint32_t now = xTaskGetTickCount();
 
@@ -187,18 +189,23 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Hovering, waiting for command to start\n");
         ledseqStop(LED_LOCK, seq_lps_lock);
-        ledseqStop(LED_LOCK, seq_armed);
         state = STATE_HOVERING;
       }
       break;
     case STATE_HOVERING:
       if (goToInitialPositionWhenReady >= 0.0f) {
         float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
-        float timeToInitialPosition = 2.0f + delayMs / 1000.0f;
+        timeWhenToGoToInitialPosition = now + delayMs;
         trajectoryStartTime = now + delayMs;
         goToInitialPositionWhenReady = -1.0f;
-        DEBUG_PRINT("Going to initial position with delay %d ms\n", (int)delayMs);
-        crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], timeToInitialPosition, false, 0);
+        DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
+        state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+      }
+      break;
+    case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
+      if (now >= timeWhenToGoToInitialPosition) {
+        DEBUG_PRINT("Going to initial position\n");
+        crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       break;
@@ -262,6 +269,7 @@ static void appTimer(xTimerHandle timer) {
       if (now > landingTimeCheckCharge) {
         DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
+          ledseqRun(LED_LOCK, seq_lps_lock);
           state = STATE_WAIT_FOR_TAKE_OFF;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
@@ -273,8 +281,8 @@ static void appTimer(xTimerHandle timer) {
     case STATE_REPOSITION_ON_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Over pad, stabalizing position\n");
-          crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, 1.0, false, 0);
-          state = STATE_GOING_TO_PAD;
+        crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, 1.5, false, 0);
+        state = STATE_GOING_TO_PAD;
       }
       break;
     default:
