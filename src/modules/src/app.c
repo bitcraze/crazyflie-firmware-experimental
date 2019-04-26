@@ -36,8 +36,8 @@ static void resetLockData();
 static bool hasLock();
 
 static bool takeOffWhenReady = false;
-static bool goToInitialPositionWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
+static float goToInitialPositionWhenReady = -1.0f;
 
 static float padX = 0.0;
 static float padY = 0.0;
@@ -45,6 +45,11 @@ static float padY = 0.0;
 static uint32_t landingTimeCheckCharge = 0;
 
 static float stabilizeEndTime;
+
+#define NO_PROGRESS -2000.0f
+static float currentProgressInTrajectory = NO_PROGRESS;
+static uint32_t trajectoryStartTime = 0;
+static float trajectoryDurationMs = 0.0f;
 
 #define USE_MELLINGER
 
@@ -78,9 +83,10 @@ static float sequence[] = {
 
 // The array of data is copy/pasted from the trajectory generator. Unfortunately it does not use the same
 // order as in the firmware. Shuffle data around.
-static void reorganizeData(float sequence[], int size) {
+static float reorganizeData(float sequence[], int size) {
   int count = size / sizeof(float);
   const int perRow = 1 + 8 * 4;
+  float totalDuration = 0.0f;
 
   for (int i = 0; i < count / perRow; i++) {
     float* row = &sequence[i * perRow];
@@ -91,7 +97,11 @@ static void reorganizeData(float sequence[], int size) {
     }
 
     row[8 * 4] = duration;
+
+    totalDuration += duration;
   }
+
+  return totalDuration;
 }
 
 void appInit() {
@@ -103,7 +113,7 @@ void appInit() {
   xTimerStart(timer, 20);
 
   pinMode(DECK_GPIO_IO3, INPUT_PULLUP);
-  reorganizeData(sequence, sizeof(sequence));
+  trajectoryDurationMs = 1000 * reorganizeData(sequence, sizeof(sequence));
 
   #ifdef USE_MELLINGER
   setControllerType(ControllerTypeMellinger);
@@ -151,18 +161,19 @@ static void appTimer(xTimerHandle timer) {
       if (hasLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
         ledseqRun(LED_LOCK, seq_lps_lock);
+        state = STATE_WAIT_FOR_TAKE_OFF;
+      }
+      break;
+    case STATE_WAIT_FOR_TAKE_OFF:
+      trajectoryStartTime = 0;
+      if (takeOffWhenReady) {
+        takeOffWhenReady = false;
+        DEBUG_PRINT("Taking off!\n");
 
         padX = getX();
         padY = getY();
         DEBUG_PRINT("Base position: (%f, %f)\n", (double)padX, (double)padY);
 
-        state = STATE_WAIT_FOR_TAKE_OFF;
-      }
-      break;
-    case STATE_WAIT_FOR_TAKE_OFF:
-      if (takeOffWhenReady) {
-        takeOffWhenReady = false;
-        DEBUG_PRINT("Taking off!\n");
         crtpCommanderHighLevelTakeOff(TAKE_OFF_HEIGHT, 1.0, 0);
         state = STATE_TAKING_OFF;
       }
@@ -176,15 +187,19 @@ static void appTimer(xTimerHandle timer) {
       }
       break;
     case STATE_HOVERING:
-      if (goToInitialPositionWhenReady) {
-        goToInitialPositionWhenReady = false;
-        DEBUG_PRINT("Going to initial position\n");
-        float timeToInitialPosition = 2.0;
+      if (goToInitialPositionWhenReady >= 0.0f) {
+        float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
+        float timeToInitialPosition = 2.0f + delayMs / 1000.0f;
+        trajectoryStartTime = now + delayMs;
+        goToInitialPositionWhenReady = -1.0f;
+        DEBUG_PRINT("Going to initial position with delay %d ms\n", (int)delayMs);
         crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], timeToInitialPosition, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
+      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
+
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
         crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, false, false, 0);
@@ -192,6 +207,8 @@ static void appTimer(xTimerHandle timer) {
       }
       break;
     case STATE_RUNNING_TRAJECTORY:
+      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
+
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (isBatLow()) {
           terminateTrajectoryAndLand = true;
@@ -202,6 +219,7 @@ static void appTimer(xTimerHandle timer) {
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, LANDING_HEIGHT, 0.0, timeToPadPosition, false, 0);
+          currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
           DEBUG_PRINT("Trajectory finished, restarting...\n");
@@ -306,10 +324,11 @@ static void resetLockData() {
 
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
-  PARAM_ADD(PARAM_UINT8, start, &goToInitialPositionWhenReady)
+  PARAM_ADD(PARAM_FLOAT, start, &goToInitialPositionWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
   LOG_ADD(LOG_UINT8, state, &state)
+  LOG_ADD(LOG_FLOAT, prgr, &currentProgressInTrajectory)
 LOG_GROUP_STOP(app)
