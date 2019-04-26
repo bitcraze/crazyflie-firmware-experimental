@@ -51,6 +51,8 @@ static float currentProgressInTrajectory = NO_PROGRESS;
 static uint32_t trajectoryStartTime = 0;
 static float trajectoryDurationMs = 0.0f;
 
+extern bool lightHouseDeckHasCalculateAPosition;
+
 #define USE_MELLINGER
 
 // duration, x0-x7, y0-y7, z0-z7, yaw0-yaw7
@@ -309,7 +311,14 @@ static bool hasLock() {
     }
   }
 
-  result = (count >= LOCK_LENGTH) && ((lXMax - lXMin) < LOCK_THRESHOLD) && ((lYMax - lYMin) < LOCK_THRESHOLD) && ((lZMax - lZMin) < LOCK_THRESHOLD && sensorsAreCalibrated());
+  result =
+    (count >= LOCK_LENGTH) &&
+    ((lXMax - lXMin) < LOCK_THRESHOLD) &&
+    ((lYMax - lYMin) < LOCK_THRESHOLD) &&
+    ((lZMax - lZMin) < LOCK_THRESHOLD &&
+    lightHouseDeckHasCalculateAPosition &&  // Make sure we have a deck and the Lighthouses are powered
+    sensorsAreCalibrated());
+
   return result;
 }
 

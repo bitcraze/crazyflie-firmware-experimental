@@ -105,6 +105,8 @@ static float frameRate = 0.0;
 static float cycleRate = 0.0;
 static float positionRate = 0.0;
 
+bool lightHouseDeckHasCalculateAPosition = false;
+
 static uint16_t pulseWidth[PULSE_PROCESSOR_N_SENSORS];
 
 static uint32_t latestStatsTimeMs = 0;
@@ -177,6 +179,9 @@ static void estimatePosition(pulseProcessorResult_t angles[]) {
   if (!isfinite(ext_pos.pos[0]) || !isfinite(ext_pos.pos[1]) || !isfinite(ext_pos.pos[2])) {
     return;
   }
+
+  lightHouseDeckHasCalculateAPosition = true;
+
   ext_pos.stdDev = 0.01;
   estimatorEnqueuePosition(&ext_pos);
 }
