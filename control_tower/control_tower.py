@@ -46,6 +46,7 @@ class TrafficController:
     STATE_WAITING_AT_PAD = 8
     STATE_LANDING = 9
     STATE_CHECK_CHARGING = 10
+    STATE_REPOSITION_ON_PAD = 11
 
     NO_PROGRESS = -1000.0
 
@@ -86,7 +87,8 @@ class TrafficController:
         return self.copter_state == self.STATE_GOING_TO_PAD or \
                self.copter_state == self.STATE_WAITING_AT_PAD or \
                self.copter_state == self.STATE_LANDING or \
-               self.copter_state == self.STATE_CHECK_CHARGING
+               self.copter_state == self.STATE_CHECK_CHARGING or \
+               self.copter_state == self.STATE_REPOSITION_ON_PAD
 
     def is_charging(self):
         return self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and not self._pre_state_taking_off

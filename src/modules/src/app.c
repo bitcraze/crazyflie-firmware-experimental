@@ -41,6 +41,7 @@ static float goToInitialPositionWhenReady = -1.0f;
 
 static float padX = 0.0;
 static float padY = 0.0;
+static float padZ = 0.0;
 
 static uint32_t landingTimeCheckCharge = 0;
 
@@ -143,6 +144,7 @@ enum State {
   STATE_WAITING_AT_PAD,
   STATE_LANDING,
   STATE_CHECK_CHARGING,
+  STATE_REPOSITION_ON_PAD,
 };
 
 static enum State state = STATE_IDLE;
@@ -174,9 +176,10 @@ static void appTimer(xTimerHandle timer) {
 
         padX = getX();
         padY = getY();
-        DEBUG_PRINT("Base position: (%f, %f)\n", (double)padX, (double)padY);
+        padZ = getZ();
+        DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
 
-        crtpCommanderHighLevelTakeOff(TAKE_OFF_HEIGHT, 1.0, 0);
+        crtpCommanderHighLevelTakeOff((double)padZ + TAKE_OFF_HEIGHT, 1.0, 0);
         state = STATE_TAKING_OFF;
       }
       break;
@@ -220,7 +223,7 @@ static void appTimer(xTimerHandle timer) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
-          crtpCommanderHighLevelGoTo(padX, padY, LANDING_HEIGHT, 0.0, timeToPadPosition, false, 0);
+          crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false, 0);
           currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
@@ -262,11 +265,16 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_WAIT_FOR_TAKE_OFF;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-          crtpCommanderHighLevelTakeOff(LANDING_HEIGHT, 1.0, 0);
-          state = STATE_GOING_TO_PAD;
-        } else {
-          state = STATE_WAIT_FOR_TAKE_OFF;
+          crtpCommanderHighLevelTakeOff((double)padZ + LANDING_HEIGHT, 1.0, 0);
+          state = STATE_REPOSITION_ON_PAD;
         }
+      }
+      break;
+    case STATE_REPOSITION_ON_PAD:
+      if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+        DEBUG_PRINT("Over pad, stabalizing position\n");
+          crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, 1.0, false, 0);
+          state = STATE_GOING_TO_PAD;
       }
       break;
     default:
