@@ -195,6 +195,8 @@ class Tower:
             'radio://0/10/2M/E7E7E7E702',
             'radio://0/10/2M/E7E7E7E703',
             'radio://0/10/2M/E7E7E7E704',
+            'radio://0/10/2M/E7E7E7E705',
+            'radio://0/10/2M/E7E7E7E706',
         ]:
             self.controllers.append(TrafficController(uri))
 
@@ -330,4 +332,4 @@ class Tower:
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
 tower = Tower()
-tower.fly(4)
+tower.fly(1)
