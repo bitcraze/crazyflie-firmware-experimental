@@ -27,6 +27,7 @@ import cflib.crtp  # noqa
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 import statistics
+import sys
 
 
 class TrafficController:
@@ -48,6 +49,7 @@ class TrafficController:
     STATE_LANDING = 10
     STATE_CHECK_CHARGING = 11
     STATE_REPOSITION_ON_PAD = 12
+    STATE_CRASHED = 13
 
     NO_PROGRESS = -1000.0
 
@@ -82,8 +84,6 @@ class TrafficController:
                self._pre_state_going_to_initial_position
 
     def is_landing(self):
-        if self.connection_state != self.CS_CONNECTED:
-            return False
         return self.copter_state == self.STATE_GOING_TO_PAD or \
                self.copter_state == self.STATE_WAITING_AT_PAD or \
                self.copter_state == self.STATE_LANDING or \
@@ -104,6 +104,10 @@ class TrafficController:
             if self._cf:
                 self._pre_state_going_to_initial_position = True
                 self._cf.param.set_value('app.start', trajectory_delay)
+
+    def force_land(self):
+        if self.connection_state == self.CS_CONNECTED:
+            self._cf.param.set_value('app.stop', 1)
 
     def get_charge_level(self):
         return self.vbat
@@ -188,30 +192,26 @@ class TrafficController:
 
 
 class Tower:
-    def __init__(self):
+    def __init__(self, uris):
         self.controllers = []
-        for uri in [
-            'radio://0/10/2M/E7E7E7E701',
-            'radio://0/10/2M/E7E7E7E702',
-            'radio://0/10/2M/E7E7E7E703',
-            'radio://0/10/2M/E7E7E7E704',
-            'radio://0/10/2M/E7E7E7E705',
-            'radio://0/10/2M/E7E7E7E706',
-        ]:
+        for uri in uris:
             self.controllers.append(TrafficController(uri))
 
     def fly(self, wanted):
         while True:
             # print()
-            currently_flying = self.flying_count()
-            missing = wanted - currently_flying
-            if missing > 0:
-                print("Want", missing, "more copters")
-                self.prepare_copters(missing)
-                self.start_copters(missing, wanted)
-            time.sleep(0.5)
+            if wanted:
+                currently_flying = self.flying_count()
+                missing = wanted - currently_flying
+                if missing > 0:
+                    print("Want", missing, "more copters")
+                    self.prepare_copters(missing)
+                    self.start_copters(missing, wanted)
+            else:
+                self.land_all()
 
             self.process_controllers()
+            time.sleep(0.2)
 
     def flying_count(self):
         count = 0
@@ -317,6 +317,10 @@ class Tower:
             map(lambda s: offset + s / total_slots, unused_slots))
         return unsued_slot_times
 
+    def land_all(self):
+        for controller in self.controllers:
+            controller.force_land()
+
     def process_controllers(self):
         for controller in self.controllers:
             controller.process()
@@ -329,7 +333,22 @@ class Tower:
             controller.dump()
 
 
+count = 1
+if len(sys.argv) > 1:
+    count = int(sys.argv[1])
+
+uris = [
+    'radio://0/10/2M/E7E7E7E701',
+    'radio://0/10/2M/E7E7E7E702',
+    'radio://0/10/2M/E7E7E7E703',
+    'radio://0/10/2M/E7E7E7E704',
+    'radio://0/10/2M/E7E7E7E705',
+    'radio://0/10/2M/E7E7E7E706',
+]
+
+print('Starting tower with', count, 'Crazyflie(s)')
+
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
-tower = Tower()
-tower.fly(1)
+tower = Tower(uris)
+tower.fly(count)

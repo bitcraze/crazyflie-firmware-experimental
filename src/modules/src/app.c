@@ -14,6 +14,7 @@
 #include "ledseq.h"
 #include "log.h"
 #include "param.h"
+#include "sitaw.h"
 
 #define DEBUG_MODULE "APP"
 #include "debug.h"
@@ -77,6 +78,7 @@ enum State {
   STATE_LANDING,
   STATE_CHECK_CHARGING,
   STATE_REPOSITION_ON_PAD,
+  STATE_CRASHED,
 };
 
 static enum State state = STATE_IDLE;
@@ -158,6 +160,14 @@ void appInit() {
 static void appTimer(xTimerHandle timer) {
   uint32_t now = xTaskGetTickCount();
 
+  if(sitAwTuDetected()) {
+    state = STATE_CRASHED;
+  }
+
+  if (isBatLow()) {
+    terminateTrajectoryAndLand = true;
+  }
+
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
@@ -181,6 +191,7 @@ static void appTimer(xTimerHandle timer) {
         padZ = getZ();
         DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
 
+        terminateTrajectoryAndLand = false;
         crtpCommanderHighLevelTakeOff((double)padZ + TAKE_OFF_HEIGHT, 1.0, 0);
         state = STATE_TAKING_OFF;
       }
@@ -193,13 +204,19 @@ static void appTimer(xTimerHandle timer) {
       }
       break;
     case STATE_HOVERING:
-      if (goToInitialPositionWhenReady >= 0.0f) {
-        float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
-        timeWhenToGoToInitialPosition = now + delayMs;
-        trajectoryStartTime = now + delayMs;
-        goToInitialPositionWhenReady = -1.0f;
-        DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
-        state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+      if (terminateTrajectoryAndLand) {
+          terminateTrajectoryAndLand = false;
+          DEBUG_PRINT("Terminating hovering\n");
+          state = STATE_GOING_TO_PAD;
+      } else {
+        if (goToInitialPositionWhenReady >= 0.0f) {
+          float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
+          timeWhenToGoToInitialPosition = now + delayMs;
+          trajectoryStartTime = now + delayMs;
+          goToInitialPositionWhenReady = -1.0f;
+          DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
+          state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+        }
       }
       break;
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
@@ -222,10 +239,6 @@ static void appTimer(xTimerHandle timer) {
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (isBatLow()) {
-          terminateTrajectoryAndLand = true;
-        }
-
         if (terminateTrajectoryAndLand) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
@@ -284,6 +297,9 @@ static void appTimer(xTimerHandle timer) {
         crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, 1.5, false, 0);
         state = STATE_GOING_TO_PAD;
       }
+      break;
+    case STATE_CRASHED:
+      crtpCommanderHighLevelStop();
       break;
     default:
       break;
