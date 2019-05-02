@@ -48,18 +48,23 @@
 #include "lh_bootloader.h"
 
 #include "pulse_processor.h"
-#include "lighthouse_geometry.h"
+#include "lighthouse.h"
 
 #include "estimator.h"
+
+#ifdef LH_FLASH_DECK
+#include "lh_flasher.h"
+#endif
 
 //#ifndef DISABLE_LIGHTHOUSE_DRIVER
 //  #define DISABLE_LIGHTHOUSE_DRIVER 1
 //#endif
 
-baseStationGeometry_t baseStationsGeometry[] = {
+baseStationGeometry_t lighthouseBaseStationsGeometry[2]  = {
 {.origin = {-0.620698, 3.103737, 1.908882, }, .mat = {{0.999437, 0.003108, -0.033399, }, {0.017487, 0.801411, 0.597858, }, {0.028624, -0.598106, 0.800906, }, }},
 {.origin = {2.592734, 3.110301, -1.056473, }, .mat = {{0.051417, -0.654252, 0.754527, }, {-0.003533, 0.755402, 0.655252, }, {-0.998671, -0.036357, 0.036529, }, }},
 };
+
 
 #if DISABLE_LIGHTHOUSE_DRIVER == 0
 
@@ -160,7 +165,7 @@ static void estimatePosition(pulseProcessorResult_t angles[]) {
   // Average over all sensors with valid data
   for (size_t sensor = 0; sensor < PULSE_PROCESSOR_N_SENSORS; sensor++) {
       if (angles[sensor].validCount == 4) {
-        lighthouseGeometryGetPosition(baseStationsGeometry, (void*)angles[sensor].angles, position, &delta);
+        lighthouseGeometryGetPosition(lighthouseBaseStationsGeometry, (void*)angles[sensor].angles, position, &delta);
 
         ext_pos.x -= position[2];
         ext_pos.y -= position[0];
@@ -198,6 +203,12 @@ static void lighthouseTask(void *param)
   int axis;
 
   systemWaitStart();
+
+#ifdef LH_FLASH_DECK
+  // Flash deck bootloader using SPI (factory and recovery flashing)
+  lhflashInit();
+  lhflashFlashBootloader();
+#endif
 
   // Boot the deck firmware
   checkVersionAndBoot();
@@ -317,7 +328,7 @@ static void lighthouseInit(DeckInfo *info)
   
   xTaskCreate(lighthouseTask, "LH",
               configMINIMAL_STACK_SIZE, NULL, /*priority*/1, NULL);
-  
+
   isInit = true;
 }
 
@@ -332,6 +343,7 @@ static const DeckDriver lighthouse_deck = {
 
   .init = lighthouseInit,
 };
+
 
 DECK_DRIVER(lighthouse_deck);
 
