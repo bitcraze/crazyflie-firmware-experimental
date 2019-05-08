@@ -28,6 +28,7 @@ from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 import statistics
 import sys
+import threading
 
 
 class TrafficController:
@@ -56,6 +57,8 @@ class TrafficController:
     def __init__(self, uri):
         self.uri = uri
         self.reset_internal()
+        self.connection_thread = threading.Thread(target=self.process)
+        self.connection_thread.start()
 
     def reset_internal(self):
         self.connection_state = self.CS_DISCONNECTED
@@ -119,8 +122,12 @@ class TrafficController:
         return self.traj_cycles
 
     def process(self):
-        if self.connection_state == self.CS_DISCONNECTED and time.time() > self._time_for_next_connection_attempt:
-            self._connect()
+        while True:
+            if self.connection_state == self.CS_DISCONNECTED:
+                if time.time() > self._time_for_next_connection_attempt:
+                    self._connect()
+
+            time.sleep(1)
 
     def _connected(self, link_uri):
         self.connection_state = self.CS_CONNECTED
@@ -139,8 +146,9 @@ class TrafficController:
         print('Disconnected from %s' % link_uri)
         self._set_disconnected()
 
-    def _set_disconnected(self, hold_back_time=0):
+    def _set_disconnected(self, hold_back_time=5):
         self.reset_internal()
+        self._time_for_next_connection_attempt = time.time() + hold_back_time
 
     def _connect(self):
         if self.connection_state != self.CS_DISCONNECTED:
@@ -210,7 +218,6 @@ class Tower:
             else:
                 self.land_all()
 
-            self.process_controllers()
             time.sleep(0.2)
 
     def flying_count(self):
@@ -320,10 +327,6 @@ class Tower:
     def land_all(self):
         for controller in self.controllers:
             controller.force_land()
-
-    def process_controllers(self):
-        for controller in self.controllers:
-            controller.process()
 
     def dump_state(self):
         print()
