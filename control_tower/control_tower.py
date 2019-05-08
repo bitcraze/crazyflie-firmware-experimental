@@ -29,6 +29,7 @@ from cflib.crazyflie.log import LogConfig
 import statistics
 import sys
 import threading
+import math
 
 
 class TrafficController:
@@ -68,11 +69,15 @@ class TrafficController:
         self.vbat = -1.0
         self._time_for_next_connection_attempt = 0
         self.traj_cycles = None
+        self.est_x = 0.0
 
         # Pre states are used to prevent multiple calls to a copter
         # when waiting for the remote state to change
         self._pre_state_taking_off = False
         self._pre_state_going_to_initial_position = False
+
+    def has_found_position(self):
+        return self.copter_state > self.STATE_WAIT_FOR_POSITION_LOCK
 
     def is_taking_off(self):
         return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off
@@ -102,9 +107,12 @@ class TrafficController:
                 self._pre_state_taking_off = True
                 self._cf.param.set_value('app.takeoff', 1)
 
-    def start_trajectory(self, trajectory_delay):
+    def start_trajectory(self, trajectory_delay, offset_x=0.0, offset_y=0.0):
         if self.is_ready_for_flight():
             if self._cf:
+                self._cf.param.set_value('app.offsx', offset_x)
+                self._cf.param.set_value('app.offsy', offset_y)
+
                 self._pre_state_going_to_initial_position = True
                 self._cf.param.set_value('app.start', trajectory_delay)
 
@@ -173,6 +181,7 @@ class TrafficController:
         self._log_conf.add_variable('app.state', 'uint8_t')
         self._log_conf.add_variable('app.prgr', 'float')
         self._log_conf.add_variable('pm.vbat', 'float')
+        self._log_conf.add_variable('stateEstimate.x', 'float')
 
         self._cf.log.add_config(self._log_conf)
         self._log_conf.data_received_cb.add_callback(self._log_data)
@@ -193,17 +202,62 @@ class TrafficController:
         if self.traj_cycles <= self.NO_PROGRESS:
             self.traj_cycles = None
 
+        self.est_x = data['stateEstimate.x']
+
     def dump(self):
         print("***", self.uri)
         print("  Connection state:", self.connection_state)
         print("  Copter state:", self.copter_state)
 
 
-class Tower:
+class TowerBase:
     def __init__(self, uris):
         self.controllers = []
         for uri in uris:
             self.controllers.append(TrafficController(uri))
+
+    def flying_count(self):
+        count = 0
+        for controller in self.controllers:
+            if controller.is_flying():
+                count += 1
+        return count
+
+    def find_best_controllers(self):
+        too_low_battery = []
+
+        charging_controllers = []
+        for controller in self.controllers:
+            if controller.is_charging():
+                charge = controller.get_charge_level()
+                if controller.is_charged_for_flight():
+                    charging_controllers.append((controller, charge))
+                else:
+                    too_low_battery.append(
+                        "{} ({:.2f}V)".format(controller.uri, charge))
+
+        if len(too_low_battery) > 0:
+            print("Ready but must charge:", too_low_battery)
+
+        charging_controllers.sort(key=lambda d: d[1], reverse=True)
+
+        return list(map(lambda d: d[0], charging_controllers))
+
+    def land_all(self):
+        for controller in self.controllers:
+            controller.force_land()
+
+    def dump_state(self):
+        print()
+        print("Dumping state")
+        print()
+        for controller in self.controllers:
+            controller.dump()
+
+
+class Tower(TowerBase):
+    def __init__(self, uris):
+        TowerBase.__init__(self, uris)
 
     def fly(self, wanted):
         while True:
@@ -219,13 +273,6 @@ class Tower:
                 self.land_all()
 
             time.sleep(0.2)
-
-    def flying_count(self):
-        count = 0
-        for controller in self.controllers:
-            if controller.is_flying():
-                count += 1
-        return count
 
     def prepare_copters(self, count):
         prepared_count = 0
@@ -258,29 +305,11 @@ class Tower:
                         trajectory_delay = 0.0
                     print("Starting prepared copter", controller.uri,
                           'with a delay of', trajectory_delay)
-                    controller.start_trajectory(trajectory_delay)
+                    controller.start_trajectory(trajectory_delay, offset_x=0.1,
+                                                offset_y=0.2)
                     slot_index += 1
                 else:
                     return
-
-    def find_best_controllers(self):
-        too_low_battery = []
-
-        charging_controllers = []
-        for controller in self.controllers:
-            if controller.is_charging():
-                charge = controller.get_charge_level()
-                if controller.is_charged_for_flight():
-                    charging_controllers.append((controller, charge))
-                else:
-                    too_low_battery.append("{} ({:.2f}V)".format(controller.uri, charge))
-
-        if len(too_low_battery) > 0:
-            print("Ready but must charge:", too_low_battery)
-
-        charging_controllers.sort(key=lambda d: d[1], reverse=True)
-
-        return list(map(lambda d: d[0], charging_controllers))
 
     def find_unused_slot_times(self, total_slots):
         # Times are measured in trajectory cycles
@@ -324,21 +353,84 @@ class Tower:
             map(lambda s: offset + s / total_slots, unused_slots))
         return unsued_slot_times
 
-    def land_all(self):
-        for controller in self.controllers:
-            controller.force_land()
 
-    def dump_state(self):
-        print()
-        print("Dumping state")
-        print()
+class SyncTower(TowerBase):
+    def __init__(self, uris):
+        TowerBase.__init__(self, uris)
+        self.spacing = 0.40
+        self.line_orientation = math.radians(40)
+
+    def fly(self, wanted):
+        while True:
+            if wanted:
+                best = self.find_best_controllers()
+                ready = list(filter(lambda ctrlr: ctrlr.has_found_position(), best))
+                found_count = len(ready)
+
+                if found_count >= wanted:
+                    self.start_line(wanted, ready)
+                    print("Started, I'm done")
+                    sys.exit(0)
+                else:
+                    print('Can only find ', found_count,
+                          'copter(s) that are charged and ready')
+            else:
+                self.land_all()
+
+            time.sleep(0.2)
+
+    def start_line(self, wanted, best):
+        self.prepare_copters(wanted, best)
+
+        while not self.start_copters(wanted, best):
+            time.sleep(1)
+
+    def prepare_copters(self, count, best_controllers):
+        prepared_count = 0
         for controller in self.controllers:
-            controller.dump()
+            if controller.is_taking_off() or controller.is_ready_for_flight():
+                prepared_count += 1
+
+        missing = count - prepared_count
+        new_prepared_count = 0
+        if missing > 0:
+            print("Trying to prepare", missing, "copter(s)")
+            for best_controller in best_controllers[:missing]:
+                if best_controller:
+                    print("Preparing " + best_controller.uri)
+                    new_prepared_count += 1
+                    best_controller.take_off()
+            print("Prepared", new_prepared_count, "copter(s)")
+
+    def start_copters(self, wanted, best):
+        ready = []
+        for controller in best:
+            if controller.is_ready_for_flight():
+                ready.append(controller)
+
+        if len(ready) >= wanted:
+            index_offset = (wanted - 1) / 2.0
+
+            ready.sort(key=lambda ctrler: ctrler.est_x)
+
+            index = 0
+            for controller in ready:
+                offset_x = (index - index_offset) * self.spacing * math.cos(self.line_orientation)
+                offset_y = (index - index_offset) * self.spacing * math.sin(self.line_orientation)
+                controller.start_trajectory(0.0, offset_x=offset_x,
+                                            offset_y=offset_y)
+                index += 1
+
+            return True
+        else:
+            return False
 
 
 count = 1
 if len(sys.argv) > 1:
     count = int(sys.argv[1])
+
+synch_traj = len(sys.argv) > 2 and sys.argv[2] == 's'
 
 uris = [
     'radio://0/10/2M/E7E7E7E701',
@@ -350,8 +442,16 @@ uris = [
 ]
 
 print('Starting tower with', count, 'Crazyflie(s)')
+if synch_traj:
+    print('Flying with synchronized trajectories')
+else:
+    print('Flying with interleaved trajectories')
 
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
-tower = Tower(uris)
+if synch_traj:
+    tower = SyncTower(uris)
+else:
+    tower = Tower(uris)
+
 tower.fly(count)

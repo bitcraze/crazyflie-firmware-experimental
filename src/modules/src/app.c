@@ -58,6 +58,9 @@ static uint32_t trajectoryStartTime = 0;
 static uint32_t timeWhenToGoToInitialPosition = 0;
 static float trajectoryDurationMs = 0.0f;
 
+static float trajecory_center_offset_x = 0.0f;
+static float trajecory_center_offset_y = 0.0f;
+
 extern bool lightHouseDeckHasCalculateAPosition;
 
 #define USE_MELLINGER
@@ -222,7 +225,7 @@ static void appTimer(xTimerHandle timer) {
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
       if (now >= timeWhenToGoToInitialPosition) {
         DEBUG_PRINT("Going to initial position\n");
-        crtpCommanderHighLevelGoTo(sequence[0], sequence[8], sequence[16], sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
+        crtpCommanderHighLevelGoTo(sequence[0] + trajecory_center_offset_x, sequence[8] + trajecory_center_offset_y, sequence[16], sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       break;
@@ -231,7 +234,7 @@ static void appTimer(xTimerHandle timer) {
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
-        crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, false, false, 0);
+        crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
         state = STATE_RUNNING_TRAJECTORY;
       }
       break;
@@ -248,7 +251,7 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
         } else {
           DEBUG_PRINT("Trajectory finished, restarting...\n");
-          crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, false, false, 0);
+          crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
         }
       }
       break;
@@ -369,6 +372,8 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
   PARAM_ADD(PARAM_FLOAT, start, &goToInitialPositionWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
+  PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
+  PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
