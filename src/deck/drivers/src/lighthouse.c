@@ -61,8 +61,8 @@
 //#endif
 
 baseStationGeometry_t lighthouseBaseStationsGeometry[2]  = {
-{.origin = {-0.620698, 3.103737, 1.908882, }, .mat = {{0.999437, 0.003108, -0.033399, }, {0.017487, 0.801411, 0.597858, }, {0.028624, -0.598106, 0.800906, }, }},
-{.origin = {2.592734, 3.110301, -1.056473, }, .mat = {{0.051417, -0.654252, 0.754527, }, {-0.003533, 0.755402, 0.655252, }, {-0.998671, -0.036357, 0.036529, }, }},
+{.origin = {-0.542299, 3.152727, 1.958483, }, .mat = {{0.999975, -0.007080, -0.000000, }, {0.005645, 0.797195, 0.603696, }, {-0.004274, -0.603681, 0.797215, }, }},
+{.origin = {2.563488, 3.112367, -1.062398, }, .mat = {{0.034269, -0.647552, 0.761251, }, {-0.012392, 0.761364, 0.648206, }, {-0.999336, -0.031647, 0.018067, }, }},
 };
 
 
@@ -158,6 +158,8 @@ static void calculateStats(uint32_t nowMs) {
 static float delta;
 static vec3d position;
 static positionMeasurement_t ext_pos;
+static float deltaLog;
+
 static void estimatePosition(pulseProcessorResult_t angles[]) {
   memset(&ext_pos, 0, sizeof(ext_pos));
   int sensorsUsed = 0;
@@ -165,7 +167,9 @@ static void estimatePosition(pulseProcessorResult_t angles[]) {
   // Average over all sensors with valid data
   for (size_t sensor = 0; sensor < PULSE_PROCESSOR_N_SENSORS; sensor++) {
       if (angles[sensor].validCount == 4) {
-        lighthouseGeometryGetPosition(lighthouseBaseStationsGeometry, (void*)angles[sensor].angles, position, &delta);
+        lighthouseGeometryGetPosition(lighthouseBaseStationsGeometry, (void*)angles[sensor].correctedAngles, position, &delta);
+
+        deltaLog = delta;
 
         ext_pos.x -= position[2];
         ext_pos.y -= position[0];
@@ -246,6 +250,9 @@ static void lighthouseTask(void *param)
         frameCount++;
         if (basestation == 1 && axis == 1) {
           cycleCount++;
+
+          pulseProcessorApplyCalibration(&ppState, angles);
+
           estimatePosition(angles);
           for (size_t sensor = 0; sensor < PULSE_PROCESSOR_N_SENSORS; sensor++) {
             angles[sensor].validCount = 0;
@@ -327,7 +334,7 @@ static void lighthouseInit(DeckInfo *info)
   lhblInit(I2C1_DEV);
   
   xTaskCreate(lighthouseTask, "LH",
-              configMINIMAL_STACK_SIZE, NULL, /*priority*/1, NULL);
+              2*configMINIMAL_STACK_SIZE, NULL, /*priority*/1, NULL);
 
   isInit = true;
 }
@@ -348,14 +355,36 @@ static const DeckDriver lighthouse_deck = {
 DECK_DRIVER(lighthouse_deck);
 
 LOG_GROUP_START(lighthouse)
-LOG_ADD(LOG_FLOAT, angle0x, &angles[0].angles[0][0])
-LOG_ADD(LOG_FLOAT, angle0y, &angles[0].angles[0][1])
-LOG_ADD(LOG_FLOAT, angle1x, &angles[0].angles[1][0])
-LOG_ADD(LOG_FLOAT, angle1y, &angles[0].angles[1][1])
+LOG_ADD(LOG_FLOAT, rawAngle0x, &angles[0].angles[0][0])
+LOG_ADD(LOG_FLOAT, rawAngle0y, &angles[0].angles[0][1])
+LOG_ADD(LOG_FLOAT, rawAngle1x, &angles[0].angles[1][0])
+LOG_ADD(LOG_FLOAT, rawAngle1y, &angles[0].angles[1][1])
+LOG_ADD(LOG_FLOAT, angle0x, &angles[0].correctedAngles[0][0])
+LOG_ADD(LOG_FLOAT, angle0y, &angles[0].correctedAngles[0][1])
+LOG_ADD(LOG_FLOAT, angle1x, &angles[0].correctedAngles[1][0])
+LOG_ADD(LOG_FLOAT, angle1y, &angles[0].correctedAngles[1][1])
+
+LOG_ADD(LOG_FLOAT, angle0x_1, &angles[1].correctedAngles[0][0])
+LOG_ADD(LOG_FLOAT, angle0y_1, &angles[1].correctedAngles[0][1])
+LOG_ADD(LOG_FLOAT, angle1x_1, &angles[1].correctedAngles[1][0])
+LOG_ADD(LOG_FLOAT, angle1y_1, &angles[1].correctedAngles[1][1])
+
+LOG_ADD(LOG_FLOAT, angle0x_2, &angles[1].correctedAngles[0][0])
+LOG_ADD(LOG_FLOAT, angle0y_2, &angles[1].correctedAngles[0][1])
+LOG_ADD(LOG_FLOAT, angle1x_2, &angles[1].correctedAngles[1][0])
+LOG_ADD(LOG_FLOAT, angle1y_2, &angles[1].correctedAngles[1][1])
+
+LOG_ADD(LOG_FLOAT, angle0x_3, &angles[3].correctedAngles[0][0])
+LOG_ADD(LOG_FLOAT, angle0y_3, &angles[3].correctedAngles[0][1])
+LOG_ADD(LOG_FLOAT, angle1x_3, &angles[3].correctedAngles[1][0])
+LOG_ADD(LOG_FLOAT, angle1y_3, &angles[3].correctedAngles[1][1])
+
 LOG_ADD(LOG_FLOAT, x, &position[0])
 LOG_ADD(LOG_FLOAT, y, &position[1])
 LOG_ADD(LOG_FLOAT, z, &position[2])
 LOG_ADD(LOG_FLOAT, delta, &delta)
+
+LOG_ADD(LOG_FLOAT, delta, &deltaLog)
 
 LOG_ADD(LOG_FLOAT, serRt, &serialFrameRate)
 LOG_ADD(LOG_FLOAT, frmRt, &frameRate)
