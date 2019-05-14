@@ -64,8 +64,8 @@ static float trajecory_center_offset_y = 0.0f;
 static uint32_t now = 0;
 static uint32_t flightTime = 0;
 
-// The copters only fly one trajectory in swap mode. Used to test the tower.
-static uint8_t swapMode = 0;
+// The nr of trajectories to fly
+static uint8_t trajectoryCount = 255;
 
 extern bool lightHouseDeckHasCalculateAPosition;
 
@@ -170,6 +170,7 @@ static void appTimer(xTimerHandle timer) {
   uint32_t previous = now;
   now = xTaskGetTickCount();
   uint32_t delta = now - previous;
+  uint8_t remainingTrajectories = 0;
 
   if(sitAwTuDetected()) {
     state = STATE_CRASHED;
@@ -247,6 +248,7 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
         crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
+        remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
       }
       flightTime += delta;
@@ -254,12 +256,8 @@ static void appTimer(xTimerHandle timer) {
     case STATE_RUNNING_TRAJECTORY:
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
-      if (swapMode) {
-        terminateTrajectoryAndLand = true;
-      }
-
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (terminateTrajectoryAndLand) {
+        if (terminateTrajectoryAndLand || remainingTrajectories == 0) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
@@ -267,8 +265,11 @@ static void appTimer(xTimerHandle timer) {
           currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
-          DEBUG_PRINT("Trajectory finished, restarting...\n");
-          crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
+          if (remainingTrajectories > 0) {
+            DEBUG_PRINT("Trajectory finished, restarting...\n");
+            crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
+          }
+          remainingTrajectories--;
         }
       }
       flightTime += delta;
@@ -396,7 +397,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
-  PARAM_ADD(PARAM_UINT8, swap, &swapMode)
+  PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
