@@ -77,14 +77,6 @@ for i in range(8):
     cf.set_state("error")
     cf.set_battery(3.0+(i/10.0))
 
-# cfs[0].set_state("charging")
-# cfs[1].set_state("ready")
-# cfs[2].set_state("flying")
-# cfs[3].set_state("plop")
-# cfs[4].set_state("idle")
-# cfs[0].set_battery(5.0)
-# cfs[1].set_battery(1.0)
-
 context = zmq.Context()
 
 socket = context.socket(zmq.PULL)
@@ -102,15 +94,14 @@ def receive_thread():
 
             cfs[report['id']].set_battery(report['battery'])
             cfs[report['id']].set_state(report['state'])
-            last_updated['id'] = time.time()
+            last_updated[report['id']] = time.time()
         except zmq.error.Again:
             pass
-        
+
         for i in range(len(cfs)):
             if last_updated[i] < (time.time()-1):
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
-
 
 
 threading.Thread(target=receive_thread, daemon=True).start()
