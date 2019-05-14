@@ -4,6 +4,7 @@ from tkinter import *
 import tkinter.ttk as ttk
 import zmq
 import threading
+import time
 
 
 class Crazyflie(ttk.Frame):
@@ -42,7 +43,7 @@ class Crazyflie(ttk.Frame):
         elif state == "flying":
             self._status.config(text="Flying", fg="green")
         elif state == "hovering":
-            self._status.config(text="Hovering", fg="green")
+            self._status.config(text="Take off", fg="green")
         elif state == "landing":
             self._status.config(text="Landing", fg="green")
         else:
@@ -57,7 +58,7 @@ class Crazyflie(ttk.Frame):
 
 
 root = tkinter.Tk()
-root.title("ICRA2019 control tower")
+root.title("ICRA2019 Bitcraze Control Tower")
 
 content = ttk.Frame(root)
 content.grid(column=0, row=0)
@@ -73,30 +74,43 @@ for i in range(8):
     cf.grid(column=c, row=r)
     cfs.append(cf)
 
-    cf.set_state("charging")
+    cf.set_state("error")
     cf.set_battery(3.0+(i/10.0))
 
-cfs[0].set_state("charging")
-cfs[1].set_state("ready")
-cfs[2].set_state("flying")
-cfs[3].set_state("plop")
-cfs[4].set_state("idle")
-cfs[0].set_battery(5.0)
-cfs[1].set_battery(1.0)
+# cfs[0].set_state("charging")
+# cfs[1].set_state("ready")
+# cfs[2].set_state("flying")
+# cfs[3].set_state("plop")
+# cfs[4].set_state("idle")
+# cfs[0].set_battery(5.0)
+# cfs[1].set_battery(1.0)
 
 context = zmq.Context()
 
 socket = context.socket(zmq.PULL)
+# socket.connect("tcp://bitcrazeDemo:5555")
 socket.connect("tcp://127.0.0.1:5555")
+socket.setsockopt(zmq.RCVTIMEO, 1000)
 
 
 def receive_thread():
+    last_updated = [0]*len(cfs)
     while True:
-        report = socket.recv_json()
-        print(report)
+        try:
+            report = socket.recv_json()
+            print(report)
 
-        cfs[report['id']].set_battery(report['battery'])
-        cfs[report['id']].set_state(report['state'])
+            cfs[report['id']].set_battery(report['battery'])
+            cfs[report['id']].set_state(report['state'])
+            last_updated['id'] = time.time()
+        except zmq.error.Again:
+            pass
+        
+        for i in range(len(cfs)):
+            if last_updated[i] < (time.time()-1):
+                cfs[i].set_state("idle")
+                cfs[i].set_battery(0)
+
 
 
 threading.Thread(target=receive_thread, daemon=True).start()
