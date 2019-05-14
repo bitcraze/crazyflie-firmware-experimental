@@ -57,6 +57,7 @@ class TrafficController:
 
     def __init__(self, uri):
         self.uri = uri
+        self.stay_alive = True
         self.reset_internal()
         self.connection_thread = threading.Thread(target=self.process)
         self.connection_thread.start()
@@ -77,6 +78,9 @@ class TrafficController:
         # when waiting for the remote state to change
         self._pre_state_taking_off = False
         self._pre_state_going_to_initial_position = False
+
+    def is_connected(self):
+        return self.connection_state == self.CS_CONNECTED
 
     def has_found_position(self):
         return self.copter_state > self.STATE_WAIT_FOR_POSITION_LOCK
@@ -132,12 +136,13 @@ class TrafficController:
         return self.traj_cycles
 
     def process(self):
-        while True:
+        while self.stay_alive:
             if self.connection_state == self.CS_DISCONNECTED:
                 if time.time() > self._time_for_next_connection_attempt:
                     self._connect()
 
             time.sleep(1)
+        self._cf.close_link()
 
     def _connected(self, link_uri):
         self.connection_state = self.CS_CONNECTED
@@ -215,13 +220,29 @@ class TrafficController:
         print("***", self.uri)
         print("  Connection state:", self.connection_state)
         print("  Copter state:", self.copter_state)
+        print("  Bat:", self.vbat)
+        print("  Up time:", self.up_time_ms / 1000)
+        print("  Flight time:", self.flight_time_ms / 1000)
+        print("  _pre_state_taking_off:", self._pre_state_taking_off)
+        print("  _pre_state_going_to_initial_position:", self._pre_state_going_to_initial_position)
+
+    def terminate(self):
+        self.stay_alive = False
 
 
 class TowerBase:
     def __init__(self, uris):
         self.controllers = []
+        self._uris = uris
         for uri in uris:
             self.controllers.append(TrafficController(uri))
+
+    def connected_count(self):
+        count = 0
+        for controller in self.controllers:
+            if controller.is_connected():
+                count += 1
+        return count
 
     def flying_count(self):
         count = 0
@@ -255,11 +276,17 @@ class TowerBase:
             controller.force_land()
 
     def dump_state(self):
-        print()
+        print('Waiting for connections...')
+        end_time = time.time() + 40
+        while time.time() < end_time and self.connected_count() < len(
+                self._uris):
+            time.sleep(1)
+
         print("Dumping state")
         print()
         for controller in self.controllers:
             controller.dump()
+            controller.terminate()
 
 
 class Tower(TowerBase):
@@ -371,7 +398,8 @@ class SyncTower(TowerBase):
         while True:
             if wanted:
                 best = self.find_best_controllers()
-                ready = list(filter(lambda ctrlr: ctrlr.has_found_position(), best))
+                ready = list(
+                    filter(lambda ctrlr: ctrlr.has_found_position(), best))
                 found_count = len(ready)
 
                 if found_count >= wanted:
@@ -422,8 +450,10 @@ class SyncTower(TowerBase):
 
             index = 0
             for controller in ready:
-                offset_x = (index - index_offset) * self.spacing * math.cos(self.line_orientation)
-                offset_y = (index - index_offset) * self.spacing * math.sin(self.line_orientation)
+                offset_x = (index - index_offset) * self.spacing * math.cos(
+                    self.line_orientation)
+                offset_y = (index - index_offset) * self.spacing * math.sin(
+                    self.line_orientation)
                 controller.start_trajectory(0.0, offset_x=offset_x,
                                             offset_y=offset_y)
                 index += 1
@@ -432,12 +462,6 @@ class SyncTower(TowerBase):
         else:
             return False
 
-
-count = 1
-if len(sys.argv) > 1:
-    count = int(sys.argv[1])
-
-synch_traj = len(sys.argv) > 2 and sys.argv[2] == 's'
 
 uris = [
     'radio://0/10/2M/E7E7E7E701',
@@ -450,17 +474,30 @@ uris = [
     'radio://0/10/2M/E7E7E7E708',
 ]
 
-print('Starting tower with', count, 'Crazyflie(s)')
-if synch_traj:
-    print('Flying with synchronized trajectories')
-else:
-    print('Flying with interleaved trajectories')
+count = 1
+mode = 'normal'
+
+if len(sys.argv) > 1:
+    if sys.argv[1] == 'd':
+        mode = 'dump'
+    else:
+        count = int(sys.argv[1])
+
+if len(sys.argv) > 2:
+    if sys.argv[2] == 's':
+        mode = 'synch'
 
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
-if synch_traj:
+print('Starting tower with', count, 'Crazyflie(s)')
+if mode == 'synch':
+    print('Flying with synchronized trajectories')
     tower = SyncTower(uris)
 else:
+    print('Flying with interleaved trajectories')
     tower = Tower(uris)
 
-tower.fly(count)
+if not mode == 'dump':
+    tower.fly(count)
+else:
+    tower.dump_state()
