@@ -66,6 +66,7 @@ static uint32_t flightTime = 0;
 
 // The nr of trajectories to fly
 static uint8_t trajectoryCount = 255;
+static uint8_t remainingTrajectories = 0;
 
 extern bool lightHouseDeckHasCalculateAPosition;
 
@@ -170,7 +171,6 @@ static void appTimer(xTimerHandle timer) {
   uint32_t previous = now;
   now = xTaskGetTickCount();
   uint32_t delta = now - previous;
-  uint8_t remainingTrajectories = 0;
 
   if(sitAwTuDetected()) {
     state = STATE_CRASHED;
@@ -257,7 +257,7 @@ static void appTimer(xTimerHandle timer) {
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (terminateTrajectoryAndLand || remainingTrajectories == 0) {
+        if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
