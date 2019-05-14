@@ -61,6 +61,9 @@ static float trajectoryDurationMs = 0.0f;
 static float trajecory_center_offset_x = 0.0f;
 static float trajecory_center_offset_y = 0.0f;
 
+static uint32_t now = 0;
+static uint32_t flightTime = 0;
+
 extern bool lightHouseDeckHasCalculateAPosition;
 
 #define USE_MELLINGER
@@ -161,7 +164,9 @@ void appInit() {
 }
 
 static void appTimer(xTimerHandle timer) {
-  uint32_t now = xTaskGetTickCount();
+  uint32_t previous = now;
+  now = xTaskGetTickCount();
+  uint32_t delta = now - previous;
 
   if(sitAwTuDetected()) {
     state = STATE_CRASHED;
@@ -204,7 +209,9 @@ static void appTimer(xTimerHandle timer) {
         DEBUG_PRINT("Hovering, waiting for command to start\n");
         ledseqStop(LED_LOCK, seq_lps_lock);
         state = STATE_HOVERING;
+
       }
+      flightTime += delta;
       break;
     case STATE_HOVERING:
       if (terminateTrajectoryAndLand) {
@@ -221,6 +228,7 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
         }
       }
+      flightTime += delta;
       break;
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
       if (now >= timeWhenToGoToInitialPosition) {
@@ -228,6 +236,7 @@ static void appTimer(xTimerHandle timer) {
         crtpCommanderHighLevelGoTo(sequence[0] + trajecory_center_offset_x, sequence[8] + trajecory_center_offset_y, sequence[16], sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
+      flightTime += delta;
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
@@ -237,6 +246,7 @@ static void appTimer(xTimerHandle timer) {
         crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
         state = STATE_RUNNING_TRAJECTORY;
       }
+      flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
@@ -254,6 +264,7 @@ static void appTimer(xTimerHandle timer) {
           crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false, 0);
         }
       }
+      flightTime += delta;
       break;
     case STATE_GOING_TO_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
@@ -261,6 +272,7 @@ static void appTimer(xTimerHandle timer) {
         stabilizeEndTime = now + 5000;
         state = STATE_WAITING_AT_PAD;
       }
+      flightTime += delta;
       break;
     case STATE_WAITING_AT_PAD:
       if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
@@ -272,6 +284,7 @@ static void appTimer(xTimerHandle timer) {
         crtpCommanderHighLevelLand(0.02, 1.0, 0);
         state = STATE_LANDING;
       }
+      flightTime += delta;
       break;
     case STATE_LANDING:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
@@ -280,6 +293,7 @@ static void appTimer(xTimerHandle timer) {
         landingTimeCheckCharge = now + 3000;
         state = STATE_CHECK_CHARGING;
       }
+      flightTime += delta;
       break;
     case STATE_CHECK_CHARGING:
       if (now > landingTimeCheckCharge) {
@@ -300,6 +314,7 @@ static void appTimer(xTimerHandle timer) {
         crtpCommanderHighLevelGoTo(padX, padY, (double)padZ + LANDING_HEIGHT, 0.0, 1.5, false, 0);
         state = STATE_GOING_TO_PAD;
       }
+      flightTime += delta;
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
@@ -374,6 +389,8 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
+  PARAM_ADD(PARAM_UINT32, uptime, &now)
+  PARAM_ADD(PARAM_UINT32, flighttime, &flightTime)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)

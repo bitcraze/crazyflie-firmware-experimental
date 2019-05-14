@@ -70,6 +70,8 @@ class TrafficController:
         self._time_for_next_connection_attempt = 0
         self.traj_cycles = None
         self.est_x = 0.0
+        self.up_time_ms = 0
+        self.flight_time_ms = 0
 
         # Pre states are used to prevent multiple calls to a copter
         # when waiting for the remote state to change
@@ -180,6 +182,8 @@ class TrafficController:
         self._log_conf = LogConfig(name='Tower', period_in_ms=100)
         self._log_conf.add_variable('app.state', 'uint8_t')
         self._log_conf.add_variable('app.prgr', 'float')
+        self._log_conf.add_variable('app.uptime', 'uint32_t')
+        self._log_conf.add_variable('app.flighttime', 'uint32_t')
         self._log_conf.add_variable('pm.vbat', 'float')
         self._log_conf.add_variable('stateEstimate.x', 'float')
 
@@ -197,6 +201,9 @@ class TrafficController:
             self._pre_state_going_to_initial_position = False
 
         self.vbat = data['pm.vbat']
+
+        self.up_time_ms = data['app.uptime']
+        self.flight_time_ms = data['app.flighttime']
 
         self.traj_cycles = data['app.prgr']
         if self.traj_cycles <= self.NO_PROGRESS:
