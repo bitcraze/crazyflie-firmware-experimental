@@ -446,6 +446,8 @@ uris = [
     'radio://0/10/2M/E7E7E7E704',
     'radio://0/10/2M/E7E7E7E705',
     'radio://0/10/2M/E7E7E7E706',
+    'radio://0/10/2M/E7E7E7E707',
+    'radio://0/10/2M/E7E7E7E708',
 ]
 
 print('Starting tower with', count, 'Crazyflie(s)')
