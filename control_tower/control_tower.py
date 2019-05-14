@@ -31,6 +31,7 @@ import sys
 import threading
 import math
 
+import zmq
 
 class TrafficController:
     CS_DISCONNECTED = 0
@@ -231,11 +232,12 @@ class TrafficController:
 
 
 class TowerBase:
-    def __init__(self, uris):
+    def __init__(self, uris, report_socket=None):
         self.controllers = []
         self._uris = uris
         for uri in uris:
             self.controllers.append(TrafficController(uri))
+        self.report_socket = report_socket
 
     def connected_count(self):
         count = 0
@@ -288,12 +290,42 @@ class TowerBase:
             controller.dump()
             controller.terminate()
 
+    def send_report(self):
+        if self.report_socket is None:
+            return
+
+        for i, controller in enumerate(self.controllers):
+            state = "idle"
+            if controller.is_flying():
+                state = "flying"
+            elif controller.is_taking_off():
+                state = "hovering"
+            elif controller.is_landing():
+                state = "landing"
+            elif controller.is_charged_for_flight():
+                state = "ready"
+            elif controller.is_charging():
+                state = "charging"
+
+            try:
+                report = {
+                    'id': i,
+                    'state': state,
+                    'battery': controller.get_charge_level()
+                }
+                self.report_socket.send_json(report, zmq.NOBLOCK)
+            except Exception:
+                pass
+
 
 class Tower(TowerBase):
-    def __init__(self, uris):
-        TowerBase.__init__(self, uris)
+    def __init__(self, uris, report_socket=None):
+        TowerBase.__init__(self, uris, report_socket)
 
     def fly(self, wanted):
+         # Wait for all CF to connect (to avoid race)
+        time.sleep(10)
+
         while True:
             # print()
             if wanted:
@@ -305,6 +337,8 @@ class Tower(TowerBase):
                     self.start_copters(missing, wanted)
             else:
                 self.land_all()
+
+            self.send_report()
 
             time.sleep(0.2)
 
@@ -389,8 +423,8 @@ class Tower(TowerBase):
 
 
 class SyncTower(TowerBase):
-    def __init__(self, uris):
-        TowerBase.__init__(self, uris)
+    def __init__(self, uris, report_socket=None):
+        TowerBase.__init__(self, uris, report_socket)
         self.spacing = 0.40
         self.line_orientation = math.radians(40)
 
@@ -411,6 +445,8 @@ class SyncTower(TowerBase):
                           'copter(s) that are charged and ready')
             else:
                 self.land_all()
+
+            self.send_report()
 
             time.sleep(0.2)
 
@@ -487,15 +523,19 @@ if len(sys.argv) > 2:
     if sys.argv[2] == 's':
         mode = 'synch'
 
+context = zmq.Context()
+socket = context.socket(zmq.PUSH)
+socket.bind("tcp://*:5555")
+
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
 print('Starting tower with', count, 'Crazyflie(s)')
 if mode == 'synch':
     print('Flying with synchronized trajectories')
-    tower = SyncTower(uris)
+    tower = SyncTower(uris, socket)
 else:
     print('Flying with interleaved trajectories')
-    tower = Tower(uris)
+    tower = Tower(uris, socket)
 
 if not mode == 'dump':
     tower.fly(count)
