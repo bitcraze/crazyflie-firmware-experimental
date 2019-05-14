@@ -127,6 +127,13 @@ class TrafficController:
         if self.connection_state == self.CS_CONNECTED:
             self._cf.param.set_value('app.stop', 1)
 
+    def set_swap_mode(self, on):
+        if self.connection_state == self.CS_CONNECTED:
+            value = 0
+            if on:
+                value = 1
+            self._cf.param.set_value('app.swap', value)
+
     def get_charge_level(self):
         return self.vbat
 
@@ -148,6 +155,9 @@ class TrafficController:
     def _connected(self, link_uri):
         self.connection_state = self.CS_CONNECTED
         print('Connected to %s' % link_uri)
+
+        # Turn on swap mode to force the copters to land after one trajectory
+        # self.set_swap_mode(True)
 
         self._setup_logging()
 
