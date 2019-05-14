@@ -64,6 +64,9 @@ static float trajecory_center_offset_y = 0.0f;
 static uint32_t now = 0;
 static uint32_t flightTime = 0;
 
+// The copters only fly one trajectory in swap mode. Used to test the tower.
+static uint8_t swapMode = 0;
+
 extern bool lightHouseDeckHasCalculateAPosition;
 
 #define USE_MELLINGER
@@ -251,6 +254,10 @@ static void appTimer(xTimerHandle timer) {
     case STATE_RUNNING_TRAJECTORY:
       currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
+      if (swapMode) {
+        terminateTrajectoryAndLand = true;
+      }
+
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (terminateTrajectoryAndLand) {
           terminateTrajectoryAndLand = false;
@@ -389,6 +396,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
+  PARAM_ADD(PARAM_UINT8, swap, &swapMode)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
