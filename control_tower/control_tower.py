@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #
 #     ||          ____  _ __
@@ -316,7 +317,9 @@ class TowerBase:
                 report = {
                     'id': i,
                     'state': state,
-                    'battery': controller.get_charge_level()
+                    'battery': controller.get_charge_level(),
+                    'uptime': controller.up_time_ms,
+                    'flighttime': controller.flight_time_ms,
                 }
                 self.report_socket.send_json(report, zmq.NOBLOCK)
             except Exception:
