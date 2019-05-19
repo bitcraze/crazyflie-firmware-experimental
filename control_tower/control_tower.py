@@ -115,11 +115,12 @@ class TrafficController:
                 self._pre_state_taking_off = True
                 self._cf.param.set_value('app.takeoff', 1)
 
-    def start_trajectory(self, trajectory_delay, offset_x=0.0, offset_y=0.0):
+    def start_trajectory(self, trajectory_delay, offset_x=0.0, offset_y=0.0, offset_z=0.0):
         if self.is_ready_for_flight():
             if self._cf:
                 self._cf.param.set_value('app.offsx', offset_x)
                 self._cf.param.set_value('app.offsy', offset_y)
+                self._cf.param.set_value('app.offsz', offset_z)
 
                 self._pre_state_going_to_initial_position = True
                 self._cf.param.set_value('app.start', trajectory_delay)
@@ -381,8 +382,7 @@ class Tower(TowerBase):
                         trajectory_delay = 0.0
                     print("Starting prepared copter", controller.uri,
                           'with a delay of', trajectory_delay)
-                    controller.start_trajectory(trajectory_delay, offset_x=0.1,
-                                                offset_y=0.2)
+                    controller.start_trajectory(trajectory_delay, offset_z=0.35)
                     slot_index += 1
                 else:
                     return

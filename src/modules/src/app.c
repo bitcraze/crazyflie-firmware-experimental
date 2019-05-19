@@ -60,6 +60,7 @@ static float trajectoryDurationMs = 0.0f;
 
 static float trajecory_center_offset_x = 0.0f;
 static float trajecory_center_offset_y = 0.0f;
+static float trajecory_center_offset_z = 0.0f;
 
 static uint32_t now = 0;
 static uint32_t flightTime = 0;
@@ -71,6 +72,8 @@ static uint8_t remainingTrajectories = 0;
 extern bool lightHouseDeckHasCalculateAPosition;
 
 #define USE_MELLINGER
+
+#define TRAJ_Y_OFFSET 0.35
 
 enum State {
   // Initialization
@@ -237,7 +240,7 @@ static void appTimer(xTimerHandle timer) {
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
       if (now >= timeWhenToGoToInitialPosition) {
         DEBUG_PRINT("Going to initial position\n");
-        crtpCommanderHighLevelGoTo(sequence[0] + trajecory_center_offset_x, sequence[8] + trajecory_center_offset_y, sequence[16], sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
+        crtpCommanderHighLevelGoTo(sequence[0] + trajecory_center_offset_x, sequence[8] + trajecory_center_offset_y, sequence[16] + trajecory_center_offset_z, sequence[24], DURATION_TO_INITIAL_POSITION, false, 0);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       flightTime += delta;
@@ -397,6 +400,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
+  PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
   PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
 PARAM_GROUP_STOP(app)
 
