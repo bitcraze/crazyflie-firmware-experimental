@@ -289,7 +289,7 @@ static void appTimer(xTimerHandle timer) {
         }
 
         DEBUG_PRINT("Landing...\n");
-        crtpCommanderHighLevelLand(0.02, 1.0, 0);
+        crtpCommanderHighLevelLand((double)padZ, 1.0, 0);
         state = STATE_LANDING;
       }
       flightTime += delta;
