@@ -32,6 +32,23 @@ class Crazyflie(ttk.Frame):
         self._battery_bar = ttk.Progressbar(self._battery_frame, orient=HORIZONTAL)
         self._battery_bar['value'] = 50
         self._battery_bar.grid(row=0, column=1, sticky="ew")
+
+        self._time_frame = ttk.Frame(self)
+        self._time_frame.grid(row=4, column=0)
+
+        up_time = Label(self._time_frame, text="Up time: ", fg="grey", font=("ubuntu", 20))
+        up_time.grid(row=0, column=0)
+
+        self._up_time_label = Label(self._time_frame, text="0:00:00", font=("ubuntu", 20))
+        self._up_time_label.grid(row=0, column=1)
+
+        flight_time = Label(self._time_frame, text="Flight time: ", fg="grey", font=("ubuntu", 20))
+        flight_time.grid(row=1, column=0)
+
+        self._flight_time_label = Label(self._time_frame, text="0:00:00", font=("ubuntu", 20))
+        self._flight_time_label.grid(row=1, column=1)
+
+
     
     def set_state(self, state):
         if state == "idle":
@@ -55,6 +72,26 @@ class Crazyflie(ttk.Frame):
         percent = (voltage - 3.0)*100.0/1.1
 
         self._battery_bar['value'] = percent
+    
+    def set_uptime(self, ms):
+        seconds = int(ms/1000) % 60
+        minutes = int((ms/1000)/60) % 60
+        hours = int((ms/1000)/3600)
+        self._up_time_label['text'] = "{}:{:02}:{:02}".format(hours, minutes, seconds)
+        if ms == 0:
+            self._up_time_label['fg'] = "grey"
+        else:
+            self._up_time_label['fg'] = "black"
+    
+    def set_flighttime(self, ms):
+        seconds = int(ms/1000) % 60
+        minutes = int((ms/1000)/60) % 60
+        hours = int((ms/1000)/3600)
+        self._flight_time_label['text'] = "{}:{:02}:{:02}".format(hours, minutes, seconds)
+        if ms == 0:
+            self._flight_time_label['fg'] = "grey"
+        else:
+            self._flight_time_label['fg'] = "black"
 
 
 root = tkinter.Tk()
@@ -94,6 +131,8 @@ def receive_thread():
 
             cfs[report['id']].set_battery(report['battery'])
             cfs[report['id']].set_state(report['state'])
+            cfs[report['id']].set_uptime(report['uptime'])
+            cfs[report['id']].set_flighttime(report['flighttime'])
             last_updated[report['id']] = time.time()
         except zmq.error.Again:
             pass
@@ -102,7 +141,12 @@ def receive_thread():
             if last_updated[i] < (time.time()-1):
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
+                cfs[i].set_uptime(0)
+                cfs[i].set_flighttime(0)
 
+
+cfs[0].set_uptime(300000)
+cfs[0].set_flighttime(140000)
 
 threading.Thread(target=receive_thread, daemon=True).start()
 
