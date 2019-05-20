@@ -57,6 +57,8 @@ class TrafficController:
 
     NO_PROGRESS = -1000.0
 
+    PRE_STATE_TIMEOUT = 3
+
     def __init__(self, uri):
         self.uri = uri
         self.stay_alive = True
@@ -78,8 +80,14 @@ class TrafficController:
 
         # Pre states are used to prevent multiple calls to a copter
         # when waiting for the remote state to change
-        self._pre_state_taking_off = False
-        self._pre_state_going_to_initial_position = False
+        self._pre_state_taking_off_end_time = 0
+        self._pre_state_going_to_initial_position_end_time = 0
+
+    def _pre_state_taking_off(self):
+        return self._pre_state_taking_off_end_time > time.time()
+
+    def _pre_state_going_to_initial_position(self):
+        return self._pre_state_going_to_initial_position_end_time > time.time()
 
     def is_connected(self):
         return self.connection_state == self.CS_CONNECTED
@@ -88,16 +96,16 @@ class TrafficController:
         return self.copter_state > self.STATE_WAIT_FOR_POSITION_LOCK
 
     def is_taking_off(self):
-        return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off
+        return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off()
 
     def is_ready_for_flight(self):
-        return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position
+        return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position()
 
     def is_flying(self):
         return self.copter_state == self.STATE_RUNNING_TRAJECTORY or \
                self.copter_state == self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION or \
                self.copter_state == self.STATE_GOING_TO_INITIAL_POSITION or \
-               self._pre_state_going_to_initial_position
+               self._pre_state_going_to_initial_position()
 
     def is_landing(self):
         return self.copter_state == self.STATE_GOING_TO_PAD or \
@@ -107,12 +115,12 @@ class TrafficController:
                self.copter_state == self.STATE_REPOSITION_ON_PAD
 
     def is_charging(self):
-        return self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and not self._pre_state_taking_off
+        return self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and not self._pre_state_taking_off()
 
     def take_off(self):
         if self.is_charging():
             if self._cf:
-                self._pre_state_taking_off = True
+                self._pre_state_taking_off_end_time = time.time() + self.PRE_STATE_TIMEOUT
                 self._cf.param.set_value('app.takeoff', 1)
 
     def start_trajectory(self, trajectory_delay, offset_x=0.0, offset_y=0.0, offset_z=0.0):
@@ -122,7 +130,7 @@ class TrafficController:
                 self._cf.param.set_value('app.offsy', offset_y)
                 self._cf.param.set_value('app.offsz', offset_z)
 
-                self._pre_state_going_to_initial_position = True
+                self._pre_state_going_to_initial_position_end_time = time.time() + self.PRE_STATE_TIMEOUT
                 self._cf.param.set_value('app.start', trajectory_delay)
 
     def force_land(self):
@@ -208,10 +216,10 @@ class TrafficController:
         self.copter_state = data['app.state']
 
         if self.copter_state != self.STATE_WAIT_FOR_TAKE_OFF:
-            self._pre_state_taking_off = False
+            self._pre_state_taking_off_end_time = 0
 
         if self.copter_state != self.STATE_HOVERING:
-            self._pre_state_going_to_initial_position = False
+            self._pre_state_going_to_initial_position_end_time = 0
 
         self.vbat = data['pm.vbat']
 
@@ -231,8 +239,8 @@ class TrafficController:
         print("  Bat:", self.vbat)
         print("  Up time:", self.up_time_ms / 1000)
         print("  Flight time:", self.flight_time_ms / 1000)
-        print("  _pre_state_taking_off:", self._pre_state_taking_off)
-        print("  _pre_state_going_to_initial_position:", self._pre_state_going_to_initial_position)
+        print("  _pre_state_taking_off:", self._pre_state_taking_off())
+        print("  _pre_state_going_to_initial_position:", self._pre_state_going_to_initial_position())
 
     def terminate(self):
         self.stay_alive = False
