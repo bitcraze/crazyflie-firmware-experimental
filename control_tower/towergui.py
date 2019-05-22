@@ -53,6 +53,10 @@ class Crazyflie(ttk.Frame):
     def set_state(self, state):
         if state == "idle":
             self._status.config(text="IDLE", fg="grey")
+        elif state == "disconnected":
+            self._status.config(text="Offline", fg="grey")
+        elif state == "crashed":
+            self._status.config(text="Crashed", fg="purple")
         elif state == "charging":
             self._status.config(text="Charging", fg="red")
         elif state == "ready":
@@ -65,6 +69,7 @@ class Crazyflie(ttk.Frame):
             self._status.config(text="Landing", fg="green")
         else:
             self._status.config(text="ERROR", fg="purple")
+            print("Error, state", state, "not handled")
 
     def set_battery(self, voltage):
         self._battery_voltage['text'] = "{:.1f}V".format(voltage)

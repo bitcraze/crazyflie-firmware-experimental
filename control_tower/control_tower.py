@@ -117,6 +117,9 @@ class TrafficController:
     def is_charging(self):
         return self.copter_state == self.STATE_WAIT_FOR_TAKE_OFF and not self._pre_state_taking_off()
 
+    def is_crashed(self):
+        return self.copter_state == self.STATE_CRASHED
+
     def take_off(self):
         if self.is_charging():
             if self._cf:
@@ -311,7 +314,11 @@ class TowerBase:
 
         for i, controller in enumerate(self.controllers):
             state = "idle"
-            if controller.is_flying():
+            if not controller.is_connected():
+                state = "disconnected"
+            elif controller.is_crashed():
+                state = "crashed"
+            elif controller.is_flying():
                 state = "flying"
             elif controller.is_taking_off():
                 state = "hovering"
