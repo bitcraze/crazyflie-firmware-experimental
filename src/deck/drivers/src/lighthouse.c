@@ -57,9 +57,9 @@
 #include "lh_flasher.h"
 #endif
 
-#ifndef DISABLE_LIGHTHOUSE_DRIVER
-  #define DISABLE_LIGHTHOUSE_DRIVER 1
-#endif
+//#ifndef DISABLE_LIGHTHOUSE_DRIVER
+//  #define DISABLE_LIGHTHOUSE_DRIVER 1
+//#endif
 
 baseStationGeometry_t lighthouseBaseStationsGeometry[2]  = {
 {.origin = {-0.542299, 3.152727, 1.958483, }, .mat = {{0.999975, -0.007080, -0.000000, }, {0.005645, 0.797195, 0.603696, }, {-0.004274, -0.603681, 0.797215, }, }},
@@ -119,6 +119,8 @@ static float frameRate = 0.0;
 static float cycleRate = 0.0;
 static float positionRate = 0.0;
 
+bool lightHouseDeckHasCalculateAPosition = false;
+
 static uint16_t pulseWidth[PULSE_PROCESSOR_N_SENSORS];
 
 static uint32_t latestStatsTimeMs = 0;
@@ -162,6 +164,7 @@ static void calculateStats(uint32_t nowMs) {
   resetStats();
 }
 
+static float delta;
 static vec3d position;
 static positionMeasurement_t ext_pos;
 static float deltaLog;
@@ -169,7 +172,6 @@ static float deltaLog;
 static void estimatePosition(pulseProcessorResult_t angles[]) {
   memset(&ext_pos, 0, sizeof(ext_pos));
   int sensorsUsed = 0;
-  float delta;
 
   // Average over all sensors with valid data
   for (size_t sensor = 0; sensor < PULSE_PROCESSOR_N_SENSORS; sensor++) {
@@ -195,6 +197,9 @@ static void estimatePosition(pulseProcessorResult_t angles[]) {
   if (!isfinite(ext_pos.pos[0]) || !isfinite(ext_pos.pos[1]) || !isfinite(ext_pos.pos[2])) {
     return;
   }
+
+  lightHouseDeckHasCalculateAPosition = true;
+
   ext_pos.stdDev = 0.01;
   estimatorEnqueuePosition(&ext_pos);
 }
@@ -386,6 +391,7 @@ LOG_ADD(LOG_FLOAT, angle1y_3, &angles[3].correctedAngles[1][1])
 LOG_ADD(LOG_FLOAT, x, &position[0])
 LOG_ADD(LOG_FLOAT, y, &position[1])
 LOG_ADD(LOG_FLOAT, z, &position[2])
+LOG_ADD(LOG_FLOAT, delta, &delta)
 
 LOG_ADD(LOG_FLOAT, delta, &deltaLog)
 

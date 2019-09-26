@@ -150,7 +150,7 @@ static inline bool stateEstimatorHasHeightPacket(heightMeasurement_t *height) {
  * Constants used in the estimator
  */
 
-#define CRAZYFLIE_WEIGHT_grams (27.0f)
+#define CRAZYFLIE_WEIGHT_grams (36.0f)
 
 //thrust is thrust mapped for 65536 <==> 60 GRAMS!
 #define CONTROL_TO_ACC (GRAVITY_MAGNITUDE*60.0f/CRAZYFLIE_WEIGHT_grams/65536.0f)
@@ -539,6 +539,14 @@ void estimatorKalmanGetEstimatedPos(point_t* pos) {
   pos->y = coreData.S[KC_STATE_Y];
   pos->z = coreData.S[KC_STATE_Z];
 }
+
+
+float getX() { return coreData.S[KC_STATE_X]; }
+float getY() { return coreData.S[KC_STATE_Y]; }
+float getZ() { return coreData.S[KC_STATE_Z]; }
+float getVarPX() { return coreData.P[KC_STATE_PX][KC_STATE_PX]; }
+float getVarPY() { return coreData.P[KC_STATE_PY][KC_STATE_PY]; }
+float getVarPZ() { return coreData.P[KC_STATE_PZ][KC_STATE_PZ]; }
 
 // Temporary development groups
 LOG_GROUP_START(kalman_states)

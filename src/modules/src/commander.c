@@ -45,6 +45,10 @@ static bool enableHighLevel = false;
 QueueHandle_t setpointQueue;
 QueueHandle_t priorityQueue;
 
+void commanderEnableHighLevel(bool enabled) {
+  enableHighLevel = enabled;
+}
+
 /* Public functions */
 void commanderInit(void)
 {
@@ -82,14 +86,14 @@ void commanderGetSetpoint(setpoint_t *setpoint, const state_t *state)
   lastUpdate = setpoint->timestamp;
   uint32_t currentTime = xTaskGetTickCount();
 
-  if ((currentTime - setpoint->timestamp) > COMMANDER_WDT_TIMEOUT_SHUTDOWN) {
+  if ((currentTime - lastUpdate) > COMMANDER_WDT_TIMEOUT_SHUTDOWN) {
     if (enableHighLevel) {
       crtpCommanderHighLevelGetSetpoint(setpoint, state);
     }
     if (!enableHighLevel || crtpCommanderHighLevelIsStopped()) {
       memcpy(setpoint, &nullSetpoint, sizeof(nullSetpoint));
     }
-  } else if ((currentTime - setpoint->timestamp) > COMMANDER_WDT_TIMEOUT_STABILIZE) {
+  } else if ((currentTime - lastUpdate) > COMMANDER_WDT_TIMEOUT_STABILIZE) {
     xQueueOverwrite(priorityQueue, &priorityDisable);
     // Leveling ...
     setpoint->mode.x = modeDisable;

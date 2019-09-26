@@ -75,4 +75,13 @@ bool estimatorKalmanEnqueueFlow(const flowMeasurement_t *flow);
 
 void estimatorKalmanGetEstimatedPos(point_t* pos);
 
+float getX();
+float getY();
+float getZ();
+
+float getVarPX();
+float getVarPY();
+float getVarPZ();
+
+
 #endif // __ESTIMATOR_KALMAN_H__

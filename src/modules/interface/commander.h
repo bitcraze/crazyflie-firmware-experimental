@@ -47,5 +47,6 @@ void commanderSetSetpoint(setpoint_t *setpoint, int priority);
 int commanderGetActivePriority(void);
 
 void commanderGetSetpoint(setpoint_t *setpoint, const state_t *state);
+void commanderEnableHighLevel(bool enabled);
 
 #endif /* COMMANDER_H_ */

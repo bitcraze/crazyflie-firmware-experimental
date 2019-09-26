@@ -30,6 +30,7 @@
 #include <stdint.h>
 
 #include "estimator.h"
+#include "controller.h"
 
 #define EMERGENCY_STOP_TIMEOUT_DISABLED (-1)
 
@@ -64,5 +65,6 @@ void stabilizerResetEmergencyStop();
  */
 void stabilizerSetEmergencyStopTimeout(int timeout);
 
+void setControllerType(ControllerType newType);
 
 #endif /* STABILIZER_H_ */

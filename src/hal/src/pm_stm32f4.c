@@ -275,6 +275,14 @@ bool pmIsDischarging(void) {
     return (pmState == lowPower )|| (pmState == battery);
 }
 
+bool isBatLow() {
+  return pmState == lowPower;
+}
+
+bool isCharging() {
+  return pmState == charging;
+}
+
 void pmTask(void *param)
 {
   PMStates pmStateOld = battery;
@@ -287,7 +295,7 @@ void pmTask(void *param)
   batteryCriticalLowTimeStamp = tickCount;
 
   pmSetChargeState(charge500mA);
-  systemWaitStart();
+  vTaskDelay(500);
 
   while(1)
   {

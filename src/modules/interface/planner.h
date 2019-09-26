@@ -82,3 +82,5 @@ int plan_go_to(struct planner *p, bool relative, struct vec hover_pos, float hov
 
 // start trajectory
 int plan_start_trajectory(struct planner *p, const struct piecewise_traj* trajectory, bool reversed);
+
+bool plan_is_finished(struct planner *p, float t);
