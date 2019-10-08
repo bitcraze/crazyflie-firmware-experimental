@@ -26,6 +26,15 @@
 #  MA  02110-1301, USA.
 """
 Records and playback
+
+This script records a trajectory and plays it back.
+To use it:
+ - Set CRAZYFLIE_URI
+ - Launch the script, it will print "WAITING"
+ - Take the Crazyflie and **move it straight up**, when you mode it 30cm up
+   the trajectory recording is starting
+ - Move the Crazyflie around and place it back at its initial position
+ - After 2 seconds, the Crazyflie takes-off, replay the trajectory and lands
 """
 import logging
 import time
