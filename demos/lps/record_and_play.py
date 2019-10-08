@@ -25,7 +25,7 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA  02110-1301, USA.
 """
-Records and playback 
+Records and playback
 """
 import logging
 import time
@@ -38,7 +38,7 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
 from cflib.positioning.position_hl_commander import PositionHlCommander
 
-CRAZYFLIE_URI = "radio://0/46/2M"
+CRAZYFLIE_URI = "radio://0/30/2M"
 
 # Configuration constants
 START_THRESHOLD = 0.3
@@ -75,7 +75,7 @@ class RecordAndPlay():
 
         # Playback step
         self._current_step = 0
-    
+
     def run(self):
         lg_stab = LogConfig(name='stateEstimate', period_in_ms=RECORDING_TICK_PERIOD_MS)
         lg_stab.add_variable('stateEstimate.x', 'float')
@@ -98,13 +98,13 @@ class RecordAndPlay():
                         self.record(position)
                     elif self._current_state == PLAYING:
                         self.playback(cf)
-                        
-                    
+
+
                     # Update state for next time
                     self._current_state = self.get_next_state(position[0],
                                                               position[1],
                                                               position[2])
-    
+
     # Calculate next step in the state machine
     # This function is responsible for the script sequencing
     def get_next_state(self, x, y, z):
@@ -125,7 +125,7 @@ class RecordAndPlay():
                     state = PLAYING
             else:
                 self._stop_recording_timer = 0
-        
+
         return state
 
     # Recorder
@@ -140,13 +140,13 @@ class RecordAndPlay():
             self._current_step += 1
         else:
             cf.commander.send_stop_setpoint()
-                            
+
 
 if __name__ == '__main__':
     # Initialize the low-level drivers (don't list the debug drivers)
     cflib.crtp.init_drivers(enable_debug_driver=False)
-    
+
     rap = RecordAndPlay(CRAZYFLIE_URI)
     rap.run()
-                    
-                    
+
+
