@@ -49,7 +49,7 @@ for i in range(openvr.k_unMaxTrackedDeviceCount):
     if poses[i].bPoseIsValid:
         device_class = vr.getTrackedDeviceClass(i)
         if (device_class == openvr.TrackedDeviceClass_TrackingReference):
-            
+
             mode = vr.getStringTrackedDeviceProperty(i, openvr.Prop_ModeLabel_String)
             try:
                 mode = mode.decode("utf-8")
@@ -79,15 +79,41 @@ for pose in bs_poses:
     print("{.origin = {", end='')
     for i in position:
         print("{:0.6f}, ".format(i), end='')
-    
+
     print("}, .mat = {", end='')
-    
+
     for i in rotation:
         print("{", end='')
         for j in i:
             print("{:0.6f}, ".format(j), end='')
         print("}, ", end='')
-    
+
     print("}},")
+
+
+print()
+print("Python")
+print()
+
+for pose in bs_poses:
+    if pose is None:
+        continue
+
+    position = [pose[0][3] - offset[0], pose[1][3] - offset[1], pose[2][3] - offset[2]]
+    rotation = [pose[0][:3], pose[1][:3], pose[2][:3]]
+
+    print("[[", end='')
+    for i in position:
+        print("{:0.6f}, ".format(i), end='')
+
+    print("], [", end='')
+
+    for i in rotation:
+        print("[", end='')
+        for j in i:
+            print("{:0.6f}, ".format(j), end='')
+        print("], ", end='')
+
+    print("]],")
 
 openvr.shutdown()

@@ -273,6 +273,37 @@ class Communicator:
         self._cf.open_link(self.uri)
         self.is_connected = True
 
+        # self.set_static_geo_data()
+
+    def set_static_geo_data(self):
+        # Rotation angle in degrees
+        angle = math.radians(-45 + 180.0)
+
+        raw = [
+            [[0.021855, 2.318295, 1.666880, ], [[0.999998, -0.001797, 0.000000, ], [0.001451, 0.807746, 0.589529, ], [-0.001059, -0.589528, 0.807747, ], ]],
+            [[-0.176309, 2.290894, -1.768068, ], [[-0.995269, 0.091770, -0.031898, ], [0.053428, 0.791198, 0.609222, ], [0.081146, 0.604635, -0.792358, ], ]],
+        ]
+
+        # Rotation matrix around Y-axis
+        c = math.cos(angle)
+        s = math.sin(angle)
+        r = np.array([
+        [c, 0, s],
+        [0, 1, 0],
+        [-s, 0, c],
+        ])
+
+        def convert(raw, index):
+            bs = LighthouseBsGeometry()
+            bs.origin = np.dot(r, raw[index][0])
+            bs.rotation_matrix = np.dot(r, raw[index][1])
+            return bs
+
+        self.got_geo_data = True
+
+        self.geo_data = [convert(raw, 0), convert(raw, 1)]
+
+
     def _connected(self, link_uri):
         print('Connected to %s' % link_uri)
 
@@ -286,7 +317,9 @@ class Communicator:
 
         self._cf.log.add_config(lg_pose)
         lg_pose.data_received_cb.add_callback(self.data_receivedPose)
-        lg_pose.start()
+
+        if not self.got_geo_data:
+            lg_pose.start()
 
         self.read_geo_data()
 
