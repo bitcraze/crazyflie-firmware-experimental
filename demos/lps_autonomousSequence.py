@@ -24,8 +24,12 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA  02110-1301, USA.
 """
-Simple example that connects to a crazyflie and uses the high level commander to
-go to a set of points.
+Simple example that connects to a crazyflie and send a sequence of setpoints,
+one every 5 seconds.
+
+This example is intended to work with the Loco Positioning System. It aims at
+documenting how to set the Crazyflie in position control mode
+and how to send setpoints.
 """
 import time
 
@@ -35,7 +39,7 @@ from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
 
-from utils import Utils
+from utils.util import Utils
 
 
 uri = 'radio://0/30/2M'
@@ -43,29 +47,32 @@ uri = 'radio://0/30/2M'
 
 #     x    y    z  YAW
 sequence = [
+    (0.0, 0.0, 1.0, 0),
     (1.0, 1.0, 1.0, 0),
     (-1.0, 1.0, 1.0, 0),
     (-1.0, -1.0, 1.0, 0),
     (1.0, -1.0, 1.0, 0),
     (0.0, 0.0, 1.0, 0),
+    (0.0, 0.0, 0.2, 0),
 ]
 
 def run_sequence(scf, sequence):
     cf = scf.cf
 
-    commander = cf.high_level_commander
-
-    commander.takeoff(1.0, 2.0)
-    time.sleep(3.0)
-
     for position in sequence:
         print('Setting position {}'.format(position))
-        commander.go_to(position[0], position[1], position[2], position[3], 2.0)
-        time.sleep(5.0)
+        next_point_time = time.time() + 5.0
+        while time.time() < next_point_time:
+            cf.commander.send_position_setpoint(position[0],
+                                                position[1],
+                                                position[2],
+                                                position[3])
+            time.sleep(0.1)
 
-    commander.land(0.0, 2.0)
-    time.sleep(2)
-    commander.stop()
+    cf.commander.send_stop_setpoint()
+    # Make sure that the last packet leaves before the link is closed
+    # since the message queue is not flushed before closing
+    time.sleep(0.1)
 
 
 if __name__ == '__main__':
@@ -73,5 +80,6 @@ if __name__ == '__main__':
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         Utils().reset_estimator(scf)
-        Utils().activate_high_level_commander(scf)
+        Utils().deactivate_high_level_commander(scf)
+        Utils().activate_pid_controller()
         run_sequence(scf, sequence)

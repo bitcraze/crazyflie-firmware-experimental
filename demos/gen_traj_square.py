@@ -28,12 +28,14 @@ import math
 
 import numpy as np
 
-from traj_util import Node, Segment
+from utils.traj_util import Node, Segment
 
 
 segment_time = 2
 z = 1.0
 yaw = 0.0
+w = 0.7
+l = 0.7
 
 segments = []
 
@@ -42,14 +44,14 @@ segments = []
 
 nodes = [
     Node((0.0, 0.0, z, yaw)),
-    Node((1.0, 1.0, z, yaw)),
-    Node((1.0, 1.0, z, yaw)),  # Delay
-    Node((-1.0, 1.0, z, yaw)),
-    Node((-1.0, 1.0, z, yaw)),  # Delay
-    Node((-1.0, -1.0, z, yaw)),
-    Node((-1.0, -1.0, z, yaw)),  # Delay
-    Node((1.0, -1.0, z, yaw)),
-    Node((1.0, -1.0, z, yaw)),  # Delay
+    Node((l, w, z, yaw)),
+    Node((l, w, z, yaw)),  # Delay
+    Node((-l, w, z, yaw)),
+    Node((-l, w, z, yaw)),  # Delay
+    Node((-l, -w, z, yaw)),
+    Node((-l, -w, z, yaw)),  # Delay
+    Node((l, -w, z, yaw)),
+    Node((l, -w, z, yaw)),  # Delay
     Node((0.0, 0.0, z, yaw)),
 ]
 

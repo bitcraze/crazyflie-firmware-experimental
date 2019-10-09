@@ -88,6 +88,11 @@ class Utils:
     def activate_high_level_commander(self, scf):
         scf.cf.param.set_value('commander.enHighLevel', '1')
 
+    def deactivate_high_level_commander(self, scf):
+        scf.cf.param.set_value('commander.enHighLevel', '0')
+
+    def activate_pid_controller(self, scf):
+        scf.cf.param.set_value('stabilizer.controller', '1')
 
     def activate_mellinger_controller(self, scf):
         scf.cf.param.set_value('stabilizer.controller', '2')

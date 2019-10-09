@@ -38,7 +38,7 @@ from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
 from cflib.crazyflie.swarm import Swarm, CachedCfFactory
 
-from utils import Utils, Uploader
+from utils.util import Utils, Uploader
 
 
 uris = {
@@ -117,6 +117,7 @@ if __name__ == '__main__':
     with Swarm(uris, factory=factory) as swarm:
         swarm.parallel_safe(Utils().reset_estimator)
         swarm.parallel_safe(Utils().activate_high_level_commander)
+        swarm.parallel_safe(Utils().activate_pid_controller)
         swarm.parallel_safe(upload_trajectory)
         swarm.parallel_safe(run_sequence)
 

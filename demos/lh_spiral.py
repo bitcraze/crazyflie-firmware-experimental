@@ -38,7 +38,7 @@ from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
 from cflib.crazyflie.swarm import Swarm, CachedCfFactory
 
-from utils import Utils, Uploader
+from utils.util import Utils, Uploader
 
 
 uris = {

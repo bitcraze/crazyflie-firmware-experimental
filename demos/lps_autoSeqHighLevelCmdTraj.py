@@ -37,7 +37,7 @@ from cflib.crazyflie.syncLogger import SyncLogger
 from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
 
-from utils import Utils, Uploader
+from utils.util import Utils, Uploader
 
 
 uri = 'radio://0/30/2M'
@@ -95,6 +95,7 @@ if __name__ == '__main__':
 
         Utils().reset_estimator(scf)
         Utils().activate_high_level_commander(scf)
+        Utils().activate_pid_controller()
         duration = upload_trajectory(scf, trajectory_id, sequence)
         run_sequence(scf, trajectory_id, duration)
 

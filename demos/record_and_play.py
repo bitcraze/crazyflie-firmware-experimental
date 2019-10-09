@@ -47,6 +47,8 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.syncLogger import SyncLogger
 from cflib.positioning.position_hl_commander import PositionHlCommander
 
+from utils.util import Utils
+
 CRAZYFLIE_URI = "radio://0/30/2M"
 
 # Configuration constants
@@ -93,6 +95,8 @@ class RecordAndPlay():
 
         cf = Crazyflie(rw_cache='./cache')
         with SyncCrazyflie(self._uri, cf=cf) as scf:
+            Utils().activate_pid_controller(scf)
+            Utils().deactivate_high_level_commander(scf)
             with SyncLogger(scf, lg_stab) as logger:
                 for log_entry in logger:
                     data = log_entry[1]
