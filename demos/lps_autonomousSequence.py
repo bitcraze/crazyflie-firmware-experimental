@@ -81,5 +81,5 @@ if __name__ == '__main__':
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         Utils().reset_estimator(scf)
         Utils().deactivate_high_level_commander(scf)
-        Utils().activate_pid_controller()
+        Utils().activate_pid_controller(scf)
         run_sequence(scf, sequence)
