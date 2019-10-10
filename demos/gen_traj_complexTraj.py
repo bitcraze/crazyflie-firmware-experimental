@@ -141,7 +141,7 @@ if False:
         # s.draw_vel(visualizer)
         # s.draw_control_points(visualizer)
 
-    for n in [n0, n1, n2, n3, n5, n6, n7, n8, n9, n10]:
-        n.draw_unscaled_controlpoints(visualizer)
+    # for n in [n0, n1, n2, n3, n5, n6, n7, n8, n9, n10]:
+    #     n.draw_unscaled_controlpoints(visualizer)
 
     visualizer.run()
