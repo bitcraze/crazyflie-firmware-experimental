@@ -104,8 +104,9 @@ def run_sequence(scf):
     commander.takeoff(1.0, 2.0)
     time.sleep(3.0)
     relative = True
-    commander.start_trajectory(trajectory_id, 1.0, relative)
-    time.sleep(duration)
+    for i in range(3):
+        commander.start_trajectory(trajectory_id, 1.0, relative)
+        time.sleep(duration)
     commander.land(0.0, 2.0)
     time.sleep(2)
     commander.stop()

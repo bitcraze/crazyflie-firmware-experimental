@@ -130,7 +130,7 @@ for s in segments:
 
 # Enable this if you have Vispy installed and want a visualization of the
 # trajectory
-if False:
+if True:
     # Import here to avoid problems for users that do not have Vispy
     from vispy import scene
     from vispy.scene import XYZAxis, LinePlot, TurntableCamera, Markers
