@@ -75,6 +75,8 @@ class TrafficController:
         self._time_for_next_connection_attempt = 0
         self.traj_cycles = None
         self.est_x = 0.0
+        self.est_y = 0.0
+        self.est_z = 0.0
         self.up_time_ms = 0
         self.flight_time_ms = 0
 
@@ -210,6 +212,7 @@ class TrafficController:
         self._log_conf.add_variable('app.flighttime', 'uint32_t')
         self._log_conf.add_variable('pm.vbat', 'float')
         self._log_conf.add_variable('stateEstimate.x', 'float')
+        self._log_conf.add_variable('stateEstimate.y', 'float')
 
         self._cf.log.add_config(self._log_conf)
         self._log_conf.data_received_cb.add_callback(self._log_data)
@@ -234,6 +237,7 @@ class TrafficController:
             self.traj_cycles = None
 
         self.est_x = data['stateEstimate.x']
+        self.est_y = data['stateEstimate.y']
 
     def dump(self):
         print("***", self.uri)
@@ -451,6 +455,20 @@ class SyncTower(TowerBase):
         self.spacing = 0.40
         self.line_orientation = math.radians(40)
 
+        master_offset = [0, 0]
+        self._start_position = [
+            [   0 + master_offset[0],    0 + master_offset[1], 0],
+            [   0 + master_offset[0],  0.5 + master_offset[1], 0],
+            [   0 + master_offset[0], -0.5 + master_offset[1], 0],
+            [ 0.5 + master_offset[0],    0 + master_offset[1], 0],
+            [-0.5 + master_offset[0],    0 + master_offset[1], 0],
+            [ 0.5 + master_offset[0],  0.5 + master_offset[1], 0],
+            [-0.5 + master_offset[0], -0.5 + master_offset[1], 0],
+            [-0.5 + master_offset[0],  0.5 + master_offset[1], 0],
+            [ 0.5 + master_offset[0], -0.5 + master_offset[1], 0]
+        ]
+
+
     def fly(self, wanted):
         while True:
             if wanted:
@@ -503,23 +521,58 @@ class SyncTower(TowerBase):
                 ready.append(controller)
 
         if len(ready) >= wanted:
-            index_offset = (wanted - 1) / 2.0
+            ready_positions = []
+            for controller in ready:
+                ready_positions.append([controller.est_x, controller.est_y, controller.est_z])
 
-            ready.sort(key=lambda ctrler: ctrler.est_x)
+            offsets = self.get_start_offsets(ready_positions, self._start_position[:wanted])
 
             index = 0
             for controller in ready:
-                offset_x = (index - index_offset) * self.spacing * math.cos(
-                    self.line_orientation)
-                offset_y = (index - index_offset) * self.spacing * math.sin(
-                    self.line_orientation)
+                offset_x = offsets[index][0]
+                offset_y = offsets[index][1]
+                offset_z = offsets[index][2]
                 controller.start_trajectory(0.0, offset_x=offset_x,
-                                            offset_y=offset_y)
+                                            offset_y=offset_y,
+                                            offset_z=offset_z)
                 index += 1
 
             return True
         else:
             return False
+
+    def calculate_distance(self, p1, p2):
+        diff = [0,0,0]
+        diff[0] = p1[0]-p2[0]
+        diff[1] = p1[1]-p2[1]
+        diff[2] = p1[2]-p2[2]
+        return math.sqrt( (diff[0]*diff[0]) + (diff[1]*diff[1]) + (diff[2]*diff[2]) )
+
+    def find_closest_target(self, start_position, targets_position):
+        min_distance = None
+        closest_index = 0
+        for index, target in enumerate(targets_position):
+            dist = self.calculate_distance(start_position, target)
+            if min_distance is None or dist < min_distance:
+                min_distance = dist
+                closest_index = index
+        
+        return targets_position[closest_index]
+
+    def get_start_offsets(self, start_positions, targets_positions):
+        offsets = []
+        target_used = [False,] * len(targets_positions)
+        for start in start_positions:
+            candidate_targets = []
+            for i in range(len(targets_positions)):
+                if not target_used[i]:
+                    candidate_targets.append(targets_positions[i])
+            
+            closest_target = self.find_closest_target(start, candidate_targets)
+            target_used[targets_positions.index(closest_target)] = True
+            offsets.append(closest_target)
+        
+        return offsets
 
 
 uris = [

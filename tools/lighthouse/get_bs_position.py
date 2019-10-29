@@ -9,7 +9,7 @@
 import sys
 import openvr
 
-CENTER_AROUND_CONTROLLER = False
+CENTER_AROUND_CONTROLLER = True
 
 print("Opening OpenVR")
 vr = openvr.init(openvr.VRApplication_Other)

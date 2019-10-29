@@ -72,7 +72,7 @@ class Crazyflie(ttk.Frame):
             print("Error, state", state, "not handled")
 
     def set_battery(self, voltage):
-        self._battery_voltage['text'] = "{:.1f}V".format(voltage)
+        self._battery_voltage['text'] = "{:.2f}V".format(voltage)
 
         percent = (voltage - 3.0)*100.0/1.1
 
@@ -109,9 +109,9 @@ root.rowconfigure(0, weight=1)
 
 cfs = []
 
-for i in range(8):
-    r = int(i/4)
-    c = int(i%4)
+for i in range(9):
+    r = int(i/3)
+    c = int(i%3)
     cf = Crazyflie(content, i)
     cf.grid(column=c, row=r)
     cfs.append(cf)
