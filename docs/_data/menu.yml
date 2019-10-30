@@ -11,11 +11,13 @@
   subs:
     - {page_id: deck}
     - {page_id: logparam}
+    - {page_id: app_layer}
 - title: Explanation Functionalities
   subs:
     - {page_id: sensor_to_control}
     - {page_id: ctrp_index}
     - {page_id: deck_memory_format}
+    - {page_id: p2p_api}
 - title: Development Instructions
   subs:
     - {page_id: starting_development}

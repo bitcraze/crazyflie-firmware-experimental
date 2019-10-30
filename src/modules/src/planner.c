@@ -35,18 +35,15 @@ SOFTWARE.
 /*
 implementation of planning state machine
 */
-
+#include <stddef.h>
 #include "planner.h"
-
-static struct piecewise_traj planned_trajectory;
-static struct poly4d pieces[1]; // the on-board planner requires a single piece, only
 
 static void plan_takeoff_or_landing(struct planner *p, struct vec pos, float yaw, float height, float duration)
 {
 	struct vec takeoff_pos = pos;
 	takeoff_pos.z = height;
 
-	piecewise_plan_7th_order_no_jerk(&planned_trajectory, duration,
+	piecewise_plan_7th_order_no_jerk(&p->planned_trajectory, duration,
 		pos,         yaw, vzero(), 0, vzero(),
 		takeoff_pos,   0, vzero(), 0, vzero());
 }
@@ -60,7 +57,7 @@ void plan_init(struct planner *p)
 	p->state = TRAJECTORY_STATE_IDLE;
 	p->reversed = false;
 	p->trajectory = NULL;
-	planned_trajectory.pieces = pieces;
+	p->planned_trajectory.pieces = p->pieces;
 }
 
 void plan_stop(struct planner *p)
@@ -108,8 +105,8 @@ int plan_takeoff(struct planner *p, struct vec pos, float yaw, float height, flo
 	plan_takeoff_or_landing(p, pos, yaw, height, duration);
 	p->reversed = false;
 	p->state = TRAJECTORY_STATE_FLYING;
-	planned_trajectory.t_begin = t;
-	p->trajectory = &planned_trajectory;
+	p->planned_trajectory.t_begin = t;
+	p->trajectory = &p->planned_trajectory;
 	return 0;
 }
 
@@ -123,8 +120,8 @@ int plan_land(struct planner *p, struct vec pos, float yaw, float height, float 
 	plan_takeoff_or_landing(p, pos, yaw, height, duration);
 	p->reversed = false;
 	p->state = TRAJECTORY_STATE_LANDING;
-	planned_trajectory.t_begin = t;
-	p->trajectory = &planned_trajectory;
+	p->planned_trajectory.t_begin = t;
+	p->trajectory = &p->planned_trajectory;
 	return 0;
 }
 
@@ -139,14 +136,14 @@ int plan_go_to(struct planner *p, bool relative, struct vec hover_pos, float hov
 		hover_yaw += setpoint.yaw;
 	}
 
-	piecewise_plan_7th_order_no_jerk(&planned_trajectory, duration,
+	piecewise_plan_7th_order_no_jerk(&p->planned_trajectory, duration,
 		setpoint.pos, setpoint.yaw, setpoint.vel, setpoint.omega.z, setpoint.acc,
 		hover_pos,    hover_yaw,    vzero(),      0,                vzero());
 
 	p->reversed = false;
 	p->state = TRAJECTORY_STATE_FLYING;
-	planned_trajectory.t_begin = t;
-	p->trajectory = &planned_trajectory;
+	p->planned_trajectory.t_begin = t;
+	p->trajectory = &p->planned_trajectory;
 	return 0;
 }
 

@@ -122,6 +122,10 @@ void systemInit(void)
   pmInit();
   buzzerInit();
 
+#ifdef APP_ENABLED
+  appInit();
+#endif
+
   isInit = true;
 }
 
@@ -221,8 +225,6 @@ void systemTask(void *arg)
     }
   }
   DEBUG_PRINT("Free heap: %d bytes\n", xPortGetFreeHeapSize());
-
-  appInit();
 
   workerLoop();
 

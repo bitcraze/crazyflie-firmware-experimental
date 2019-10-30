@@ -72,8 +72,14 @@ bool estimatorKalmanEnqueueDistance(const distanceMeasurement_t *dist);
 bool estimatorKalmanEnqueueTOF(const tofMeasurement_t *tof);
 bool estimatorKalmanEnqueueAbsoluteHeight(const heightMeasurement_t *height);
 bool estimatorKalmanEnqueueFlow(const flowMeasurement_t *flow);
+bool estimatorKalmanEnqueueYawError(const float error);
 
 void estimatorKalmanGetEstimatedPos(point_t* pos);
+
+/**
+ * Copies 9 floats representing the current state rotation matrix
+ */
+void estimatorKalmanGetEstimatedRot(float * rotationMatrix);
 
 float getX();
 float getY();

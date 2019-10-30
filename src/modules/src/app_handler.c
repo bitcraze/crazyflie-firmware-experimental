@@ -22,21 +22,45 @@
  * You should have received a copy of the GNU General Public License
  * along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
  */
-/* app.h: App layer API */
-#pragma once
+/* app_handler.c: App layer handling function implementation */
 
-/**
- * App Inintialization
- * 
- * Called during firmware initialization. A default weak function is implemented
- * that creates a task and calls appMain() when the system is started.
- * 
- * Implementation can be overwriten.
- */
-void appInit();
+#include <stdbool.h>
 
-/**
- * app main function, called when the Crazyflie has started from within a task created
- * by appInit().
- */
-void appMain();
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "system.h"
+
+#include "app.h"
+
+#ifndef APP_STACKSIZE
+#define APP_STACKSIZE 300
+#endif
+
+#ifndef APP_PRIORITY
+#define APP_PRIORITY 0
+#endif
+
+static bool isInit = false;
+
+static void appTask(void *param);
+
+void __attribute__((weak)) appInit()
+{
+  if (isInit) return;
+
+  xTaskCreate(appTask, "app", APP_STACKSIZE, NULL,
+              APP_PRIORITY, NULL);
+  isInit = true;
+}
+
+static void appTask(void *param)
+{
+  systemWaitStart();
+
+  appMain();
+
+  while(1) {
+    vTaskDelay(portMAX_DELAY);
+  }
+}

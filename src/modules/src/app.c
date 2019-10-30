@@ -147,7 +147,7 @@ static float reorganizeData(float sequence[], int size) {
   return totalDuration;
 }
 
-void appInit() {
+void appMain() {
   if (isInit) {
     return;
   }
