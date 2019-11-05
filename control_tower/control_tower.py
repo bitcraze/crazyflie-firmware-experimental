@@ -150,7 +150,7 @@ class TrafficController:
         return self.vbat
 
     def is_charged_for_flight(self):
-        return self.vbat > 4.0
+        return self.vbat > 4.10
 
     def get_traj_cycles(self):
         return self.traj_cycles
@@ -401,7 +401,7 @@ class Tower(TowerBase):
                         trajectory_delay = 0.0
                     print("Starting prepared copter", controller.uri,
                           'with a delay of', trajectory_delay)
-                    controller.start_trajectory(trajectory_delay, offset_z=0.35)
+                    controller.start_trajectory(trajectory_delay, offset_z=0.25)
                     slot_index += 1
                 else:
                     return
@@ -584,6 +584,7 @@ uris = [
     'radio://1/10/2M/E7E7E7E706',
     'radio://1/10/2M/E7E7E7E707',
     'radio://1/10/2M/E7E7E7E708',
+    'radio://1/10/2M/E7E7E7E709'
 ]
 
 count = 1
