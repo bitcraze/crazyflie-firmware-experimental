@@ -160,10 +160,10 @@ module RakefileHelpers
     return {:command => command, :pre_support => pre_support, :post_support => post_support}
   end
 
-  def execute(command_string, verbose=true)
-    report command_string
+  def execute(command_string, logOutput: true)
+    report(command_string) if $logCmd
     output = `#{command_string}`.chomp
-    report(output) if (verbose && !output.nil? && (output.length > 0))
+    report(output) if (logOutput && !output.nil? && (output.length > 0))
     if $?.exitstatus != 0
       raise "Command failed. (Returned #{$?.exitstatus})"
     end
@@ -184,17 +184,19 @@ module RakefileHelpers
   def parse_and_run_tests(args)
     defines = find_defines_in_args(args)
     test_files = find_test_files_in_args(args)
+    output_style = find_output_style_in_args(args)
+
+    set_environment_vars($cfg['env'])
 
     # No file names found in the args, find all files that are unit test files
     if test_files.length == 0
       test_files = exclude_test_files(get_unit_test_files(), defines)
     end
 
-    run_tests(test_files, defines)
+    run_tests(test_files, defines, output_style)
   end
 
-  def run_tests(test_files, defines)
-
+  def run_tests(test_files, defines, output_style)
     report 'Running system tests...'
 
     # Tack on TEST define for compiling unit tests
@@ -203,6 +205,13 @@ module RakefileHelpers
     $cfg['compiler']['defines']['items'] = [] if $cfg['compiler']['defines']['items'].nil?
     $cfg['compiler']['defines']['items'] << 'TEST'
     $cfg['compiler']['defines']['items'].concat defines
+
+    # Supress logging of commands and all warningns in minimalistic output style
+    $logCmd = true
+    if output_style.include?('min')
+      $cfg['compiler']['options'] << '-w'
+      $logCmd = false
+    end
 
     include_dirs = get_local_include_dirs
 
@@ -312,6 +321,14 @@ module RakefileHelpers
     end
   end
 
+  def find_output_style_in_args(args)
+    key = 'UNIT_TEST_STYLE='
+    args.each do |arg|
+      if arg.start_with?(key)
+        return arg[(key.length)..-1].split(' ')
+      end
+    end
+  end
 
   # Parse the arguments and find all defines that are passed in on the command line
   # Defines are part of compiler flags and start with -D, for instance -DMY_DEFINE
@@ -397,5 +414,12 @@ module RakefileHelpers
     end
 
     obj_list
+  end
+
+  def set_environment_vars(env_vars)
+    # puts "Setting env vars: " + env_vars.to_s
+    env_vars.each do |key, val|
+      ENV[key] = val
+    end
   end
 end

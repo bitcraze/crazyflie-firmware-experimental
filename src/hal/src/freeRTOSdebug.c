@@ -1,6 +1,6 @@
 /**
- *    ||          ____  _ __                           
- * +------+      / __ )(_) /_______________ _____  ___ 
+ *    ||          ____  _ __
+ * +------+      / __ )(_) /_______________ _____  ___
  * | 0xBC |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
@@ -33,25 +33,30 @@
 #include "debug.h"
 #include "nvicconf.h"
 #include "led.h"
+#include "power_distribution.h"
 
 uint32_t traceTickCount;
 
 void vApplicationMallocFailedHook( void )
 {
-	  portDISABLE_INTERRUPTS();
-	  DEBUG_PRINT("\nMalloc failed!\n");
-	  ledSet(ERR_LED1, 1);
-	  ledSet(ERR_LED2, 1);
-	  while(1);
+  portDISABLE_INTERRUPTS();
+  DEBUG_PRINT("\nMalloc failed!\n");
+  ledSet(ERR_LED1, 1);
+  ledSet(ERR_LED2, 1);
+  powerStop();
+  storeAssertTextData("Malloc failed");
+  while(1);
 }
 
-#if (configCHECK_FOR_STACK_OVERFLOW == 1)
-void vApplicationStackOverflowHook(xTaskHandle *pxTask, signed portCHAR *pcTaskName)
+#if (configCHECK_FOR_STACK_OVERFLOW > 0)
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char * pcTaskName)
 {
   portDISABLE_INTERRUPTS();
   DEBUG_PRINT("\nStack overflow!\n");
   ledSet(ERR_LED1, 1);
   ledSet(ERR_LED2, 1);
+  powerStop();
+  storeAssertTextData("Stack overflow");
   while(1);
 }
 #endif

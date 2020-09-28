@@ -1,23 +1,24 @@
 - page_id: home
-- title: Introduction
-  subs:
-    - {page_id: folder_description}
-    - {page_id: crazyflie-1-support}
 - title: Building and Flashing
   subs:
     - {page_id: build_instructions}
+    - {page_id: build_config}
+    - {page_id: flashing}
     - {page_id: dfu}
 - title: Userguides
   subs:
     - {page_id: deck}
+    - {page_id: decks-index}
     - {page_id: logparam}
     - {page_id: app_layer}
-- title: Explanation Functionalities
+- title: Functional areas
   subs:
-    - {page_id: sensor_to_control}
-    - {page_id: ctrp_index}
+    - {page_id: crtp_index}
+    - {page_id: stabilizer_index}
     - {page_id: deck_memory_format}
     - {page_id: p2p_api}
+    - {page_id: trajectory_formats}
+    - {page_id: lh_overview}
 - title: Development Instructions
   subs:
     - {page_id: starting_development}
@@ -25,3 +26,5 @@
     - {page_id: serial}
     - {page_id: openocd_gdb_debugging}
     - {page_id: unit_testing}
+    - {page_id: systemtask}
+    - {page_id: memory_management}

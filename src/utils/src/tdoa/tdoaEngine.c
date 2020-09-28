@@ -55,11 +55,14 @@ The implementation must handle
 
 #define MEASUREMENT_NOISE_STD 0.15f
 
-void tdoaEngineInit(tdoaEngineState_t* engineState, const uint32_t now_ms, tdoaEngineSendTdoaToEstimator sendTdoaToEstimator, const double locodeckTsFreq) {
+void tdoaEngineInit(tdoaEngineState_t* engineState, const uint32_t now_ms, tdoaEngineSendTdoaToEstimator sendTdoaToEstimator, const double locodeckTsFreq, const tdoaEngineMatchingAlgorithm_t matchingAlgorithm) {
   tdoaStorageInitialize(engineState->anchorInfoArray);
   tdoaStatsInit(&engineState->stats, now_ms);
   engineState->sendTdoaToEstimator = sendTdoaToEstimator;
   engineState->locodeckTsFreq = locodeckTsFreq;
+  engineState->matchingAlgorithm = matchingAlgorithm;
+
+  engineState->matching.offset = 0;
 }
 
 #define TRUNCATE_TO_ANCHOR_TS_BITMAP 0x00FFFFFFFF
@@ -76,17 +79,18 @@ static void enqueueTDOA(const tdoaAnchorContext_t* anchorACtx, const tdoaAnchorC
   };
 
   if (tdoaStorageGetAnchorPosition(anchorACtx, &tdoa.anchorPosition[0]) && tdoaStorageGetAnchorPosition(anchorBCtx, &tdoa.anchorPosition[1])) {
-      stats->packetsToEstimator++;
-      engineState->sendTdoaToEstimator(&tdoa);
+    STATS_CNT_RATE_EVENT(&stats->packetsToEstimator);
 
-      uint8_t idA = tdoaStorageGetId(anchorACtx);
-      uint8_t idB = tdoaStorageGetId(anchorBCtx);
-      if (idA == stats->anchorId && idB == stats->remoteAnchorId) {
-        stats->tdoa = distanceDiff;
-      }
-      if (idB == stats->anchorId && idA == stats->remoteAnchorId) {
-        stats->tdoa = -distanceDiff;
-      }
+    uint8_t idA = tdoaStorageGetId(anchorACtx);
+    uint8_t idB = tdoaStorageGetId(anchorBCtx);
+    if (idA == stats->anchorId && idB == stats->remoteAnchorId) {
+      stats->tdoa = distanceDiff;
+    }
+    if (idB == stats->anchorId && idA == stats->remoteAnchorId) {
+      stats->tdoa = -distanceDiff;
+    }
+
+    engineState->sendTdoaToEstimator(&tdoa, idA, idB);
   }
 }
 
@@ -103,7 +107,7 @@ static bool updateClockCorrection(tdoaAnchorContext_t* anchorCtx, const int64_t 
     if (sampleIsReliable){
       if (tdoaStorageGetId(anchorCtx) == stats->anchorId) {
         stats->clockCorrection = tdoaStorageGetClockCorrection(anchorCtx);
-        stats->clockCorrectionCount++;
+        STATS_CNT_RATE_EVENT(&stats->clockCorrectionCount);
       }
     }
   }
@@ -131,29 +135,21 @@ static double calcDistanceDiff(const tdoaAnchorContext_t* otherAnchorCtx, const 
   return SPEED_OF_LIGHT * tdoa / locodeckTsFreq;
 }
 
-static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext_t* otherAnchorCtx, const tdoaAnchorContext_t* anchorCtx) {
-  static uint8_t seqNr[REMOTE_ANCHOR_DATA_COUNT];
-  static uint8_t id[REMOTE_ANCHOR_DATA_COUNT];
-  static uint8_t offset = 0;
-
-  if (tdoaStorageGetClockCorrection(anchorCtx) <= 0.0) {
-    return false;
-  }
-
-  offset++;
+static bool matchRandomAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext_t* otherAnchorCtx, const tdoaAnchorContext_t* anchorCtx) {
+  engineState->matching.offset++;
   int remoteCount = 0;
-  tdoaStorageGetRemoteSeqNrList(anchorCtx, &remoteCount, seqNr, id);
+  tdoaStorageGetRemoteSeqNrList(anchorCtx, &remoteCount, engineState->matching.seqNr, engineState->matching.id);
 
   uint32_t now_ms = anchorCtx->currentTime_ms;
 
   // Loop over the candidates and pick the first one that is useful
   // An offset (updated for each call) is added to make sure we start at
   // different positions in the list and vary which candidate to choose
-  for (int i = offset; i < (remoteCount + offset); i++) {
+  for (int i = engineState->matching.offset; i < (remoteCount + engineState->matching.offset); i++) {
     uint8_t index = i % remoteCount;
-    const uint8_t candidateAnchorId = id[index];
+    const uint8_t candidateAnchorId = engineState->matching.id[index];
     if (tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, candidateAnchorId, now_ms, otherAnchorCtx)) {
-      if (seqNr[index] == tdoaStorageGetSeqNr(otherAnchorCtx) && tdoaStorageGetTimeOfFlight(anchorCtx, candidateAnchorId)) {
+      if (engineState->matching.seqNr[index] == tdoaStorageGetSeqNr(otherAnchorCtx) && tdoaStorageGetTimeOfFlight(anchorCtx, candidateAnchorId)) {
         return true;
       }
     }
@@ -163,22 +159,76 @@ static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext
   return false;
 }
 
+static bool matchYoungestAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext_t* otherAnchorCtx, const tdoaAnchorContext_t* anchorCtx) {
+    int remoteCount = 0;
+    tdoaStorageGetRemoteSeqNrList(anchorCtx, &remoteCount, engineState->matching.seqNr, engineState->matching.id);
+
+    uint32_t now_ms = anchorCtx->currentTime_ms;
+    uint32_t youmgestUpdateTime = 0;
+    int bestId = -1;
+
+    for (int index = 0; index < remoteCount; index++) {
+      const uint8_t candidateAnchorId = engineState->matching.id[index];
+      if (tdoaStorageGetTimeOfFlight(anchorCtx, candidateAnchorId)) {
+        if (tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, candidateAnchorId, now_ms, otherAnchorCtx)) {
+          uint32_t updateTime = otherAnchorCtx->anchorInfo->lastUpdateTime;
+          if (updateTime > youmgestUpdateTime) {
+            if (engineState->matching.seqNr[index] == tdoaStorageGetSeqNr(otherAnchorCtx)) {
+              youmgestUpdateTime = updateTime;
+              bestId = candidateAnchorId;
+            }
+          }
+        }
+      }
+    }
+
+    if (bestId >= 0) {
+      tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, bestId, now_ms, otherAnchorCtx);
+      return true;
+    }
+
+    otherAnchorCtx->anchorInfo = 0;
+    return false;
+}
+
+static bool findSuitableAnchor(tdoaEngineState_t* engineState, tdoaAnchorContext_t* otherAnchorCtx, const tdoaAnchorContext_t* anchorCtx) {
+  bool result = false;
+
+  if (tdoaStorageGetClockCorrection(anchorCtx) > 0.0) {
+    switch(engineState->matchingAlgorithm) {
+      case TdoaEngineMatchingAlgorithmRandom:
+        result = matchRandomAnchor(engineState, otherAnchorCtx, anchorCtx);
+        break;
+
+      case TdoaEngineMatchingAlgorithmYoungest:
+        result = matchYoungestAnchor(engineState, otherAnchorCtx, anchorCtx);
+        break;
+
+      default:
+        // Do nothing
+        break;
+    }
+  }
+
+  return result;
+}
+
 void tdoaEngineGetAnchorCtxForPacketProcessing(tdoaEngineState_t* engineState, const uint8_t anchorId, const uint32_t currentTime_ms, tdoaAnchorContext_t* anchorCtx) {
   if (tdoaStorageGetCreateAnchorCtx(engineState->anchorInfoArray, anchorId, currentTime_ms, anchorCtx)) {
-    engineState->stats.contextHitCount++;
+    STATS_CNT_RATE_EVENT(&engineState->stats.contextHitCount);
   } else {
-    engineState->stats.contextMissCount++;
+    STATS_CNT_RATE_EVENT(&engineState->stats.contextMissCount);
   }
 }
 
 void tdoaEngineProcessPacket(tdoaEngineState_t* engineState, tdoaAnchorContext_t* anchorCtx, const int64_t txAn_in_cl_An, const int64_t rxAn_by_T_in_cl_T) {
   bool timeIsGood = updateClockCorrection(anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T, &engineState->stats);
   if (timeIsGood) {
-    engineState->stats.timeIsGood++;
+    STATS_CNT_RATE_EVENT(&engineState->stats.timeIsGood);
 
     tdoaAnchorContext_t otherAnchorCtx;
     if (findSuitableAnchor(engineState, &otherAnchorCtx, anchorCtx)) {
-      engineState->stats.suitableDataFound++;
+      STATS_CNT_RATE_EVENT(&engineState->stats.suitableDataFound);
       double tdoaDistDiff = calcDistanceDiff(&otherAnchorCtx, anchorCtx, txAn_in_cl_An, rxAn_by_T_in_cl_T, engineState->locodeckTsFreq);
       enqueueTDOA(&otherAnchorCtx, anchorCtx, tdoaDistDiff, engineState);
     }

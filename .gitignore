@@ -17,15 +17,16 @@ tags
 /tag.*
 *.gch
 
+current_platform.mk
+
 /generated-test/**
 **/__pycache__/**
 
-current_platform.mk
-
-# generated files for githubpages
-/docs/_site/*
-/docs/Gemfile.lock
-
-
 /docs/.jekyll-metadata
 docs/.jekyll-cache
+
+/examples/app_hello_world/bin/*
+/examples/app_hello_world/cf2.*
+
+/examples/app_peer_to_peer/bin/*
+/examples/app_peer_to_peer/cf2.*

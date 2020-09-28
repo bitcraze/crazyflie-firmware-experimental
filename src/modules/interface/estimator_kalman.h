@@ -62,6 +62,9 @@ bool estimatorKalmanTest(void);
 void estimatorKalman(state_t *state, sensorData_t *sensors, control_t *control, const uint32_t tick);
 
 
+void estimatorKalmanTaskInit();
+bool estimatorKalmanTaskTest();
+
 /**
  * The filter supports the incorporation of additional sensors into the state estimate via the following functions:
  */
@@ -72,7 +75,8 @@ bool estimatorKalmanEnqueueDistance(const distanceMeasurement_t *dist);
 bool estimatorKalmanEnqueueTOF(const tofMeasurement_t *tof);
 bool estimatorKalmanEnqueueAbsoluteHeight(const heightMeasurement_t *height);
 bool estimatorKalmanEnqueueFlow(const flowMeasurement_t *flow);
-bool estimatorKalmanEnqueueYawError(const float error);
+bool estimatorKalmanEnqueueYawError(const yawErrorMeasurement_t* error);
+bool estimatorKalmanEnqueueSweepAngles(const sweepAngleMeasurement_t *angles);
 
 void estimatorKalmanGetEstimatedPos(point_t* pos);
 

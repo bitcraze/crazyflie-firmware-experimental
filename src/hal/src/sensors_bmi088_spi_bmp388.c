@@ -35,9 +35,6 @@
 #include "sensors_bmi088_spi_bmp388.h"
 #include "imu.h"
 
-#include "zranger.h"
-#include "zranger2.h"
-
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
@@ -56,6 +53,7 @@
 #include "bmi088.h"
 #include "bmp3.h"
 #include "bstdr_types.h"
+#include "static_mem.h"
 
 /* Defines for the SPI and GPIO pins used to drive the SPI Flash */
 #define BMI088_ACC_GPIO_CS             GPIO_Pin_1
@@ -135,11 +133,14 @@
 #define GYR_DIS_CS() GPIO_SetBits(BMI088_GYR_GPIO_CS_PORT, BMI088_GYR_GPIO_CS)
 
 /* Defines and buffers for full duplex SPI DMA transactions */
+/* The buffers must not be placed in CCM */
 #define SPI_MAX_DMA_TRANSACTION_SIZE    15
 static uint8_t spiTxBuffer[SPI_MAX_DMA_TRANSACTION_SIZE + 1];
 static uint8_t spiRxBuffer[SPI_MAX_DMA_TRANSACTION_SIZE + 1];
 static xSemaphoreHandle spiTxDMAComplete;
+static StaticSemaphore_t spiTxDMACompleteBuffer;
 static xSemaphoreHandle spiRxDMAComplete;
+static StaticSemaphore_t spiRxDMACompleteBuffer;
 
 typedef struct
 {
@@ -157,19 +158,26 @@ static struct bmi088_dev bmi088Dev;
 static struct bmp3_dev   bmp388Dev;
 
 static xQueueHandle accelerometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(accelerometerDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle gyroDataQueue;
+STATIC_MEM_QUEUE_ALLOC(gyroDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle magnetometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(magnetometerDataQueue, 1, sizeof(Axis3f));
 static xQueueHandle barometerDataQueue;
+STATIC_MEM_QUEUE_ALLOC(barometerDataQueue, 1, sizeof(baro_t));
+
 static xSemaphoreHandle sensorsDataReady;
+static StaticSemaphore_t sensorsDataReadyBuffer;
 static xSemaphoreHandle dataReady;
+static StaticSemaphore_t dataReadyBuffer;
 
 static bool isInit = false;
 static sensorData_t sensorData;
-static uint64_t imuIntTimestamp;
+static volatile uint64_t imuIntTimestamp;
 
 static Axis3i16 gyroRaw;
 static Axis3i16 accelRaw;
-static BiasObj gyroBiasRunning;
+NO_DMA_CCM_SAFE_ZERO_INIT static BiasObj gyroBiasRunning;
 static Axis3f gyroBias;
 #if defined(SENSORS_GYRO_BIAS_CALCULATE_STDDEV) && defined (GYRO_BIAS_LIGHT_WEIGHT)
 static Axis3f gyroBiasStdDev;
@@ -192,10 +200,10 @@ static bool isBarometerPresent = false;
 static uint8_t baroMeasDelayMin = SENSORS_DELAY_BARO;
 
 // Pre-calculated values for accelerometer alignment
-float cosPitch;
-float sinPitch;
-float cosRoll;
-float sinRoll;
+static float cosPitch;
+static float sinPitch;
+static float cosRoll;
+static float sinRoll;
 
 #ifdef GYRO_GYRO_BIAS_LIGHT_WEIGHT
 static bool processGyroBiasNoBuffer(int16_t gx, int16_t gy, int16_t gz, Axis3f *gyroBiasOut);
@@ -210,6 +218,7 @@ static void sensorsAddBiasValue(BiasObj* bias, int16_t x, int16_t y, int16_t z);
 static bool sensorsFindBiasValue(BiasObj* bias);
 static void sensorsAccAlignToGravity(Axis3f* in, Axis3f* out);
 
+STATIC_MEM_TASK_ALLOC(sensorsTask, SENSORS_TASK_STACKSIZE);
 
 /***********************
  * SPI private methods *
@@ -497,13 +506,13 @@ static void spiDMAInit(void)
   NVIC_InitStructure.NVIC_IRQChannel = BMI088_SPI_RX_DMA_IRQ;
   NVIC_Init(&NVIC_InitStructure);
 
-  spiTxDMAComplete = xSemaphoreCreateBinary();
-  spiRxDMAComplete = xSemaphoreCreateBinary();
+  spiTxDMAComplete = xSemaphoreCreateBinaryStatic(&spiTxDMACompleteBuffer);
+  spiRxDMAComplete = xSemaphoreCreateBinaryStatic(&spiRxDMACompleteBuffer);
 }
 
-static void sensorsGyroGet(Axis3i16* dataOut)
+static uint16_t sensorsGyroGet(Axis3i16* dataOut)
 {
-  bmi088_get_gyro_data((struct bmi088_sensor_data*)dataOut, &bmi088Dev);
+  return bmi088_get_gyro_data((struct bmi088_sensor_data*)dataOut, &bmi088Dev);
 }
 
 static void sensorsAccelGet(Axis3i16* dataOut)
@@ -546,9 +555,6 @@ void sensorsBmi088SpiBmp388Acquire(sensorData_t *sensors, const uint32_t tick)
   sensorsReadAcc(&sensors->acc);
   sensorsReadMag(&sensors->mag);
   sensorsReadBaro(&sensors->baro);
-  if (!zRangerReadRange(&sensors->zrange, tick)) {
-    zRanger2ReadRange(&sensors->zrange, tick);
-  }
   sensors->interruptTimestamp = sensorData.interruptTimestamp;
 }
 
@@ -795,12 +801,12 @@ static void sensorsDeviceInit(void)
 
 static void sensorsTaskInit(void)
 {
-  accelerometerDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  gyroDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  magnetometerDataQueue = xQueueCreate(1, sizeof(Axis3f));
-  barometerDataQueue = xQueueCreate(1, sizeof(baro_t));
+  accelerometerDataQueue = STATIC_MEM_QUEUE_CREATE(accelerometerDataQueue);
+  gyroDataQueue = STATIC_MEM_QUEUE_CREATE(gyroDataQueue);
+  magnetometerDataQueue = STATIC_MEM_QUEUE_CREATE(magnetometerDataQueue);
+  barometerDataQueue = STATIC_MEM_QUEUE_CREATE(barometerDataQueue);
 
-  xTaskCreate(sensorsTask, SENSORS_TASK_NAME, SENSORS_TASK_STACKSIZE, NULL, SENSORS_TASK_PRI, NULL);
+  STATIC_MEM_TASK_CREATE(sensorsTask, sensorsTask, SENSORS_TASK_NAME, NULL, SENSORS_TASK_PRI);
 }
 
 static void sensorsInterruptInit(void)
@@ -808,8 +814,8 @@ static void sensorsInterruptInit(void)
   GPIO_InitTypeDef GPIO_InitStructure;
   EXTI_InitTypeDef EXTI_InitStructure;
 
-  sensorsDataReady = xSemaphoreCreateBinary();
-  dataReady = xSemaphoreCreateBinary();
+  sensorsDataReady = xSemaphoreCreateBinaryStatic(&sensorsDataReadyBuffer);
+  dataReady = xSemaphoreCreateBinaryStatic(&dataReadyBuffer);
 
   // Enable the interrupt on PC14
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_14;
@@ -846,15 +852,51 @@ void sensorsBmi088SpiBmp388Init(void)
   sensorsTaskInit();
 }
 
+static bool gyroSelftest()
+{
+  bool testStatus = true;
+
+  int i = 3;
+  uint16_t readResult = BMI088_OK;
+  do {
+    readResult = sensorsGyroGet(&gyroRaw);
+  } while (readResult != BMI088_OK && i-- > 0);
+
+  if ((readResult != BMI088_OK) || (gyroRaw.x == 0 && gyroRaw.y == 0 && gyroRaw.z == 0))
+  {
+    DEBUG_PRINT("BMI088 gyro returning x=0 y=0 z=0 [FAILED]\n");
+    testStatus = false;
+  }
+
+  int8_t gyroResult = 0;
+  bmi088_perform_gyro_selftest(&gyroResult, &bmi088Dev);
+  if (gyroResult == BMI088_SELFTEST_PASS)
+  {
+    DEBUG_PRINT("BMI088 gyro self-test [OK]\n");
+  }
+  else
+  {
+    DEBUG_PRINT("BMI088 gyro self-test [FAILED]\n");
+    testStatus = false;
+  }
+
+  return testStatus;
+}
+
 bool sensorsBmi088SpiBmp388Test(void)
 {
   bool testStatus = true;
 
   if (!isInit)
-    {
-      DEBUG_PRINT("Uninitialized\n");
-      testStatus = false;
-    }
+  {
+    DEBUG_PRINT("Uninitialized\n");
+    testStatus = false;
+  }
+
+  if (! gyroSelftest())
+  {
+    testStatus = false;
+  }
 
   return testStatus;
 }
@@ -1058,7 +1100,25 @@ static bool sensorsFindBiasValue(BiasObj* bias)
 
 bool sensorsBmi088SpiBmp388ManufacturingTest(void)
 {
-  return true;
+  bool testStatus = true;
+  if (! gyroSelftest())
+  {
+    testStatus = false;
+  }
+
+  int8_t accResult = 0;
+  bmi088_perform_accel_selftest(&accResult, &bmi088Dev);
+  if (accResult == BMI088_SELFTEST_PASS)
+  {
+    DEBUG_PRINT("BMI088 acc self-test [OK]\n");
+  }
+  else
+  {
+    DEBUG_PRINT("BMI088 acc self-test [FAILED]\n");
+    testStatus = false;
+  }
+
+  return testStatus;
 }
 
 /**

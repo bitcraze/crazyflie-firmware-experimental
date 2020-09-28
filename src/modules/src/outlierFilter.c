@@ -28,8 +28,9 @@
 #include "outlierFilter.h"
 #include "stabilizer_types.h"
 #include "log.h"
+#include "debug.h"
 
-#define BUCKET_ACCEPTANCE_LEVEL 2
+#define BUCKET_ACCEPTANCE_LEVEL 3
 #define MAX_BUCKET_FILL 10
 #define FILTER_CLOSE_DELAY_COUNT 30
 
@@ -101,9 +102,49 @@ bool outlierFilterValidateTdoaSteps(const tdoaMeasurement_t* tdoa, const float e
   return sampleIsGood;
 }
 
-void outlierFilterReset() {
-  // Nothing here
+
+#define LH_TICKS_PER_FRAME (1000 / 120)
+static const int32_t lhMinWindowTime = -2 * LH_TICKS_PER_FRAME;
+static const int32_t lhMaxWindowTime = 5 * LH_TICKS_PER_FRAME;
+static const int32_t lhBadSampleWindowChange = -LH_TICKS_PER_FRAME;
+static const int32_t lhGoodSampleWindowChange = LH_TICKS_PER_FRAME / 2;
+static const float lhMaxError = 0.05f;
+
+void outlierFilterReset(OutlierFilterLhState_t* this, const uint32_t now) {
+  this->openingTime = now;
+  this->openingWindow = lhMinWindowTime;
 }
+
+
+bool outlierFilterValidateLighthouseSweep(OutlierFilterLhState_t* this, const float distanceToBs, const float angleError, const uint32_t now) {
+  // float error = distanceToBs * tan(angleError);
+  // We use an approximattion
+  float error = distanceToBs * angleError;
+
+  bool isGoodSample = (fabsf(error) < lhMaxError);
+  if (isGoodSample) {
+    this->openingWindow += lhGoodSampleWindowChange;
+    if (this->openingWindow > lhMaxWindowTime) {
+      this->openingWindow = lhMaxWindowTime;
+    }
+  } else {
+    this->openingWindow += lhBadSampleWindowChange;
+    if (this->openingWindow < lhMinWindowTime) {
+      this->openingWindow = lhMinWindowTime;
+    }
+  }
+
+  bool result = true;
+  bool isFilterClosed = (now < this->openingTime);
+  if (isFilterClosed) {
+    result = isGoodSample;
+  }
+
+  this->openingTime = now + this->openingWindow;
+
+  return result;
+}
+
 
 static bool isDistanceDiffSmallerThanDistanceBetweenAnchors(const tdoaMeasurement_t* tdoa) {
   float anchorDistanceSq = distanceSq(&tdoa->anchorPosition[0], &tdoa->anchorPosition[1]);
@@ -156,5 +197,4 @@ LOG_GROUP_START(outlierf)
   LOG_ADD(LOG_INT32, bucket4, &filterLevels[4].bucket)
   LOG_ADD(LOG_FLOAT, accLev, &acceptanceLevel)
   LOG_ADD(LOG_FLOAT, errD, &errorDistance)
-
 LOG_GROUP_STOP(outlierf)

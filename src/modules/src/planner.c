@@ -38,14 +38,16 @@ implementation of planning state machine
 #include <stddef.h>
 #include "planner.h"
 
-static void plan_takeoff_or_landing(struct planner *p, struct vec pos, float yaw, float height, float duration)
+static struct traj_eval plan_eval(struct planner *p, float t);
+
+static void plan_takeoff_or_landing(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration)
 {
-	struct vec takeoff_pos = pos;
-	takeoff_pos.z = height;
+	struct vec hover_pos = curr_pos;
+	hover_pos.z = hover_height;
 
 	piecewise_plan_7th_order_no_jerk(&p->planned_trajectory, duration,
-		pos,         yaw, vzero(), 0, vzero(),
-		takeoff_pos,   0, vzero(), 0, vzero());
+		curr_pos,  curr_yaw,  vzero(), 0, vzero(),
+		hover_pos, hover_yaw, vzero(), 0, vzero());
 }
 
 // ----------------- //
@@ -55,14 +57,30 @@ static void plan_takeoff_or_landing(struct planner *p, struct vec pos, float yaw
 void plan_init(struct planner *p)
 {
 	p->state = TRAJECTORY_STATE_IDLE;
+	p->type = TRAJECTORY_TYPE_PIECEWISE;
 	p->reversed = false;
 	p->trajectory = NULL;
+	p->compressed_trajectory = NULL;
 	p->planned_trajectory.pieces = p->pieces;
 }
 
 void plan_stop(struct planner *p)
 {
 	p->state = TRAJECTORY_STATE_IDLE;
+}
+
+bool plan_is_finished(struct planner *p, float t)
+{
+	switch (p->type) {
+		case TRAJECTORY_TYPE_PIECEWISE:
+			return piecewise_is_finished(p->trajectory, t);
+
+		case TRAJECTORY_TYPE_PIECEWISE_COMPRESSED:
+		  return piecewise_compressed_is_finished(p->compressed_trajectory, t);
+
+		default:
+		  return 1;
+	}
 }
 
 bool plan_is_stopped(struct planner *p)
@@ -74,52 +92,89 @@ struct traj_eval plan_current_goal(struct planner *p, float t)
 {
 	switch (p->state) {
 		case TRAJECTORY_STATE_LANDING:
-			if (piecewise_is_finished(p->trajectory, t)) {
+			if (plan_is_finished(p, t)) {
 				p->state = TRAJECTORY_STATE_IDLE;
 			}
 			// intentional fall-thru
 		case TRAJECTORY_STATE_FLYING:
-			if (p->reversed) {
-				return piecewise_eval_reversed(p->trajectory, t);
-			}
-			else {
-				return piecewise_eval(p->trajectory, t);
-			}
+			return plan_eval(p, t);
 
 		default:
 			return traj_eval_invalid();
 	}
 }
 
+struct traj_eval plan_eval(struct planner *p, float t)
+{
+	switch (p->type) {
+		case TRAJECTORY_TYPE_PIECEWISE:
+			if (p->reversed) {
+				return piecewise_eval_reversed(p->trajectory, t);
+			}
+			else {
+				return piecewise_eval(p->trajectory, t);
+			}
+			break;
 
-bool plan_is_finished(struct planner *p, float t) {
-  return piecewise_is_finished(p->trajectory, t);
+		case TRAJECTORY_TYPE_PIECEWISE_COMPRESSED:
+			if (p->reversed) {
+				/* not supported */
+				return traj_eval_invalid();
+			}
+			else {
+				return piecewise_compressed_eval(p->compressed_trajectory, t);
+			}
+			break;
+
+		default:
+			return traj_eval_invalid();
+	}
 }
 
-int plan_takeoff(struct planner *p, struct vec pos, float yaw, float height, float duration, float t)
+int plan_takeoff(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t)
 {
 	if (p->state != TRAJECTORY_STATE_IDLE) {
 		return 1;
 	}
 
-	plan_takeoff_or_landing(p, pos, yaw, height, duration);
+	plan_takeoff_or_landing(p, curr_pos, curr_yaw, hover_height, hover_yaw, duration);
 	p->reversed = false;
 	p->state = TRAJECTORY_STATE_FLYING;
+	p->type = TRAJECTORY_TYPE_PIECEWISE;
 	p->planned_trajectory.t_begin = t;
 	p->trajectory = &p->planned_trajectory;
 	return 0;
 }
 
-int plan_land(struct planner *p, struct vec pos, float yaw, float height, float duration, float t)
+int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t)
 {
-	if (   p->state == TRAJECTORY_STATE_IDLE
-		|| p->state == TRAJECTORY_STATE_LANDING) {
+	if (p->state == TRAJECTORY_STATE_LANDING) {
 		return 1;
 	}
 
-	plan_takeoff_or_landing(p, pos, yaw, height, duration);
+	plan_takeoff_or_landing(p, curr_pos, curr_yaw, hover_height, hover_yaw, duration);
 	p->reversed = false;
 	p->state = TRAJECTORY_STATE_LANDING;
+	p->type = TRAJECTORY_TYPE_PIECEWISE;
+	p->planned_trajectory.t_begin = t;
+	p->trajectory = &p->planned_trajectory;
+	return 0;
+}
+
+int plan_go_to_from(struct planner *p, const struct traj_eval *curr_eval, bool relative, struct vec hover_pos, float hover_yaw, float duration, float t)
+{
+	if (relative) {
+		hover_pos = vadd(hover_pos, curr_eval->pos);
+		hover_yaw += curr_eval->yaw;
+	}
+
+	piecewise_plan_7th_order_no_jerk(&p->planned_trajectory, duration,
+		curr_eval->pos, curr_eval->yaw, curr_eval->vel, curr_eval->omega.z, curr_eval->acc,
+		hover_pos,      hover_yaw,      vzero(),        0,                  vzero());
+
+	p->reversed = false;
+	p->state = TRAJECTORY_STATE_FLYING;
+	p->type = TRAJECTORY_TYPE_PIECEWISE;
 	p->planned_trajectory.t_begin = t;
 	p->trajectory = &p->planned_trajectory;
 	return 0;
@@ -127,31 +182,26 @@ int plan_land(struct planner *p, struct vec pos, float yaw, float height, float 
 
 int plan_go_to(struct planner *p, bool relative, struct vec hover_pos, float hover_yaw, float duration, float t)
 {
-	// allow in any state, i.e., can also be used to take-off or land
-
 	struct traj_eval setpoint = plan_current_goal(p, t);
-
-	if (relative) {
-		hover_pos = vadd(hover_pos, setpoint.pos);
-		hover_yaw += setpoint.yaw;
-	}
-
-	piecewise_plan_7th_order_no_jerk(&p->planned_trajectory, duration,
-		setpoint.pos, setpoint.yaw, setpoint.vel, setpoint.omega.z, setpoint.acc,
-		hover_pos,    hover_yaw,    vzero(),      0,                vzero());
-
-	p->reversed = false;
-	p->state = TRAJECTORY_STATE_FLYING;
-	p->planned_trajectory.t_begin = t;
-	p->trajectory = &p->planned_trajectory;
-	return 0;
+	return plan_go_to_from(p, &setpoint, relative, hover_pos, hover_yaw, duration, t);
 }
 
 int plan_start_trajectory( struct planner *p, const struct piecewise_traj* trajectory, bool reversed)
 {
 	p->reversed = reversed;
-	p->trajectory = trajectory;
 	p->state = TRAJECTORY_STATE_FLYING;
+	p->type = TRAJECTORY_TYPE_PIECEWISE;
+	p->trajectory = trajectory;
+
+	return 0;
+}
+
+int plan_start_compressed_trajectory( struct planner *p, struct piecewise_traj_compressed* trajectory)
+{
+	p->reversed = 0;
+	p->state = TRAJECTORY_STATE_FLYING;
+	p->type = TRAJECTORY_TYPE_PIECEWISE_COMPRESSED;
+	p->compressed_trajectory = trajectory;
 
 	return 0;
 }

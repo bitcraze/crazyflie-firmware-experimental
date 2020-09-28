@@ -36,6 +36,7 @@
 #include "crc.h"
 #include "console.h"
 #include "debug.h"
+#include "static_mem.h"
 
 #if 0
 #define PARAM_DEBUG(fmt, ...) DEBUG_PRINT("D/param " fmt, ## __VA_ARGS__)
@@ -99,6 +100,8 @@ static CRTPPacket p;
 
 static bool isInit = false;
 
+STATIC_MEM_TASK_ALLOC_STACK_NO_DMA_CCM_SAFE(paramTask, PARAM_TASK_STACKSIZE);
+
 void paramInit(void)
 {
   int i;
@@ -147,8 +150,7 @@ void paramInit(void)
 
 
   //Start the param task
-	xTaskCreate(paramTask, PARAM_TASK_NAME,
-	            PARAM_TASK_STACKSIZE, NULL, PARAM_TASK_PRI, NULL);
+  STATIC_MEM_TASK_CREATE(paramTask, paramTask, PARAM_TASK_NAME, NULL, PARAM_TASK_PRI);
 
   //TODO: Handle stored parameters!
 
@@ -665,4 +667,47 @@ unsigned int paramGetUint(int varid)
 {
   return (unsigned int)paramGetInt(varid);
 }
+
+void paramSetInt(int varid, int valuei)
+{
+   ASSERT(varid >= 0);
+
+  switch(params[varid].type)
+  {
+    case PARAM_UINT8:
+      *(uint8_t *)params[varid].address = (uint8_t) valuei;
+      break;
+    case PARAM_INT8:
+      *(int8_t *)params[varid].address = (int8_t) valuei;
+      break;
+    case PARAM_UINT16:
+      *(uint16_t *)params[varid].address = (uint16_t) valuei;
+      break;
+    case PARAM_INT16:
+      *(int16_t *)params[varid].address = (int16_t) valuei;
+      break;
+    case PARAM_UINT32:
+      *(uint32_t *)params[varid].address = (uint32_t) valuei;
+      break;
+    case PARAM_INT32:
+      *(int32_t *)params[varid].address = (int32_t) valuei;
+      break;
+    case PARAM_FLOAT:
+    // Todo: are floats handy to have here?
+      *(float *)params[varid].address = (float) valuei;
+
+      break;
+  }
+}
+
+void paramSetFloat(int varid, float valuef)
+{
+  ASSERT(varid >= 0);
+
+  if (params[varid].type == PARAM_FLOAT )
+      *(float *)params[varid].address = valuef;
+}
+
+
+
 

@@ -1,6 +1,6 @@
 # CrazyFlie's Makefile
 # Copyright (c) 2011,2012 Bitcraze AB
-# This Makefile compiles all the objet file to ./bin/ and the resulting firmware
+# This Makefile compiles all the object file to ./bin/ and the resulting firmware
 # image in ./cfX.elf and ./cfX.bin
 
 CRAZYFLIE_BASE ?= ./
@@ -16,7 +16,7 @@ OPENOCD           ?= openocd
 OPENOCD_INTERFACE ?= interface/stlink-v2.cfg
 OPENOCD_CMDS      ?=
 CROSS_COMPILE     ?= arm-none-eabi-
-PYTHON2           ?= python2
+PYTHON            ?= python3
 DFU_UTIL          ?= dfu-util
 CLOAD             ?= 1
 DEBUG             ?= 0
@@ -38,14 +38,17 @@ CFLAGS += -DCRAZYFLIE_FW
 ######### Stabilizer configuration ##########
 ## These are set by the platform (see tools/make/platforms/*.mk), can be overwritten here
 ESTIMATOR          ?= any
-CONTROLLER         ?= Any # one of Any, PID, Mellinger
+CONTROLLER         ?= Any # one of Any, PID, Mellinger, INDI
 POWER_DISTRIBUTION ?= stock
 
 #OpenOCD conf
 RTOS_DEBUG        ?= 0
 
 LIB = $(CRAZYFLIE_BASE)/src/lib
-FREERTOS = $(CRAZYFLIE_BASE)/src/lib/FreeRTOS
+FREERTOS = $(CRAZYFLIE_BASE)/vendor/FreeRTOS
+
+# Communication Link
+UART2_LINK        ?= 0
 
 
 ############### CPU-specific build configuration ################
@@ -82,6 +85,9 @@ CFLAGS += -DSTM32F4XX -DSTM32F40_41xxx -DHSE_VALUE=8000000 -DUSE_STDPERIPH_DRIVE
 
 LOAD_ADDRESS_stm32f4 = 0x8000000
 LOAD_ADDRESS_CLOAD_stm32f4 = 0x8004000
+MEM_SIZE_FLASH_K = 1008
+MEM_SIZE_RAM_K = 128
+MEM_SIZE_CCM_K = 64
 endif
 
 ################ Build configuration ##################
@@ -96,14 +102,14 @@ VPATH += $(LIB)/vl53l1/core/src
 VPATH += $(PORT)
 PORT_OBJ = port.o
 VPATH +=  $(FREERTOS)/portable/MemMang
-MEMMANG_OBJ = heap_4.o
+MEMMANG_OBJ ?= heap_4.o
 
 VPATH += $(FREERTOS)
 FREERTOS_OBJ = list.o tasks.o queue.o timers.o $(MEMMANG_OBJ)
 
 #FatFS
 VPATH += $(LIB)/FatFS
-PROJ_OBJ += diskio.o ff.o syscall.o unicode.o fatfs_sd.o
+PROJ_OBJ += diskio.o ff.o syscall.o ffunicode.o fatfs_sd.o
 ifeq ($(FATFS_DISKIO_TESTS), 1)
 PROJ_OBJ += diskio_function_tests.o
 CFLAGS += -DUSD_RUN_DISKIO_FUNCTION_TESTS
@@ -120,7 +126,7 @@ CFLAGS += -DAPP_PRIORITY=$(APP_PRIORITY)
 endif
 
 # Crazyflie sources
-VPATH += $(CRAZYFLIE_BASE)/src/init $(CRAZYFLIE_BASE)/src/hal/src $(CRAZYFLIE_BASE)/src/modules/src $(CRAZYFLIE_BASE)/src/utils/src $(CRAZYFLIE_BASE)/src/drivers/bosch/src $(CRAZYFLIE_BASE)/src/drivers/src $(CRAZYFLIE_BASE)/src/platform
+VPATH += $(CRAZYFLIE_BASE)/src/init $(CRAZYFLIE_BASE)/src/hal/src $(CRAZYFLIE_BASE)/src/modules/src $(CRAZYFLIE_BASE)/src/modules/src/lighthouse $(CRAZYFLIE_BASE)/src/utils/src $(CRAZYFLIE_BASE)/src/drivers/bosch/src $(CRAZYFLIE_BASE)/src/drivers/src $(CRAZYFLIE_BASE)/src/platform
 
 
 ############### Source files configuration ################
@@ -159,21 +165,21 @@ PROJ_OBJ += vl53l1_register_funcs.o vl53l1_wait.o vl53l1_core_support.o
 # Modules
 PROJ_OBJ += system.o comm.o console.o pid.o crtpservice.o param.o
 PROJ_OBJ += log.o worker.o trigger.o sitaw.o queuemonitor.o msp.o
-PROJ_OBJ += platformservice.o sound_cf2.o extrx.o sysload.o mem_cf2.o
-PROJ_OBJ += range.o app_handler.o
+PROJ_OBJ += platformservice.o sound_cf2.o extrx.o sysload.o mem.o
+PROJ_OBJ += range.o app_handler.o static_mem.o
 
 # Stabilizer modules
 PROJ_OBJ += commander.o crtp_commander.o crtp_commander_rpyt.o
-PROJ_OBJ += crtp_commander_generic.o crtp_localization_service.o
+PROJ_OBJ += crtp_commander_generic.o crtp_localization_service.o peer_localization.o
 PROJ_OBJ += attitude_pid_controller.o sensfusion6.o stabilizer.o
-PROJ_OBJ += position_estimator_altitude.o position_controller_pid.o
+PROJ_OBJ += position_estimator_altitude.o position_controller_pid.o position_controller_indi.o
 PROJ_OBJ += estimator.o estimator_complementary.o
-PROJ_OBJ += controller.o controller_pid.o controller_mellinger.o
+PROJ_OBJ += controller.o controller_pid.o controller_mellinger.o controller_indi.o
 PROJ_OBJ += power_distribution_$(POWER_DISTRIBUTION).o
 PROJ_OBJ += estimator_kalman.o kalman_core.o kalman_supervisor.o
 
 # High-Level Commander
-PROJ_OBJ += crtp_commander_high_level.o planner.o pptraj.o
+PROJ_OBJ += crtp_commander_high_level.o planner.o pptraj.o pptraj_compressed.o
 
 # Deck Core
 PROJ_OBJ += deck.o deck_info.o deck_drivers.o deck_test.o
@@ -183,6 +189,7 @@ PROJ_OBJ += deck_constants.o
 PROJ_OBJ += deck_digital.o
 PROJ_OBJ += deck_analog.o
 PROJ_OBJ += deck_spi.o
+PROJ_OBJ += deck_spi3.o
 
 # Decks
 PROJ_OBJ += bigquad.o
@@ -196,13 +203,20 @@ PROJ_OBJ += locodeck.o
 PROJ_OBJ += clockCorrectionEngine.o
 PROJ_OBJ += lpsTwrTag.o
 PROJ_OBJ += lpsTdoa2Tag.o
-PROJ_OBJ += lpsTdoa3Tag.o tdoaEngine.o tdoaStats.o tdoaStorage.o
+PROJ_OBJ += lpsTdoa3Tag.o tdoaEngineInstance.o tdoaEngine.o tdoaStats.o tdoaStorage.o
 PROJ_OBJ += outlierFilter.o
 PROJ_OBJ += flowdeck_v1v2.o
 PROJ_OBJ += oa.o
 PROJ_OBJ += multiranger.o
 PROJ_OBJ += lighthouse.o
 PROJ_OBJ += activeMarkerDeck.o
+
+# Uart2 Link for CRTP communication is not compatible with decks using uart2
+ifeq ($(UART2_LINK), 1)
+CFLAGS += -DUART2_LINK_COMM
+else
+PROJ_OBJ += aideck.o
+endif
 
 ifeq ($(LPS_TDOA_ENABLE), 1)
 CFLAGS += -DLPS_TDOA_ENABLE
@@ -233,14 +247,15 @@ PROJ_OBJ += exptestRR.o
 PROJ_OBJ += exptestBolt.o
 #PROJ_OBJ += bigquadtest.o
 #PROJ_OBJ += uarttest.o
+#PROJ_OBJ += aidecktest.o
 
 
 # Utilities
 PROJ_OBJ += filter.o cpuid.o cfassert.o  eprintf.o crc.o num.o debug.o
 PROJ_OBJ += version.o FreeRTOS-openocd.o
 PROJ_OBJ += configblockeeprom.o crc_bosch.o
-PROJ_OBJ += sleepus.o
-PROJ_OBJ += pulse_processor.o lighthouse_geometry.o ootx_decoder.o lighthouse_calibration.o
+PROJ_OBJ += sleepus.o statsCnt.o rateSupervisor.o
+PROJ_OBJ += lighthouse_core.o pulse_processor.o pulse_processor_v1.o pulse_processor_v2.o lighthouse_geometry.o ootx_decoder.o lighthouse_calibration.o lighthouse_deck_flasher.o lighthouse_position_est.o
 
 ifeq ($(DEBUG_PRINT_ON_SEGGER_RTT), 1)
 VPATH += $(LIB)/Segger_RTT/RTT
@@ -265,7 +280,7 @@ OBJCOPY = $(CROSS_COMPILE)objcopy
 GDB = $(CROSS_COMPILE)gdb
 
 INCLUDES += -I$(FREERTOS)/include -I$(PORT) -I$(CRAZYFLIE_BASE)/src
-INCLUDES += -I$(CRAZYFLIE_BASE)/src/config -I$(CRAZYFLIE_BASE)/src/hal/interface -I$(CRAZYFLIE_BASE)/src/modules/interface
+INCLUDES += -I$(CRAZYFLIE_BASE)/src/config -I$(CRAZYFLIE_BASE)/src/hal/interface -I$(CRAZYFLIE_BASE)/src/modules/interface -I$(CRAZYFLIE_BASE)/src/modules/interface/lighthouse
 INCLUDES += -I$(CRAZYFLIE_BASE)/src/utils/interface -I$(CRAZYFLIE_BASE)/src/drivers/interface -I$(CRAZYFLIE_BASE)/src/platform
 INCLUDES += -I$(CRAZYFLIE_BASE)/vendor/CMSIS/CMSIS/Include -I$(CRAZYFLIE_BASE)/src/drivers/bosch/interface
 
@@ -282,14 +297,21 @@ INCLUDES += -I$(LIB)/FatFS
 INCLUDES += -I$(LIB)/vl53l1
 INCLUDES += -I$(LIB)/vl53l1/core/inc
 
+CFLAGS += -g3
 ifeq ($(DEBUG), 1)
-  CFLAGS += -O0 -g3 -DDEBUG
+  CFLAGS += -O0 -DDEBUG
+
   # Prevent silent errors when converting between types (requires explicit casting)
   CFLAGS += -Wconversion
 else
-	# Fail on warnings
-  CFLAGS += -Os -g3 -Werror
+  CFLAGS += -Os
+
+  # Fail on warnings
+  CFLAGS += -Werror
 endif
+
+# Disable warnings for unaligned addresses in packed structs (added in GCC 9)
+CFLAGS += -Wno-address-of-packed-member
 
 ifeq ($(LTO), 1)
   CFLAGS += -flto
@@ -310,7 +332,7 @@ CFLAGS += -Wdouble-promotion
 
 
 ASFLAGS = $(PROCESSOR) $(INCLUDES)
-LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority 
+LDFLAGS = --specs=nosys.specs --specs=nano.specs $(PROCESSOR) -Wl,-Map=$(PROG).map,--cref,--gc-sections,--undefined=uxTopUsedPriority
 LDFLAGS += -L$(CRAZYFLIE_BASE)/tools/make/F405/linker
 
 #Flags required by the ST library
@@ -364,7 +386,7 @@ bin/vendor:
 	mkdir -p bin/vendor
 
 libarm_math.a:
-	+$(MAKE) -C $(CRAZYFLIE_BASE)/tools/make/cmsis_dsp/ CRAZYFLIE_BASE=$(abspath $(CRAZYFLIE_BASE)) PROJ_ROOT=$(CURDIR) V=$(V)
+	+$(MAKE) -C $(CRAZYFLIE_BASE)/tools/make/cmsis_dsp/ CRAZYFLIE_BASE=$(abspath $(CRAZYFLIE_BASE)) PROJ_ROOT=$(CURDIR) V=$(V) CROSS_COMPILE=$(CROSS_COMPILE)
 
 clean_version:
 ifeq ($(SHELL),/bin/sh)
@@ -374,7 +396,7 @@ endif
 
 print_version:
 	@echo "Build for the $(PLATFORM_NAME_$(PLATFORM))!"
-	@$(PYTHON2) $(CRAZYFLIE_BASE)/tools/make/versionTemplate.py --crazyflie-base $(CRAZYFLIE_BASE) --print-version
+	@$(PYTHON) $(CRAZYFLIE_BASE)/tools/make/versionTemplate.py --crazyflie-base $(CRAZYFLIE_BASE) --print-version
 ifeq ($(CLOAD), 1)
 	@echo "Crazyloader build!"
 endif
@@ -383,7 +405,7 @@ ifeq ($(FATFS_DISKIO_TESTS), 1)
 endif
 
 size:
-	@$(SIZE) -B $(PROG).elf
+	@$(PYTHON) $(CRAZYFLIE_BASE)/tools/make/size.py $(SIZE) $(PROG).elf $(MEM_SIZE_FLASH_K) $(MEM_SIZE_RAM_K) $(MEM_SIZE_CCM_K)
 
 #Radio bootloader
 cload:
@@ -431,7 +453,7 @@ prep:
 	@$(CC) $(CFLAGS) -dM -E - < /dev/null
 
 check_submodules:
-	@cd $(CRAZYFLIE_BASE); $(PYTHON2) tools/make/check-for-submodules.py
+	@cd $(CRAZYFLIE_BASE); $(PYTHON) tools/make/check-for-submodules.py
 
 include $(CRAZYFLIE_BASE)/tools/make/targets.mk
 
@@ -440,4 +462,4 @@ include $(CRAZYFLIE_BASE)/tools/make/targets.mk
 
 unit:
 # The flag "-DUNITY_INCLUDE_DOUBLE" allows comparison of double values in Unity. See: https://stackoverflow.com/a/37790196
-	rake unit "DEFINES=$(CFLAGS) -DUNITY_INCLUDE_DOUBLE" "FILES=$(FILES)"
+	rake unit "DEFINES=$(CFLAGS) -DUNITY_INCLUDE_DOUBLE" "FILES=$(FILES)" "UNIT_TEST_STYLE=$(UNIT_TEST_STYLE)"
