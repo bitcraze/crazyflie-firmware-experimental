@@ -75,7 +75,13 @@ static statsCntRateLogger_t* bsRates[PULSE_PROCESSOR_N_BASE_STATIONS] = {&bs0Rat
 static uint16_t pulseWidth[PULSE_PROCESSOR_N_SENSORS];
 NO_DMA_CCM_SAFE_ZERO_INIT static pulseProcessor_t ppState = {};
 
+#if LIGHTHOUSE_FORCE_TYPE == 1
+pulseProcessorProcessPulse_t pulseProcessorProcessPulse = pulseProcessorV1ProcessPulse;
+#elif LIGHTHOUSE_FORCE_TYPE == 2
+pulseProcessorProcessPulse_t pulseProcessorProcessPulse = pulseProcessorV2ProcessPulse;
+#else
 pulseProcessorProcessPulse_t pulseProcessorProcessPulse = (void*)0;
+#endif
 
 #define UART_FRAME_LENGTH 12
 
