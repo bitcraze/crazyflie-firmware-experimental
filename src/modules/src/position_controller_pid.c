@@ -67,7 +67,7 @@ struct this_s {
 static float rpLimit  = 20;
 static float rpLimitOverhead = 1.10f;
 // Velocity maximums
-static float xyVelMax = 1.0f;
+static float xyVelMax = 3.0f;
 static float zVelMax  = 1.0f;
 static float velMaxOverhead = 1.10f;
 static const float thrustScale = 1000.0f;
