@@ -36,19 +36,26 @@ from cflib.crazyflie.swarm import Swarm
 from cflib.crazyflie.syncLogger import SyncLogger
 
 # Change uris and sequences according to your setup
-URI0 = 'radio://0/30'
+URI0 = 'radio://0/10/2M/E7E7E7E708'
 URI1 = 'radio://0/10/2M/E7E7E7E702'
+URI2 = 'radio://0/10/2M/E7E7E7E703'
+URI3 = 'radio://0/10/2M/E7E7E7E706'
+URI4 = 'radio://0/10/2M/E7E7E7E701'
 
 SEPARATION = 1.5
 
 swarm_args = {
-    URI0: [{'delay': SEPARATION * 0, 'landX': 0.0, 'landY': -1.0}],
-    URI1: [{'delay': SEPARATION * 1, 'landX': 0.0, 'landY': 0.0}],
+    URI0: [{'delay': SEPARATION * 1 +1 , 'landX': -0.5, 'landY': 0.0, 'id':1}],
+    URI1: [{'delay': SEPARATION * 3, 'landX': 0.0, 'landY': 0.5, 'id':2}],
+    URI2: [{'delay': SEPARATION * 4, 'landX': 0.0, 'landY': -0.5, 'id':3}],
+    URI3: [{'delay': SEPARATION * 5, 'landX': 0.5, 'landY': -0.25, 'id':6}],
+    URI4: [{'delay': SEPARATION * 6+0.5, 'landX': 0.5, 'landY': 0.25, 'id':8}],
+
     # URI2: [SEPARATION * 2],
 }
 
 
-def wait_for_position_estimator(scf):
+def wait_for_position_estimator(scf,data):
     print('Waiting for estimator to find position...')
 
     log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
@@ -86,6 +93,8 @@ def wait_for_position_estimator(scf):
             if (max_x - min_x) < threshold and (
                     max_y - min_y) < threshold and (
                     max_z - min_z) < threshold:
+                #print(data['id'])
+
                 break
 
 
@@ -127,6 +136,6 @@ if __name__ == '__main__':
 
     factory = CachedCfFactory(rw_cache='./cache')
     with Swarm(swarm_args.keys(), factory=factory) as swarm:
-        swarm.parallel_safe(wait_for_position_estimator)
+        swarm.parallel_safe(wait_for_position_estimator, args_dict=swarm_args)
         swarm.parallel_safe(setup, args_dict=swarm_args)
         swarm.parallel_safe(run_trajectory, args_dict=swarm_args)
