@@ -29,7 +29,7 @@
 static xTimerHandle timer;
 static bool isInit = false;
 
-static void appTimer(xTimerHandle timer);
+static void pilotTimer(xTimerHandle timer);
 
 #define LED_LOCK         LED_GREEN_R
 #define LOCK_LENGTH 50
@@ -42,8 +42,8 @@ static void appTimer(xTimerHandle timer);
 
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
-static void resetLockData();
-static bool hasLock();
+static void resetPositionLockData();
+static bool hasPositionLock();
 
 static bool takeOffWhenReady = false;
 static float goToInitialPositionWhenReady = -1.0f;
@@ -99,6 +99,7 @@ enum State {
   STATE_WAIT_FOR_POSITION_LOCK,
 
   STATE_WAIT_FOR_TAKE_OFF, // Charging
+  // TODO krri Add state when battery is charged and we are ready to take off
   STATE_TAKING_OFF,
   STATE_HOVERING,
   STATE_WAITING_TO_GO_TO_INITIAL_POSITION,
@@ -174,45 +175,11 @@ static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 static bool isCharging() { return logGetInt(logIdPmState) == charging; }
 static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 
-const baseStationGeometry_t lighthouseGeoData[PULSE_PROCESSOR_N_BASE_STATIONS]  = {
- {.valid = true, .origin = {-2.057947, 0.398319, 3.109704, }, .mat = {{0.807210, 0.002766, 0.590258, }, {0.067095, 0.993078, -0.096409, }, {-0.586439, 0.117426, 0.801437, }, }},
- {.valid = true, .origin = {0.866244, -2.566829, 3.132632, }, .mat = {{-0.043296, -0.997675, -0.052627, }, {0.766284, -0.066962, 0.639003, }, {-0.641042, -0.012661, 0.767401, }, }},
-};
-
-lighthouseCalibration_t lighthouseCalibrationData[PULSE_PROCESSOR_N_BASE_STATIONS] = {
-  { // Base station 0
-    .sweep = {
-      {.tilt = -0.047353, .phase = 0.000000, .curve = 0.478887, .gibphase = 1.023093, .gibmag = 0.005071, .ogeephase = 1.136886, .ogeemag = -0.520102, },
-      {.tilt = 0.049104, .phase = -0.006642, .curve = 0.675827, .gibphase = 2.367835, .gibmag = 0.004907, .ogeephase = 1.900456, .ogeemag = -0.457289, },
-    },
-    .uid = 0x3C65D22F,
-    .valid = true,
-  },
-  { // Base station 1
-    .sweep = {
-      {.tilt = -0.048959, .phase = 0.000000, .curve = 0.144913, .gibphase = 1.288635, .gibmag = -0.005397, .ogeephase = 2.004001, .ogeemag = 0.033096, },
-      {.tilt = 0.047509, .phase = -0.004676, .curve = 0.374379, .gibphase = 1.727613, .gibmag = -0.005642, .ogeephase = 2.586835, .ogeemag = 0.117884, },
-    },
-    .uid = 0x34C2AD7E,
-    .valid = true,
-  },
-};
-
 #ifdef USE_MELLINGER
 static void enableMellingerController() { paramSetInt(paramIdStabilizerController, ControllerTypeMellinger); }
 #endif
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 static void useCrossingBeamPositioningMethod() { paramSetInt(paramIdLighthouseMethod, 0); }
-
-static void setupLighthouse() {
-  lighthousePositionSetGeometryData(0, &lighthouseGeoData[0]);
-  lighthousePositionSetGeometryData(1, &lighthouseGeoData[1]);
-
-  lighthouseCoreSetCalibrationData(0, &lighthouseCalibrationData[0]);
-  lighthouseCoreSetCalibrationData(1, &lighthouseCalibrationData[1]);
-
-  useCrossingBeamPositioningMethod();
-}
 
 static void defineTrajectory() {
   const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
@@ -230,7 +197,7 @@ void appMain() {
     return;
   }
 
-  DEBUG_PRINT("This is a demo app\n");
+  DEBUG_PRINT("This is a demo app for an autonomous swarm\n");
 
   // Get log and param ids
   logIdStateEstimateX = logGetVarId("stateEstimate", "x");
@@ -248,25 +215,23 @@ void appMain() {
   paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
 
 
-  timer = xTimerCreate("AppTimer", M2T(20), pdTRUE, NULL, appTimer);
+  timer = xTimerCreate("PilotTimer", M2T(20), pdTRUE, NULL, pilotTimer);
   xTimerStart(timer, 20);
-
-  pinMode(DECK_GPIO_IO3, INPUT_PULLUP);
 
   #ifdef USE_MELLINGER
     enableMellingerController();
   #endif
 
-  setupLighthouse();
+  useCrossingBeamPositioningMethod();
   enableHighlevelCommander();
   defineTrajectory();
   defineLedSequence();
-  resetLockData();
+  resetPositionLockData();
 
   isInit = true;
 }
 
-static void appTimer(xTimerHandle timer) {
+static void pilotTimer(xTimerHandle timer) {
   uint32_t previous = now;
   now = xTaskGetTickCount();
   uint32_t delta = now - previous;
@@ -285,7 +250,7 @@ static void appTimer(xTimerHandle timer) {
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
-      if (hasLock()) {
+      if (hasPositionLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
         ledseqRun(&seq_lock);
         state = STATE_WAIT_FOR_TAKE_OFF;
@@ -312,7 +277,6 @@ static void appTimer(xTimerHandle timer) {
         DEBUG_PRINT("Hovering, waiting for command to start\n");
         ledseqStop(&seq_lock);
         state = STATE_HOVERING;
-
       }
       flightTime += delta;
       break;
@@ -425,6 +389,7 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
+      // TODO krri Let the peers know we have crashed. Revoke the lock.
       break;
     default:
       break;
@@ -432,7 +397,7 @@ static void appTimer(xTimerHandle timer) {
 }
 
 
-static bool hasLock() {
+static bool hasPositionLock() {
   bool result = false;
 
   // Store current state
@@ -481,7 +446,7 @@ static bool hasLock() {
   return result;
 }
 
-static void resetLockData() {
+static void resetPositionLockData() {
     lockWriteIndex = 0;
     for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
       lockData[i][0] = FLT_MAX;
