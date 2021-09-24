@@ -29,6 +29,7 @@ This example utilizes the SyncCrazyflie and SyncLogger classes.
 """
 import logging
 import time
+import struct
 
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
@@ -42,7 +43,16 @@ uri = uri_helper.uri_from_env(default='usb://0')
 logging.basicConfig(level=logging.ERROR)
 
 def print_packet(data):
+    print("Length:", len(data))
     print(data)
+    msg_type = data[0]
+
+    if msg_type == 1:
+        node, proposal_nr = struct.unpack('<BL', data[1:])
+        print("Proposal - node:", node, "proposalNr:", proposal_nr)
+    else:
+        print("Warning! unknown message type:", msg_type)
+        print(data)
 
 
 if __name__ == '__main__':
@@ -52,5 +62,6 @@ if __name__ == '__main__':
     cf = Crazyflie(rw_cache='./cache')
     with SyncCrazyflie(uri, cf=cf) as scf:
         cf.appchannel.packet_received.add_callback(print_packet)
+        print("Sniffer started. Waiting for packets...")
         while True:
             time.sleep(5)
