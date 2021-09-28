@@ -1,7 +1,5 @@
 
 // Define to build the sniffer flavour of the firmware, disable to build for flying members
-#define BUILD_SNIFFER 0
-
 #include "FreeRTOS.h"
 #include "timers.h"
 #include "pilot.h"
@@ -42,6 +40,7 @@ void appMain() {
   DEBUG_PRINT("This is a demo app for an autonomous swarm - flyer\n");
 
   initPilot();
+  initTower();
 
   pilotTimer = xTimerCreate("PilotTimer", M2T(20), pdTRUE, NULL, pilotTimerCb);
   xTimerStart(pilotTimer, 20);

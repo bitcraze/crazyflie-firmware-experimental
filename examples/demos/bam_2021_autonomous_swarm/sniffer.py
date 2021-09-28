@@ -29,6 +29,7 @@ This example utilizes the SyncCrazyflie and SyncLogger classes.
 """
 import logging
 import time
+from datetime import datetime
 import struct
 
 import cflib.crtp
@@ -42,14 +43,31 @@ uri = uri_helper.uri_from_env(default='usb://0')
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.ERROR)
 
+def print_state(data):
+    vals = struct.unpack('<BLBL', data)
+    print("[nodeId1: {}, timeRemaining1: {}, nodeId2: {}, timeRemaining2: {}]".format(*vals))
+
 def print_packet(data):
-    print("Length:", len(data))
-    print(data)
+#    print("Length:", len(data))
+#    print(data)
     msg_type = data[0]
 
+    print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
+
     if msg_type == 1:
-        node, proposal_nr = struct.unpack('<BL', data[1:])
-        print("Proposal - node:", node, "proposalNr:", proposal_nr)
+        vals = struct.unpack('<BL', data[1:])
+        print("From {}, Proposal,           proposalNr: {:3d}".format(*vals))
+    elif msg_type == 2:
+        vals = struct.unpack('<BLL?', data[1:11])
+        print("From {}, Promise,            proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
+        print_state(data[11:21])
+    elif msg_type == 3:
+        vals = struct.unpack('<BB', data[1:3])
+        print("From {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
+        print_state(data[3:13])
+    elif msg_type == 4:
+        vals = struct.unpack('<BB?', data[1:4])
+        print("From {}, StateUpdateAccept,  proposalNr: {:3d}, updateAccepted: {}".format(*vals))
     else:
         print("Warning! unknown message type:", msg_type)
         print(data)

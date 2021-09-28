@@ -25,13 +25,13 @@ typedef struct {
 typedef struct {
   uint8_t msgType; // = 3
   uint8_t nodeId;
-  uint8_t roundNr;
+  uint8_t proposalNr;
   TowerState newState;
-} __attribute__((packed)) StateUpdate;
+} __attribute__((packed)) StateUpdateRequest;
 
 typedef struct {
   uint8_t msgType; // = 4
   uint8_t nodeId;
-  uint8_t roundNr;
+  uint8_t proposalNr;
   uint8_t updateAccepted;
-} __attribute__((packed)) Accepted;
+} __attribute__((packed)) StateUpdateAccept;

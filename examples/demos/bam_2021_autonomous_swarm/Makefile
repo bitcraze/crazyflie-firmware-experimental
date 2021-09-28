@@ -9,7 +9,7 @@ CFLAGS += -DCF_MASS=0.036f
 ## Force lighthouse 2
 CFLAGS += -DLIGHTHOUSE_FORCE_TYPE=2
 
-# CLOAD_CMDS = -w radio://0/30/2M
+# CFLAGS += -DBUILD_SNIFFER
 # DEBUG=1
 
 
