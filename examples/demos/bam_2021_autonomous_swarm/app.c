@@ -15,6 +15,7 @@ static bool isInit = false;
 
 
 #if BUILD_SNIFFER
+#warning "Building sniffer"
 void appMain() {
   if (isInit) {
     return;
@@ -28,6 +29,7 @@ void appMain() {
 
 
 #else
+#warning "Building flyer"
 
 static xTimerHandle pilotTimer;
 static xTimerHandle towerTimer;
@@ -42,11 +44,11 @@ void appMain() {
   initPilot();
   initTower();
 
-  pilotTimer = xTimerCreate("PilotTimer", M2T(20), pdTRUE, NULL, pilotTimerCb);
-  xTimerStart(pilotTimer, 20);
+  pilotTimer = xTimerCreate("PilotTimer", M2T(21), pdTRUE, NULL, pilotTimerCb);
+  xTimerStart(pilotTimer, 100);
 
-  towerTimer = xTimerCreate("TowerTimer", M2T(1000), pdTRUE, NULL, towerTimerCb);
-  xTimerStart(towerTimer, 20);
+  towerTimer = xTimerCreate("TowerTimer", M2T(10), pdTRUE, NULL, towerTimerCb);
+  xTimerStart(towerTimer, 100);
 
   isInit = true;
 }

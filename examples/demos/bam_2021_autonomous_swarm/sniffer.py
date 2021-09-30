@@ -30,6 +30,7 @@ This example utilizes the SyncCrazyflie and SyncLogger classes.
 import logging
 import time
 from datetime import datetime
+from datetime import timedelta
 import struct
 
 import cflib.crtp
@@ -38,39 +39,107 @@ from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.utils import uri_helper
 
 
+
+
 uri = uri_helper.uri_from_env(default='usb://0')
 
 # Only output errors from the logging framework
 logging.basicConfig(level=logging.ERROR)
 
-def print_state(data):
-    vals = struct.unpack('<BLBL', data)
-    print("[nodeId1: {}, timeRemaining1: {}, nodeId2: {}, timeRemaining2: {}]".format(*vals))
+class State:
+    def __init__(self) -> None:
+        self.nodeId1 = 0;
+        self.endTime1 = time.time();
+        self.nodeId2 = 0;
+        self.endTime2 = time.time();
 
-def print_packet(data):
-#    print("Length:", len(data))
-#    print(data)
-    msg_type = data[0]
 
-    print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
+class Sniffer:
+    def __init__(self) -> None:
+        # Latest accepted concensus state (that the sniffer knows about)
+        self.concensusStateProposalNr = 0
+        self.concensusState = State()
+        self.concensusStateAcceptCount = 0
 
-    if msg_type == 1:
-        vals = struct.unpack('<BL', data[1:])
-        print("From {}, Proposal,           proposalNr: {:3d}".format(*vals))
-    elif msg_type == 2:
-        vals = struct.unpack('<BLL?', data[1:11])
-        print("From {}, Promise,            proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
-        print_state(data[11:21])
-    elif msg_type == 3:
-        vals = struct.unpack('<BB', data[1:3])
-        print("From {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
-        print_state(data[3:13])
-    elif msg_type == 4:
-        vals = struct.unpack('<BB?', data[1:4])
-        print("From {}, StateUpdateAccept,  proposalNr: {:3d}, updateAccepted: {}".format(*vals))
-    else:
-        print("Warning! unknown message type:", msg_type)
-        print(data)
+        self.MAJORITY = 5
+
+    def handle_packet(self, data):
+        # print(data)
+        msg_type = data[0]
+
+        print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
+
+        if msg_type == 1:
+            vals = struct.unpack('<BL', data[1:])
+            print("From {}, Proposal,           proposalNr: {:3d}".format(*vals))
+        elif msg_type == 2:
+            vals = struct.unpack('<BLL?', data[1:11])
+            print("From {}, Promise,            proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
+            self.print_state(self.unpack_state(data[11:21]))
+        elif msg_type == 3:
+            vals = struct.unpack('<BL', data[1:6])
+            print("From {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
+            self.print_state(self.unpack_state(data[6:16]))
+        elif msg_type == 4:
+            vals = struct.unpack('<BL?', data[1:7])
+            print("From {}, StateUpdateAccept,  proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
+            state = self.unpack_state(data[7:17])
+            self.print_state(state)
+
+            proposalNr = vals[1]
+            self.handle_state_update_accept(proposalNr, state)
+        else:
+            print("Warning! unknown message type:", msg_type)
+            print(data)
+
+    def handle_state_update_accept(self, proposalNr, state):
+        if proposalNr == self.concensusStateProposalNr:
+            self.concensusStateAcceptCount += 1
+            if self.concensusStateAcceptCount == self.MAJORITY:
+                self.concensusState = state
+                print("New concensus!", end='')
+                self.print_state(self.concensusState)
+        elif proposalNr > self.concensusStateProposalNr:
+            self.concensusStateProposalNr = proposalNr;
+            self.concensusStateAcceptCount = 1
+
+    def unpack_state(self, data):
+        vals = struct.unpack('<BLBL', data)
+
+        result = State()
+        result.nodeId1 = vals[0]
+        result.nodeId2 = vals[2]
+
+        delta1 = vals[1]
+        if delta1 != 0:
+            result.endTime1 = datetime.now() + timedelta(seconds=delta1 / 1000.0)
+        else:
+            result.endTime1 = None
+
+        delta2 = vals[3]
+        if delta2 != 0:
+            result.endTime2 = datetime.now() + timedelta(seconds=delta2 / 1000.0)
+        else:
+            result.endTime2 = None
+
+        return result
+
+    def print_state(self, state):
+        time1 = 'free'
+        if state.endTime1 is not None:
+            clock = state.endTime1.strftime("%H:%M:%S.%f")
+            seconds_remaining = (state.endTime1 - datetime.now()).seconds
+            time1 = "{} ({})".format(clock, seconds_remaining)
+
+        time2 = 'free'
+        if state.endTime2 is not None:
+            clock = state.endTime2.strftime("%H:%M:%S.%f")
+            seconds_remaining = (state.endTime2 - datetime.now()).seconds
+            time2 = "{} ({})".format(clock, seconds_remaining)
+
+        print("[node1: {} - {}, node2: {} - {}]".format(
+            state.nodeId1, time1, state.nodeId2, time2))
+
 
 
 if __name__ == '__main__':
@@ -79,7 +148,8 @@ if __name__ == '__main__':
 
     cf = Crazyflie(rw_cache='./cache')
     with SyncCrazyflie(uri, cf=cf) as scf:
-        cf.appchannel.packet_received.add_callback(print_packet)
+        sniffer = Sniffer()
+        cf.appchannel.packet_received.add_callback(sniffer.handle_packet)
         print("Sniffer started. Waiting for packets...")
         while True:
             time.sleep(5)
