@@ -5,25 +5,27 @@
 #include "radiolink.h"
 #include "protocol.h"
 #include "configblock.h"
-
+#include "cf_math.h"
 
 #include "tower.h"
+#include "pilot.h"
 
 #define DEBUG_MODULE "TOWER"
 #include "debug.h"
 
-#if 1
+#if 0
   #define DBG_FLOW(fmt, ...)  DEBUG_PRINT(fmt, ## __VA_ARGS__)
 #else
   #define DBG_FLOW(...)
 #endif
 
+typedef struct {
+  uint8_t nodeId;
+  uint32_t endTime;
+} TimedLock;
 
 typedef struct {
-  uint8_t nodeId1;
-  uint32_t endTime1;
-  uint8_t nodeId2;
-  uint32_t endTime2;
+  TimedLock lock[LOCK_COUNT];
 } SwarmState;
 
 
@@ -57,7 +59,9 @@ static uint32_t getTxSlotTick();
 
 static const int NO_FLIGHT_SLOT_EMPTY = -1;
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state);
-static bool planFlight(uint32_t now, SwarmState* newState);
+static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeOffTime);
+static int sortLocks(const SwarmState* state, int sortedIndexs[]);
+static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const uint32_t targetTime);
 
 // Distributed concensus data ****************************************
 // General data ======================================================
@@ -112,6 +116,7 @@ enum TowerState {
   STATE_WAIT_FOR_PROMISE,
   STATE_PLAN_FLIGHT,
   STATE_WAIT_FOR_ACCEPTED_STATE_UPDATE,
+  STATE_FLYING,
 };
 
 static enum TowerState towerState;
@@ -129,6 +134,7 @@ static uint32_t towerHoldbackTime = 0;
 static uint32_t goToIdle(const uint32_t now, const uint32_t minimumDelay);
 static void holdBackNewInitiations();
 
+static uint32_t latestTakeOffTime = 0;
 
 
 void initTower() {
@@ -176,12 +182,11 @@ void towerTimerCb(xTimerHandle timer) {
       break;
     case STATE_CHECK_STATUS:
       {
-        // TODO Implement check for battery voltage
-        bool isBatteryCharged = true;
-        if (isBatteryCharged) {
-          bool isAFlightSlotEpty = (findEmptyFlightSlot(now, &latestKnownConcensusState) != NO_FLIGHT_SLOT_EMPTY);
-          if (isAFlightSlotEpty) {
-            DBG_FLOW("Newproposal at %lu\n", now);
+        bool isReadyForFlight = isPilotReadyForFlight();
+        if (isReadyForFlight) {
+          bool isAFlightSlotEmpty = (findEmptyFlightSlot(now, &latestKnownConcensusState) != NO_FLIGHT_SLOT_EMPTY);
+          if (isAFlightSlotEmpty) {
+            DEBUG_PRINT("Proposing flight plan\n");
             initiateNewProposition(now);
             towerState = STATE_WAIT_FOR_PROMISE;
           } else {
@@ -216,9 +221,9 @@ void towerTimerCb(xTimerHandle timer) {
     case STATE_PLAN_FLIGHT:
       {
         SwarmState newState;
-        bool planSuccess = planFlight(now, &newState);
+        bool planSuccess = planFlight(now, &newState, &latestTakeOffTime);
         if (planSuccess) {
-          DBG_FLOW("Flight plan success\n");
+          DEBUG_PRINT("Flight plan submitted\n");
           initiatorSendStateUpdateRequest(initiatorCurrentProposalNr, &newState);
           learnerAcceptVoteEndTime = now + VOTE_TIME;
           towerState = STATE_WAIT_FOR_ACCEPTED_STATE_UPDATE;
@@ -230,14 +235,26 @@ void towerTimerCb(xTimerHandle timer) {
       break;
     case STATE_WAIT_FOR_ACCEPTED_STATE_UPDATE:
       if (latestKnownConcensusStateProposalNr == initiatorCurrentProposalNr) {
-        DBG_FLOW("Flight plan accepted\n");
-        // TODO if majoity take off
-        towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
+        DEBUG_PRINT("Flight plan accepted\n");
+
+        float delay = latestTakeOffTime - now;
+        if (delay >= 0.0f) {
+          takeOffWithDelay(delay);
+          towerState = STATE_FLYING;
+        } else {
+          // Missed flight slot, cancel flight
+          towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
+        }
       } else {
         if (now > learnerAcceptVoteEndTime) {
           DBG_FLOW("No majority for flight plan\n");
           towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
         }
+      }
+      break;
+    case STATE_FLYING:
+      if (hasPilotLanded()) {
+        towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
       }
       break;
     default:
@@ -318,7 +335,7 @@ static uint32_t generateProposalNr() {
   return newProposalId;
 }
 
-// TODO krri Protect data to be reentrant safe
+
 static void p2pRxCallback(P2PPacket *packet) {
   const uint8_t msgType = packet->data[0];
   uint32_t proposalNr = 0;
@@ -364,8 +381,7 @@ static void initiatorHandlePromise(const Promise* data) {
     if (data->proposalNr == initiatorCurrentProposalNr) {
       initiatorPromiseCount++;
 
-      const uint32_t now = xTaskGetTickCount();
-      DBG_FLOW("Pr %lu %i %i\n", now, data->nodeId, initiatorPromiseCount);
+      DBG_FLOW("Pr %lu %i %i\n", xTaskGetTickCount(), data->nodeId, initiatorPromiseCount);
 
       if (data->previousProposalNr > initiatorHighestProposalNr) {
         initiatorHighestProposalNr = data->previousProposalNr;
@@ -397,8 +413,7 @@ static void learnerHandleStateUpdateAccept(const StateUpdateAccept* data) {
 
     if (data->proposalNr == learnerConcensusStatePropositionNr) {
       learnerConcensusStateCount++;
-      const uint32_t now = xTaskGetTickCount();
-      DBG_FLOW("Learner count %lu %i %i\n", now, data->nodeId, learnerConcensusStateCount);
+      DBG_FLOW("Learner count %lu %i %i\n", xTaskGetTickCount(), data->nodeId, learnerConcensusStateCount);
       if (learnerConcensusStateCount == MAJORITY_COUNT) {
         // We have a majority! Save the state as the new concensus.
         setSwarmStateFromDeltaState(&latestKnownConcensusState, &data->newState);
@@ -412,28 +427,26 @@ static void learnerHandleStateUpdateAccept(const StateUpdateAccept* data) {
 static void setSwarmStateFromDeltaState(SwarmState* target, const DeltaState* source) {
   const uint32_t now = xTaskGetTickCount();
 
-  target->nodeId1 = source->nodeId1;
-  target->endTime1 = source->timeRemaining1 + now;
-
-  target->nodeId2 = source->nodeId2;
-  target->endTime2 = source->timeRemaining2 + now;
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    target->lock[i].nodeId = source->lock[i].nodeId;
+    if (source->lock[i].timeRemaining == 0) {
+      target->lock[i].endTime = 0;
+    } else {
+      target->lock[i].endTime = source->lock[i].timeRemaining + now;
+    }
+  }
 }
 
 static void setDeltaStateFromSwarmState(DeltaState* target, const SwarmState* source) {
   const uint32_t now = xTaskGetTickCount();
 
-  target->nodeId1 = source->nodeId1;
-  if (source->endTime1 > now) {
-    target->timeRemaining1 = source->endTime1 - now;
-  } else {
-    target->timeRemaining1 = 0;
-  }
-
-  target->nodeId2 = source->nodeId2;
-  if (source->endTime2 > now) {
-    target->timeRemaining2 = source->endTime2 - now;
-  } else {
-    target->timeRemaining2 = 0;
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    target->lock[i].nodeId = source->lock[i].nodeId;
+    if (source->lock[i].endTime > now) {
+      target->lock[i].timeRemaining = source->lock[i].endTime - now;
+    } else {
+      target->lock[i].timeRemaining = 0;
+    }
   }
 }
 
@@ -477,35 +490,118 @@ static void holdBackNewInitiations() {
 }
 
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state) {
-  if (state->endTime1 <= now) {
-    return 0;
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    if (state->lock[i].endTime <= now) {
+      return i;
+    }
   }
-
-  // TODO Enable second slot
-  // if (state->endTime2 <= now) {
-  //   return 1;
-  // }
 
   return NO_FLIGHT_SLOT_EMPTY;
 }
 
-static bool planFlight(uint32_t now, SwarmState* newState) {
-  // TODO Plan flight (based on initiatorPromiseState)
-  // TODO impelement for real. Use dummy state for testing
+static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeOffTime) {
+  #if (LOCK_COUNT != 3)
+    #error "This code only works for 3 locks"
+  #endif
+
+  bool planSuccess = false;
+
+  // The time it takes to finalize the concensus
+  const uint32_t MIN_PREPARATION_TIME = M2T(1000);
+  const uint32_t flightCycleTime = M2T(getFlightCycleTimeMs());
+  const uint32_t fullFlightTime = M2T(getFullFlightTimeMs());
+
   // Use initiatorPromiseState, we are sure it has not been updated
   // since the majority was received. It is possible (but unlikely)
   // that latestKnownConcensusState had been modified
   const SwarmState* currentState = &initiatorPromiseState;
 
-  bool result = false;
+  int sortedIndexes[LOCK_COUNT];
+  const int usedLocks = sortLocks(currentState, sortedIndexes);
 
-  if (findEmptyFlightSlot(now, currentState) == 0) {
-    newState->nodeId1 = nodeId;
-    newState->endTime1 = now + 5000;
-    newState->nodeId2 = 0;
-    newState->endTime2 = now;
+  // We have 4 cases depending on the number of locks that are taken:
+  // 0 - fly anytime
+  // 1 - Plan the flight to intersect with the existing flight, half a cycle off
+  // 2 - Plan the flight to intersect with the existing flight that has the latest end time. Make sure we do not enter before the other flight is ended.
+  // 3 - No flight
 
-    result = true;
+
+  switch(usedLocks) {
+    case 0:
+      *latestTakeOffTime = now + MIN_PREPARATION_TIME;
+      break;
+    case 1:
+      {
+        const uint32_t previousTakeOffTime = currentState->lock[sortedIndexes[0]].endTime - fullFlightTime;
+        const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
+        *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, now + MIN_PREPARATION_TIME);
+      }
+      break;
+    case 2:
+      {
+        const uint32_t oldestFlightEndTime = currentState->lock[sortedIndexes[1]].endTime;
+        const uint32_t previousTakeOffTime = currentState->lock[sortedIndexes[0]].endTime - fullFlightTime;
+        const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
+
+        uint32_t targetTime = MAX(now + MIN_PREPARATION_TIME, oldestFlightEndTime);
+        *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, targetTime);
+      }
+      break;
+    default:
+      // Flight can not be planned
+      break;
+  }
+
+  // Set up the new state
+  if (planSuccess) {
+    *newState = *currentState;
+    int emptySlot = sortedIndexes[usedLocks];
+    newState->lock[emptySlot].nodeId = nodeId;
+    newState->lock[emptySlot].endTime = *latestTakeOffTime + fullFlightTime;
+  }
+
+  return planSuccess;
+}
+
+// Bubble-sort lock end times and return a list of indexes where the first index
+// is for the lock that will expire last.
+static int sortLocks(const SwarmState* state, int sortedIndexs[]) {
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    sortedIndexs[i] = i;
+  }
+
+  bool changed = false;
+  do {
+    changed = false;
+    for (int i = 0; i < (LOCK_COUNT - 1); i++) {
+      uint32_t t1 = state->lock[sortedIndexs[i]].endTime;
+      uint32_t t2 = state->lock[sortedIndexs[i + 1]].endTime;
+
+      if (t1 < t2) {
+        int tmp = sortedIndexs[i];
+        sortedIndexs[i] = sortedIndexs[i + 1];
+        sortedIndexs[i + 1] = tmp;
+        changed = true;
+      }
+    }
+
+  } while(changed);
+
+  int usedCount = 0;
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    if (state->lock[i].endTime != 0) {
+      usedCount++;
+    }
+  }
+
+  return usedCount;
+}
+
+static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const uint32_t targetTime) {
+  uint32_t result = baseTime;
+
+  while(result < targetTime) {
+    result += flightCycleTime;
   }
 
   return result;

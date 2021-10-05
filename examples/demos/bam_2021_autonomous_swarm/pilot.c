@@ -32,9 +32,10 @@
 #define LOCK_THRESHOLD 0.001f
 #define MAX_PAD_ERR 0.005
 #define TAKE_OFF_HEIGHT 0.2f
+#define TAKE_OFF_TIME 1.0f
 #define LANDING_HEIGHT 0.12f
 #define SEQUENCE_SPEED 1.0f
-#define DURATION_TO_INITIAL_POSITION 2.0
+#define DURATION_TO_INITIAL_POSITION 2.0f
 
 static uint32_t positionLockWriteIndex;
 static float positionLockData[LOCK_LENGTH][3];
@@ -42,7 +43,7 @@ static void resetPositionLockData();
 static bool hasPositionLock();
 
 static bool takeOffWhenReady = false;
-static float goToInitialPositionWhenReady = -1.0f;
+static float takeOffDelayS = 0.0f;
 static bool terminateTrajectoryAndLand = false;
 
 static float padX = 0.0;
@@ -54,9 +55,7 @@ static uint32_t landingTimeCheckCharge = 0;
 static float stabilizeEndTime;
 
 #define NO_PROGRESS -2000.0f
-static float currentProgressInTrajectory = NO_PROGRESS;
 static uint32_t trajectoryStartTime = 0;
-static uint32_t timeWhenToGoToInitialPosition = 0;
 static float trajectoryDurationMs = 0.0f;
 
 static float trajecory_center_offset_x = 0.0f;
@@ -67,7 +66,7 @@ static uint32_t now = 0;
 static uint32_t flightTime = 0;
 
 // The nr of trajectories to fly
-static uint8_t trajectoryCount = 255;
+static uint8_t trajectoryCount = 2;
 static uint8_t remainingTrajectories = 0;
 
 // Log and param ids
@@ -78,6 +77,7 @@ static logVarId_t logIdKalmanVarPX;
 static logVarId_t logIdKalmanVarPY;
 static logVarId_t logIdKalmanVarPZ;
 static logVarId_t logIdPmState;
+static logVarId_t logIdPmVbat;
 static logVarId_t logIdlighthouseEstBs0Rt;
 static logVarId_t logIdlighthouseEstBs1Rt;
 
@@ -95,10 +95,7 @@ enum State {
   STATE_WAIT_FOR_POSITION_LOCK,
 
   STATE_WAIT_FOR_TAKE_OFF, // Charging
-  // TODO krri Add state when battery is charged and we are ready to take off
   STATE_TAKING_OFF,
-  STATE_HOVERING,
-  STATE_WAITING_TO_GO_TO_INITIAL_POSITION,
   STATE_GOING_TO_INITIAL_POSITION,
   STATE_RUNNING_TRAJECTORY,
   STATE_GOING_TO_PAD,
@@ -184,6 +181,38 @@ static void defineTrajectory() {
   crtpCommanderHighLevelDefineTrajectory(trajectoryId, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
 }
 
+
+// The flight time for one spiral sequence, that is going up in the center and down in the spiral
+int getFlightCycleTimeMs() {
+  return trajectoryDurationMs;
+}
+
+// The flight time from take off to the end of the last spiral
+int getFullFlightTimeMs() {
+  return (TAKE_OFF_TIME + DURATION_TO_INITIAL_POSITION)* 1000 + trajectoryDurationMs;
+}
+
+bool isPilotReadyForFlight() {
+  const float VBAT_ACCEPT_LEVEL = 4.10f;
+  const float vbat = logGetFloat(logIdPmVbat);
+
+  return (STATE_WAIT_FOR_TAKE_OFF == state) && (vbat >= VBAT_ACCEPT_LEVEL);
+}
+
+void takeOffWithDelay(const uint32_t delayMs) {
+  takeOffWhenReady = true;
+  takeOffDelayS = delayMs * 1000.0f;
+}
+
+bool hasPilotLanded() {
+  return STATE_WAIT_FOR_TAKE_OFF == state;
+}
+
+bool hasCrashed() {
+  return STATE_CRASHED == state;
+}
+
+
 static void defineLedSequence() {
   ledseqRegisterSequence(&seq_lock);
 }
@@ -199,6 +228,7 @@ void initPilot() {
   logIdKalmanVarPY = logGetVarId("kalman", "varPY");
   logIdKalmanVarPZ = logGetVarId("kalman", "varPZ");
   logIdPmState = logGetVarId("pm", "state");
+  logIdPmVbat = logGetVarId("pm", "vbat");
   logIdlighthouseEstBs0Rt = logGetVarId("lighthouse", "estBs0Rt");
   logIdlighthouseEstBs1Rt = logGetVarId("lighthouse", "estBs1Rt");
 
@@ -255,48 +285,23 @@ void pilotTimerCb(xTimerHandle timer) {
         DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
 
         terminateTrajectoryAndLand = false;
-        crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+        crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, TAKE_OFF_TIME);
         state = STATE_TAKING_OFF;
       }
       break;
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Hovering, waiting for command to start\n");
-        ledseqStop(&seq_lock);
-        state = STATE_HOVERING;
-      }
-      flightTime += delta;
-      break;
-    case STATE_HOVERING:
-      if (terminateTrajectoryAndLand) {
-          terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Terminating hovering\n");
-          state = STATE_GOING_TO_PAD;
-      } else {
-        if (goToInitialPositionWhenReady >= 0.0f) {
-          float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
-          timeWhenToGoToInitialPosition = now + delayMs;
-          trajectoryStartTime = now + delayMs;
-          goToInitialPositionWhenReady = -1.0f;
-          DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
-          state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
-        }
-      }
-      flightTime += delta;
-      break;
-    case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
-      if (now >= timeWhenToGoToInitialPosition) {
         DEBUG_PRINT("Going to initial position\n");
-        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
+        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION + takeOffDelayS, false);
+        ledseqStop(&seq_lock);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
       flightTime += delta;
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
-
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
+        trajectoryStartTime = now;
         crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
         remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
@@ -304,15 +309,12 @@ void pilotTimerCb(xTimerHandle timer) {
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
-
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
-          currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
@@ -376,7 +378,6 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
-      // TODO krri Let the peers know we have crashed. Revoke the lock.
       break;
     default:
       break;
@@ -444,7 +445,6 @@ static void resetPositionLockData() {
 
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
-  PARAM_ADD(PARAM_FLOAT, start, &goToInitialPositionWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
@@ -454,7 +454,6 @@ PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
   LOG_ADD(LOG_UINT8, state, &state)
-  LOG_ADD(LOG_FLOAT, prgr, &currentProgressInTrajectory)
   LOG_ADD(LOG_UINT32, uptime, &now)
   LOG_ADD(LOG_UINT32, flighttime, &flightTime)
 LOG_GROUP_STOP(app)

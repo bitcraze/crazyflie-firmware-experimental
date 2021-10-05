@@ -28,6 +28,7 @@ and prints it to the console. After 10s the application disconnects and exits.
 This example utilizes the SyncCrazyflie and SyncLogger classes.
 """
 import logging
+from os import times
 import time
 from datetime import datetime
 from datetime import timedelta
@@ -47,11 +48,12 @@ uri = uri_helper.uri_from_env(default='usb://0')
 logging.basicConfig(level=logging.ERROR)
 
 class State:
+    LOCK_COUNT = 3
+
     def __init__(self) -> None:
-        self.nodeId1 = 0;
-        self.endTime1 = time.time();
-        self.nodeId2 = 0;
-        self.endTime2 = time.time();
+        self.lock = []
+        for _ in range(self.LOCK_COUNT):
+            self.lock.append({"nodeId": 0, "endTime": None })
 
 
 class Sniffer:
@@ -64,7 +66,7 @@ class Sniffer:
         self.MAJORITY = 5
 
     def handle_packet(self, data):
-        # print(data)
+        print(len(data), data)
         msg_type = data[0]
 
         print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
@@ -75,15 +77,15 @@ class Sniffer:
         elif msg_type == 2:
             vals = struct.unpack('<BLL?', data[1:11])
             print("From {}, Promise,            proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[11:21]))
+            self.print_state(self.unpack_state(data[11:26]))
         elif msg_type == 3:
             vals = struct.unpack('<BL', data[1:6])
             print("From {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[6:16]))
+            self.print_state(self.unpack_state(data[6:21]))
         elif msg_type == 4:
             vals = struct.unpack('<BL?', data[1:7])
             print("From {}, StateUpdateAccept,  proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
-            state = self.unpack_state(data[7:17])
+            state = self.unpack_state(data[7:22])
             self.print_state(state)
 
             proposalNr = vals[1]
@@ -104,42 +106,33 @@ class Sniffer:
             self.concensusStateAcceptCount = 1
 
     def unpack_state(self, data):
-        vals = struct.unpack('<BLBL', data)
+        vals = struct.unpack('<BLBLBL', data)
 
         result = State()
-        result.nodeId1 = vals[0]
-        result.nodeId2 = vals[2]
-
-        delta1 = vals[1]
-        if delta1 != 0:
-            result.endTime1 = datetime.now() + timedelta(seconds=delta1 / 1000.0)
-        else:
-            result.endTime1 = None
-
-        delta2 = vals[3]
-        if delta2 != 0:
-            result.endTime2 = datetime.now() + timedelta(seconds=delta2 / 1000.0)
-        else:
-            result.endTime2 = None
+        for i in range(State.LOCK_COUNT):
+            result.lock[i]["nodeId"] = vals[i * 2]
+            delta = vals[i * 2 + 1]
+            if delta != 0:
+                result.lock[i]["endTime"] = datetime.now() + timedelta(seconds=delta / 1000.0)
+            else:
+                result.lock[i]["endTime"] = None
 
         return result
 
     def print_state(self, state):
-        time1 = 'free'
-        if state.endTime1 is not None:
-            clock = state.endTime1.strftime("%H:%M:%S.%f")
-            seconds_remaining = (state.endTime1 - datetime.now()).seconds
-            time1 = "{} ({})".format(clock, seconds_remaining)
+        result = "["
+        for i in range(State.LOCK_COUNT):
+            timeStr = 'free'
+            endTime = state.lock[i]["endTime"]
+            if endTime is not None:
+                clock = endTime.strftime("%H:%M:%S.%f")
+                seconds_remaining = (endTime - datetime.now()).seconds
+                timeStr = "{} ({})".format(clock, seconds_remaining)
+            result += "node{}: {} - {}, ".format(i, state.lock[i]["nodeId"], timeStr)
 
-        time2 = 'free'
-        if state.endTime2 is not None:
-            clock = state.endTime2.strftime("%H:%M:%S.%f")
-            seconds_remaining = (state.endTime2 - datetime.now()).seconds
-            time2 = "{} ({})".format(clock, seconds_remaining)
+        result += ']'
 
-        print("[node1: {} - {}, node2: {} - {}]".format(
-            state.nodeId1, time1, state.nodeId2, time2))
-
+        print(result)
 
 
 if __name__ == '__main__':

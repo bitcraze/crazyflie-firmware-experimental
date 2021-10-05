@@ -1,10 +1,15 @@
 #pragma once
 
+
+# define LOCK_COUNT 3
+
 typedef struct {
-  uint8_t nodeId1;
-  uint32_t timeRemaining1;
-  uint8_t nodeId2;
-  uint32_t timeRemaining2;
+  uint8_t nodeId;
+  uint32_t timeRemaining;
+} __attribute__((packed)) DeltaTimedLock;
+
+typedef struct {
+  DeltaTimedLock lock[LOCK_COUNT];
 } __attribute__((packed)) DeltaState;
 
 #define MSG_TYPE_PROPOSITION 1
