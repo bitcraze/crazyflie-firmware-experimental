@@ -222,7 +222,7 @@ static void defineLedSequence() {
 }
 
 void initPilot() {
-  DEBUG_PRINT("Pilot initialization\n");
+  DEBUG_PRINT("Pilot signing on\n");
 
   // Get log and param ids
   logIdStateEstimateX = logGetVarId("stateEstimate", "x");
@@ -267,11 +267,12 @@ void pilotTimerCb(xTimerHandle timer) {
 
   switch(state) {
     case STATE_IDLE:
-      DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+      DEBUG_PRINT("I'm ready! Waiting for position lock...\n");
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
-      if (hasPositionLock()) {
+    // TODO remove bypass
+      if (true || hasPositionLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
         ledseqRun(&seq_lock);
         state = STATE_WAIT_FOR_TAKE_OFF;
@@ -286,7 +287,7 @@ void pilotTimerCb(xTimerHandle timer) {
         padX = getX();
         padY = getY();
         padZ = getZ();
-        DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
+        DEBUG_PRINT("Pad position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
 
         terminateTrajectoryAndLand = false;
         crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, TAKE_OFF_TIME);
@@ -295,7 +296,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Going to initial position, %fs\n", DURATION_TO_INITIAL_POSITION + takeOffDelayS);
+        DEBUG_PRINT("Going to initial position, will be there in T -%f s\n", (double)(DURATION_TO_INITIAL_POSITION + takeOffDelayS));
         crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION + takeOffDelayS, false);
         ledseqStop(&seq_lock);
         state = STATE_GOING_TO_INITIAL_POSITION;
@@ -316,13 +317,13 @@ void pilotTimerCb(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
           terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Terminating trajectory, going to pad\n");
+          DEBUG_PRINT("Terminating trajectory, going back to pad\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
-            DEBUG_PRINT("Trajectory finished, restarting\n");
+            DEBUG_PRINT("Trajectory finished, running one more time\n");
             crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
           }
           remainingTrajectories--;
@@ -332,7 +333,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_GOING_TO_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         stabilizeEndTime = now + 5000;
         state = STATE_WAITING_AT_PAD;
       }
@@ -341,7 +342,7 @@ void pilotTimerCb(xTimerHandle timer) {
     case STATE_WAITING_AT_PAD:
       if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
         if (now > stabilizeEndTime) {
-          DEBUG_PRINT("Warning: timeout!\n");
+          DEBUG_PRINT("Warning: failed to stabilize in time!\n");
         }
 
         DEBUG_PRINT("Landing...\n");
@@ -352,7 +353,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_LANDING:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Landed. Feed me!\n");
+        DEBUG_PRINT("Landed. Re-charge me!\n");
         crtpCommanderHighLevelStop();
         landingTimeCheckCharge = now + 3000;
         state = STATE_CHECK_CHARGING;
@@ -361,8 +362,8 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_CHECK_CHARGING:
       if (now > landingTimeCheckCharge) {
-        DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
+          DEBUG_PRINT("Charging started");
           ledseqRun(&seq_lock);
           state = STATE_WAIT_FOR_TAKE_OFF;
         } else {
@@ -374,7 +375,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_REPOSITION_ON_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, 1.5, false);
         state = STATE_GOING_TO_PAD;
       }

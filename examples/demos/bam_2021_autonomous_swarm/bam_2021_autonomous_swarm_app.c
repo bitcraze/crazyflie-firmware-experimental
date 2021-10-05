@@ -15,7 +15,6 @@ static bool isInit = false;
 
 
 #if BUILD_SNIFFER
-#warning "Building sniffer"
 void appMain() {
   if (isInit) {
     return;
@@ -29,7 +28,6 @@ void appMain() {
 
 
 #else
-#warning "Building flyer"
 
 static xTimerHandle pilotTimer;
 static xTimerHandle towerTimer;

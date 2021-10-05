@@ -13,7 +13,7 @@
 #define DEBUG_MODULE "TOWER"
 #include "debug.h"
 
-#if 0
+#if 1
   #define DBG_FLOW(fmt, ...)  DEBUG_PRINT(fmt, ## __VA_ARGS__)
 #else
   #define DBG_FLOW(...)
@@ -60,7 +60,7 @@ static uint32_t getTxSlotTick();
 static const int NO_FLIGHT_SLOT_EMPTY = -1;
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state);
 static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeOffTime);
-static int sortLocks(const SwarmState* state, int sortedIndexs[]);
+static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t* nextEndTime, int* slotToUse);
 static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const uint32_t targetTime);
 
 // Distributed concensus data ****************************************
@@ -138,7 +138,7 @@ static uint32_t latestTakeOffTime = 0;
 
 
 void initTower() {
-  DEBUG_PRINT("Tower initialization\n");
+  DEBUG_PRINT("Tower signing on\n");
 
   uint64_t address = configblockGetRadioAddress();
   nodeId =(uint8_t)((address) & 0x00000000ff);
@@ -504,11 +504,9 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     #error "This code only works for 3 locks"
   #endif
 
-  // TODO Check if we already have booked a slot, reuse it
-
   bool planSuccess = false;
 
-  // The time it takes to finalize the concensus
+  // Some extra time to finalize the concensus
   const uint32_t MIN_PREPARATION_TIME = M2T(1000);
   const uint32_t flightCycleTime = M2T(getFlightCycleTimeMs());
   const uint32_t fullFlightTime = M2T(getFullFlightTimeMs());
@@ -518,8 +516,10 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
   // that latestKnownConcensusState had been modified
   const SwarmState* currentState = &initiatorPromiseState;
 
-  int sortedIndexes[LOCK_COUNT];
-  const int usedLocks = sortLocks(currentState, sortedIndexes);
+  uint32_t closestEndTime = 0;
+  uint32_t nextEndTime = 0;
+  int slotToUse = 0;
+  const int usedLocks = sortLocks(currentState, &closestEndTime, &nextEndTime, &slotToUse);
 
   // We have 4 cases depending on the number of locks that are taken:
   // 0 - fly anytime
@@ -532,74 +532,74 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     case 0:
       *latestTakeOffTime = now + MIN_PREPARATION_TIME;
       planSuccess = true;
-      DEBUG_PRINT("Plan: mode 0, %lu\n", *latestTakeOffTime);
+      DEBUG_PRINT("Flight plan: No traffic, take off at T -%lu ms\n", *latestTakeOffTime);
       break;
     case 1:
       {
-        const uint32_t previousTakeOffTime = currentState->lock[sortedIndexes[0]].endTime - fullFlightTime;
+        const uint32_t previousTakeOffTime = closestEndTime - fullFlightTime;
         const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
         *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, now + MIN_PREPARATION_TIME);
         planSuccess = true;
-        DEBUG_PRINT("Plan: mode 1, %lu\n", *latestTakeOffTime);
+        DEBUG_PRINT("Flight plan: One other copter flying, take off at T -%lu ms\n", *latestTakeOffTime);
       }
       break;
     case 2:
       {
-        const uint32_t oldestFlightEndTime = currentState->lock[sortedIndexes[1]].endTime;
-        const uint32_t previousTakeOffTime = currentState->lock[sortedIndexes[0]].endTime - fullFlightTime;
+        const uint32_t previousTakeOffTime = nextEndTime - fullFlightTime;
         const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
 
-        uint32_t targetTime = MAX(now + MIN_PREPARATION_TIME, oldestFlightEndTime);
+        uint32_t targetTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime);
         *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, targetTime);
         planSuccess = true;
-        DEBUG_PRINT("Plan: mode 2, %lu\n", *latestTakeOffTime);
+        DEBUG_PRINT("Flight plan: two other copters flying, wait for one to land, take off at T -%lu ms\n", *latestTakeOffTime);
       }
       break;
     default:
-      DEBUG_PRINT("Plan: not possible\n");
-      // Flight can not be planned
+      DEBUG_PRINT("Flight plan: air space occupied, flight not possible\n");
       break;
   }
 
   // Set up the new state
   if (planSuccess) {
     memcpy(newState, currentState, sizeof(SwarmState));
-    int emptySlot = sortedIndexes[usedLocks];
-    newState->lock[emptySlot].nodeId = nodeId;
-    newState->lock[emptySlot].endTime = *latestTakeOffTime + fullFlightTime;
+    newState->lock[slotToUse].nodeId = nodeId;
+    newState->lock[slotToUse].endTime = *latestTakeOffTime + fullFlightTime;
   }
 
   return planSuccess;
 }
 
-// Bubble-sort lock end times and return a list of indexes where the first index
-// is for the lock that will expire last.
-static int sortLocks(const SwarmState* state, int sortedIndexs[]) {
+static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t* nextEndTime, int* slotToUse) {
+  #if (LOCK_COUNT != 3)
+    #error "This code only works for 3 locks"
+  #endif
+
+  *closestEndTime = __UINT32_MAX__;
+  *nextEndTime = 0;
+  int usedCount = 0;
+
   for (int i = 0; i < LOCK_COUNT; i++) {
-    sortedIndexs[i] = i;
+    const uint32_t endTime = state->lock[i].endTime;
+    if ((state->lock[i].nodeId != nodeId) && (endTime != 0)) {
+      if (endTime > *nextEndTime) {
+        *nextEndTime = endTime;
+      }
+      if (endTime < *closestEndTime) {
+        *closestEndTime = endTime;
+      }
+      usedCount++;
+    }
   }
 
-  bool changed = false;
-  do {
-    changed = false;
-    for (int i = 0; i < (LOCK_COUNT - 1); i++) {
-      uint32_t t1 = state->lock[sortedIndexs[i]].endTime;
-      uint32_t t2 = state->lock[sortedIndexs[i + 1]].endTime;
-
-      if (t1 < t2) {
-        int tmp = sortedIndexs[i];
-        sortedIndexs[i] = sortedIndexs[i + 1];
-        sortedIndexs[i + 1] = tmp;
-        changed = true;
-      }
+  // Find an empty slot. If there is a slot with our nodeId, always use that instead.
+  for (int i = 0; i < LOCK_COUNT; i++) {
+    if (state->lock[i].endTime == 0) {
+      *slotToUse = i;
     }
 
-  } while(changed);
-
-  int usedCount = 0;
-  for (int i = 0; i < LOCK_COUNT; i++) {
-    if (state->lock[i].endTime != 0) {
-      usedCount++;
+    if (state->lock[i].nodeId == nodeId) {
+      *slotToUse = i;
+      break;
     }
   }
 

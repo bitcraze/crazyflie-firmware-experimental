@@ -14,7 +14,7 @@ CFLAGS += -DLIGHTHOUSE_FORCE_TYPE=2
 
 
 VPATH += src/
-PROJ_OBJ += app.o pilot.o tower.o sniffer.o
+PROJ_OBJ += bam_2021_autonomous_swarm_app.o pilot.o tower.o sniffer.o
 
 CRAZYFLIE_BASE=../../..
 include $(CRAZYFLIE_BASE)/Makefile
