@@ -69,6 +69,10 @@ static uint32_t flightTime = 0;
 static uint8_t trajectoryCount = 2;
 static uint8_t remainingTrajectories = 0;
 
+// Set to 1 to be active in the swarm. If 0 the CF is still
+// part of the decision network.
+static uint8_t isActive = 0;
+
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
 static logVarId_t logIdStateEstimateY;
@@ -196,12 +200,12 @@ bool isPilotReadyForFlight() {
   const float VBAT_ACCEPT_LEVEL = 4.10f;
   const float vbat = logGetFloat(logIdPmVbat);
 
-  return (STATE_WAIT_FOR_TAKE_OFF == state) && (vbat >= VBAT_ACCEPT_LEVEL);
+  return (STATE_WAIT_FOR_TAKE_OFF == state) && (vbat >= VBAT_ACCEPT_LEVEL) && isActive;
 }
 
 void takeOffWithDelay(const uint32_t delayMs) {
   takeOffWhenReady = true;
-  takeOffDelayS = delayMs * 1000.0f;
+  takeOffDelayS = delayMs / 1000.0f;
 }
 
 bool hasPilotLanded() {
@@ -291,7 +295,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Going to initial position\n");
+        DEBUG_PRINT("Going to initial position, %fs\n", DURATION_TO_INITIAL_POSITION + takeOffDelayS);
         crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION + takeOffDelayS, false);
         ledseqStop(&seq_lock);
         state = STATE_GOING_TO_INITIAL_POSITION;
@@ -300,7 +304,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("At initial position, starting trajectory...\n");
+        DEBUG_PRINT("At initial position, starting trajectory\n");
         trajectoryStartTime = now;
         crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
         remainingTrajectories = trajectoryCount - 1;
@@ -312,13 +316,13 @@ void pilotTimerCb(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
           terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Terminating trajectory, going to pad...\n");
+          DEBUG_PRINT("Terminating trajectory, going to pad\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
-            DEBUG_PRINT("Trajectory finished, restarting...\n");
+            DEBUG_PRINT("Trajectory finished, restarting\n");
             crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
           }
           remainingTrajectories--;
@@ -450,6 +454,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
   PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
   PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
+  PARAM_ADD(PARAM_UINT8, active, &isActive)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)

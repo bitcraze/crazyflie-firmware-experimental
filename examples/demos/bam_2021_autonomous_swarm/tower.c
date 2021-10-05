@@ -504,6 +504,8 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     #error "This code only works for 3 locks"
   #endif
 
+  // TODO Check if we already have booked a slot, reuse it
+
   bool planSuccess = false;
 
   // The time it takes to finalize the concensus
@@ -529,12 +531,16 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
   switch(usedLocks) {
     case 0:
       *latestTakeOffTime = now + MIN_PREPARATION_TIME;
+      planSuccess = true;
+      DEBUG_PRINT("Plan: mode 0, %lu\n", *latestTakeOffTime);
       break;
     case 1:
       {
         const uint32_t previousTakeOffTime = currentState->lock[sortedIndexes[0]].endTime - fullFlightTime;
         const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
         *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, now + MIN_PREPARATION_TIME);
+        planSuccess = true;
+        DEBUG_PRINT("Plan: mode 1, %lu\n", *latestTakeOffTime);
       }
       break;
     case 2:
@@ -545,16 +551,19 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
 
         uint32_t targetTime = MAX(now + MIN_PREPARATION_TIME, oldestFlightEndTime);
         *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, targetTime);
+        planSuccess = true;
+        DEBUG_PRINT("Plan: mode 2, %lu\n", *latestTakeOffTime);
       }
       break;
     default:
+      DEBUG_PRINT("Plan: not possible\n");
       // Flight can not be planned
       break;
   }
 
   // Set up the new state
   if (planSuccess) {
-    *newState = *currentState;
+    memcpy(newState, currentState, sizeof(SwarmState));
     int emptySlot = sortedIndexes[usedLocks];
     newState->lock[emptySlot].nodeId = nodeId;
     newState->lock[emptySlot].endTime = *latestTakeOffTime + fullFlightTime;

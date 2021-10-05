@@ -66,7 +66,7 @@ class Sniffer:
         self.MAJORITY = 5
 
     def handle_packet(self, data):
-        print(len(data), data)
+        # print(len(data), data)
         msg_type = data[0]
 
         print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
