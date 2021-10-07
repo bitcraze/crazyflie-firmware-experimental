@@ -45,3 +45,9 @@ typedef struct {
   uint8_t updateAccepted;
   DeltaState newState;
 } __attribute__((packed)) StateUpdateAccept;
+
+#define MSG_TYPE_ACTIVATION_UPDATE 5
+typedef struct {
+  uint8_t msgType; // = 5
+  uint8_t isActive;
+} __attribute__((packed)) ActivationUpdate;

@@ -76,7 +76,7 @@ class Sniffer:
             print("From {}, Proposal,           proposalNr: {:3d}".format(*vals))
         elif msg_type == 2:
             vals = struct.unpack('<BLL?', data[1:11])
-            print("From {}, Promise,            proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
+            print("From {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
             self.print_state(self.unpack_state(data[11:26]))
         elif msg_type == 3:
             vals = struct.unpack('<BL', data[1:6])
@@ -84,12 +84,15 @@ class Sniffer:
             self.print_state(self.unpack_state(data[6:21]))
         elif msg_type == 4:
             vals = struct.unpack('<BL?', data[1:7])
-            print("From {}, StateUpdateAccept,  proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
+            print("From {},  StateUpdateAccept, proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
             state = self.unpack_state(data[7:22])
             self.print_state(state)
 
             proposalNr = vals[1]
             self.handle_state_update_accept(proposalNr, state)
+        elif msg_type == 5:
+            vals = struct.unpack('<B', data[1:])
+            print("ActivationUpdate,  isActive: {}".format(*vals))
         else:
             print("Warning! unknown message type:", msg_type)
             print(data)

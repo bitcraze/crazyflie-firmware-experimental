@@ -21,6 +21,8 @@
 #include "lighthouse_position_est.h"
 #include "lighthouse_core.h"
 #include "pilot.h"
+#include "radiolink.h"
+#include "protocol.h"
 
 #define DEBUG_MODULE "PILOT"
 #include "debug.h"
@@ -42,8 +44,7 @@ static float positionLockData[LOCK_LENGTH][3];
 static void resetPositionLockData();
 static bool hasPositionLock();
 
-static bool takeOffWhenReady = false;
-static float takeOffDelayS = 0.0f;
+static uint32_t takeOffTime = 0;
 static bool terminateTrajectoryAndLand = false;
 
 static float padX = 0.0;
@@ -72,6 +73,8 @@ static uint8_t remainingTrajectories = 0;
 // Set to 1 to be active in the swarm. If 0 the CF is still
 // part of the decision network.
 static uint8_t isActive = 0;
+static uint8_t allActivate = 0;
+static uint8_t allDeactivate = 0;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -176,7 +179,22 @@ static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt
 static void enableMellingerController() { paramSetInt(paramIdStabilizerController, ControllerTypeMellinger); }
 #endif
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
-static void useCrossingBeamPositioningMethod() { paramSetInt(paramIdLighthouseMethod, 0); }
+// static void useCrossingBeamPositioningMethod() { paramSetInt(paramIdLighthouseMethod, 0); }
+void pilotSetActivation(const uint8_t newActive) { isActive = newActive; }
+void activateAll(const uint8_t isActive) {
+  P2PPacket pk;
+
+  pk.port = 0;
+  pk.size = sizeof(ActivationUpdate);
+
+  ActivationUpdate* activationUpdate = (ActivationUpdate*)&pk.data;
+  activationUpdate->msgType = MSG_TYPE_ACTIVATION_UPDATE;
+  activationUpdate->isActive = isActive;
+
+  radiolinkSendP2PPacketBroadcast(&pk);
+
+  pilotSetActivation(isActive);
+}
 
 static void defineTrajectory() {
   const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
@@ -197,15 +215,19 @@ int getFullFlightTimeMs() {
 }
 
 bool isPilotReadyForFlight() {
-  const float VBAT_ACCEPT_LEVEL = 4.10f;
+  const float VBAT_ACCEPT_LEVEL = 4.00f;
   const float vbat = logGetFloat(logIdPmVbat);
 
-  return (STATE_WAIT_FOR_TAKE_OFF == state) && (vbat >= VBAT_ACCEPT_LEVEL) && isActive;
+  const bool batteryCharged = (vbat >= VBAT_ACCEPT_LEVEL);
+  if (!batteryCharged) {
+    DEBUG_PRINT("Battery: %fV", (double)vbat);
+  }
+
+  return (STATE_WAIT_FOR_TAKE_OFF == state) && batteryCharged && isActive;
 }
 
-void takeOffWithDelay(const uint32_t delayMs) {
-  takeOffWhenReady = true;
-  takeOffDelayS = delayMs / 1000.0f;
+void takeOffAt(const uint32_t time) {
+  takeOffTime = time;
 }
 
 bool hasPilotLanded() {
@@ -241,11 +263,12 @@ void initPilot() {
   paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
 
 
+
   #ifdef USE_MELLINGER
     enableMellingerController();
   #endif
 
-  useCrossingBeamPositioningMethod();
+  // useCrossingBeamPositioningMethod();
   enableHighlevelCommander();
   defineTrajectory();
   defineLedSequence();
@@ -265,14 +288,23 @@ void pilotTimerCb(xTimerHandle timer) {
     terminateTrajectoryAndLand = true;
   }
 
+  if (allActivate) {
+    allActivate = 0;
+    activateAll(1);
+  }
+
+  if (allDeactivate) {
+    allDeactivate = 0;
+    activateAll(0);
+  }
+
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("I'm ready! Waiting for position lock...\n");
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
-    // TODO remove bypass
-      if (true || hasPositionLock()) {
+      if (hasPositionLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
         ledseqRun(&seq_lock);
         state = STATE_WAIT_FOR_TAKE_OFF;
@@ -280,8 +312,8 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_WAIT_FOR_TAKE_OFF:
       trajectoryStartTime = 0;
-      if (takeOffWhenReady) {
-        takeOffWhenReady = false;
+      if (takeOffTime != 0 && takeOffTime <= now) {
+        takeOffTime = 0;
         DEBUG_PRINT("Taking off!\n");
 
         padX = getX();
@@ -296,8 +328,8 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Going to initial position, will be there in T -%f s\n", (double)(DURATION_TO_INITIAL_POSITION + takeOffDelayS));
-        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION + takeOffDelayS, false);
+        DEBUG_PRINT("Going to initial position, will be there in T -%f s\n", (double)(DURATION_TO_INITIAL_POSITION));
+        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
         ledseqStop(&seq_lock);
         state = STATE_GOING_TO_INITIAL_POSITION;
       }
@@ -449,13 +481,14 @@ static void resetPositionLockData() {
 }
 
 PARAM_GROUP_START(app)
-  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
   PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
   PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
   PARAM_ADD(PARAM_UINT8, active, &isActive)
+  PARAM_ADD(PARAM_UINT8, activeAll, &allActivate)
+  PARAM_ADD(PARAM_UINT8, deactiveAll, &allDeactivate)
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)

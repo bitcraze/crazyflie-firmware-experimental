@@ -6,6 +6,7 @@ void pilotTimerCb(xTimerHandle timer);
 int getFlightCycleTimeMs();
 int getFullFlightTimeMs();
 bool isPilotReadyForFlight();
-void takeOffWithDelay(const uint32_t delayMs);
+void takeOffAt(const uint32_t takeOffTime);
 bool hasPilotLanded();
 bool hasCrashed();
+void pilotSetActivation(const uint8_t isActive);

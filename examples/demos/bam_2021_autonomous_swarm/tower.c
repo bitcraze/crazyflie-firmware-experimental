@@ -214,7 +214,7 @@ void towerTimerCb(xTimerHandle timer) {
         } else {
           // No majority, go back to idle to start over
           towerState = goToIdle(now, PROPOSAL_FAILED_HOLD_BACK_TIME);
-          DBG_FLOW("No promise, %d\n", initiatorPromiseCount);
+          DBG_FLOW("No promise majority, %d\n", initiatorPromiseCount);
         }
       }
       break;
@@ -237,9 +237,8 @@ void towerTimerCb(xTimerHandle timer) {
       if (latestKnownConcensusStateProposalNr == initiatorCurrentProposalNr) {
         DEBUG_PRINT("Flight plan accepted\n");
 
-        float delay = latestTakeOffTime - now;
-        if (delay >= 0.0f) {
-          takeOffWithDelay(delay);
+        if (latestTakeOffTime > now) {
+          takeOffAt(latestTakeOffTime);
           towerState = STATE_FLYING;
         } else {
           // Missed flight slot, cancel flight
@@ -281,10 +280,10 @@ static void initiatorSendProposition(const uint32_t proposalNr) {
 static void acceptorSendPromise() {
   nextPromise.msgType = MSG_TYPE_PROMISE;
   nextPromise.nodeId = nodeId;
+
+  // proposalNr and propositionAccepted filled in earlier
   nextPromise.previousProposalNr = acceptorCommitedProposalNr;
   setDeltaStateFromSwarmState(&nextPromise.currentState, &acceptorCommitedState);
-  nextPromise.propositionAccepted = true;
-  // proposalNr filled in earlier
 
   sendTowerMessage((uint8_t*)&nextPromise, sizeof(nextPromise));
 }
@@ -314,8 +313,7 @@ static void acceptorSendStateUpdateAccept() {
 }
 
 static void sendTowerMessage(const uint8_t* msg, const uint8_t size) {
-  // Not re-entrant safe
-  static P2PPacket pk;
+  P2PPacket pk;
 
   pk.port = 0;
   pk.size = size;
@@ -360,6 +358,9 @@ static void p2pRxCallback(P2PPacket *packet) {
     case MSG_TYPE_STATE_UPDATE_ACCEPT:
       learnerHandleStateUpdateAccept((StateUpdateAccept*)packet->data);
       break;
+    case MSG_TYPE_ACTIVATION_UPDATE:
+      pilotSetActivation(((ActivationUpdate*)packet->data)->isActive);
+      break;
     default:
       // Unhandled message type
       break;
@@ -370,10 +371,13 @@ static void acceptorHandleProposition(const Proposition* data) {
   if (data->proposalNr > acceptorPromisedProposalNr) {
     acceptorPromisedProposalNr = data->proposalNr;
     nextPromise.proposalNr = data->proposalNr;
-
-    // Initiate transmission of Promise message
-    nextPromiseTxTime = getTxSlotTick();
+    nextPromise.propositionAccepted = true;
+  } else {
+    nextPromise.propositionAccepted = false;
   }
+
+  // Initiate transmission of Promise message
+  nextPromiseTxTime = getTxSlotTick();
 }
 
 static void initiatorHandlePromise(const Promise* data) {
@@ -381,7 +385,7 @@ static void initiatorHandlePromise(const Promise* data) {
     if (data->proposalNr == initiatorCurrentProposalNr) {
       initiatorPromiseCount++;
 
-      DBG_FLOW("Pr %lu %i %i\n", xTaskGetTickCount(), data->nodeId, initiatorPromiseCount);
+      DBG_FLOW("Promise from %i, count: %i\n", data->nodeId, initiatorPromiseCount);
 
       if (data->previousProposalNr > initiatorHighestProposalNr) {
         initiatorHighestProposalNr = data->previousProposalNr;
@@ -413,7 +417,7 @@ static void learnerHandleStateUpdateAccept(const StateUpdateAccept* data) {
 
     if (data->proposalNr == learnerConcensusStatePropositionNr) {
       learnerConcensusStateCount++;
-      DBG_FLOW("Learner count %lu %i %i\n", xTaskGetTickCount(), data->nodeId, learnerConcensusStateCount);
+      DBG_FLOW("Update accept from %i, count: %i\n", data->nodeId, learnerConcensusStateCount);
       if (learnerConcensusStateCount == MAJORITY_COUNT) {
         // We have a majority! Save the state as the new concensus.
         setSwarmStateFromDeltaState(&latestKnownConcensusState, &data->newState);
@@ -507,7 +511,7 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
   bool planSuccess = false;
 
   // Some extra time to finalize the concensus
-  const uint32_t MIN_PREPARATION_TIME = M2T(1000);
+  const uint32_t MIN_PREPARATION_TIME = M2T(1700);
   const uint32_t flightCycleTime = M2T(getFlightCycleTimeMs());
   const uint32_t fullFlightTime = M2T(getFullFlightTimeMs());
 
@@ -532,26 +536,26 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     case 0:
       *latestTakeOffTime = now + MIN_PREPARATION_TIME;
       planSuccess = true;
-      DEBUG_PRINT("Flight plan: No traffic, take off at T -%lu ms\n", *latestTakeOffTime);
+      DEBUG_PRINT("Flight plan: No traffic in airspace, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
       break;
     case 1:
       {
-        const uint32_t previousTakeOffTime = closestEndTime - fullFlightTime;
-        const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
-        *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, now + MIN_PREPARATION_TIME);
+        const uint32_t currentTakeOffTime = closestEndTime - fullFlightTime;
+        const uint32_t slotBaseTime = currentTakeOffTime + flightCycleTime / 2;
+        const uint32_t earliestPossibleTakeOffTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime - flightCycleTime);
+        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, earliestPossibleTakeOffTime);
         planSuccess = true;
-        DEBUG_PRINT("Flight plan: One other copter flying, take off at T -%lu ms\n", *latestTakeOffTime);
+        DEBUG_PRINT("Flight plan: One other copter flying, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
       }
       break;
     case 2:
       {
-        const uint32_t previousTakeOffTime = nextEndTime - fullFlightTime;
-        const uint32_t firstPossibleTakeOffTime = previousTakeOffTime + flightCycleTime / 2;
-
-        uint32_t targetTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime);
-        *latestTakeOffTime = stepTimeForward(firstPossibleTakeOffTime, flightCycleTime, targetTime);
+        const uint32_t currentTakeOffTime = nextEndTime - fullFlightTime;
+        const uint32_t slotBaseTime = currentTakeOffTime + flightCycleTime / 2;
+        const uint32_t earliestPossibleTakeOffTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime + flightCycleTime / 2);
+        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, earliestPossibleTakeOffTime);
         planSuccess = true;
-        DEBUG_PRINT("Flight plan: two other copters flying, wait for one to land, take off at T -%lu ms\n", *latestTakeOffTime);
+        DEBUG_PRINT("Flight plan: two other copters flying, wait for one to land, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
       }
       break;
     default:
@@ -580,7 +584,7 @@ static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t
 
   for (int i = 0; i < LOCK_COUNT; i++) {
     const uint32_t endTime = state->lock[i].endTime;
-    if ((state->lock[i].nodeId != nodeId) && (endTime != 0)) {
+    if (endTime != 0) {
       if (endTime > *nextEndTime) {
         *nextEndTime = endTime;
       }
@@ -591,13 +595,9 @@ static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t
     }
   }
 
-  // Find an empty slot. If there is a slot with our nodeId, always use that instead.
+  // Find an empty slot.
   for (int i = 0; i < LOCK_COUNT; i++) {
     if (state->lock[i].endTime == 0) {
-      *slotToUse = i;
-    }
-
-    if (state->lock[i].nodeId == nodeId) {
       *slotToUse = i;
       break;
     }
