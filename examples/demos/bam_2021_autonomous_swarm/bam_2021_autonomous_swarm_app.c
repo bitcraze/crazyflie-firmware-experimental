@@ -45,7 +45,7 @@ void appMain() {
   pilotTimer = xTimerCreate("PilotTimer", M2T(21), pdTRUE, NULL, pilotTimerCb);
   xTimerStart(pilotTimer, 100);
 
-  towerTimer = xTimerCreate("TowerTimer", M2T(10), pdTRUE, NULL, towerTimerCb);
+  towerTimer = xTimerCreate("TowerTimer", M2T(2), pdTRUE, NULL, towerTimerCb);
   xTimerStart(towerTimer, 100);
 
   isInit = true;

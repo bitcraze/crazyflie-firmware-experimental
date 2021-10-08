@@ -61,7 +61,7 @@ static const int NO_FLIGHT_SLOT_EMPTY = -1;
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state);
 static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeOffTime);
 static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t* nextEndTime, int* slotToUse);
-static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const uint32_t targetTime);
+static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const bool blockStep0, const uint32_t earliestTakeOffTime);
 
 // Distributed concensus data ****************************************
 // General data ======================================================
@@ -153,11 +153,10 @@ void initTower() {
   p2pRegisterCB(p2pRxCallback);
 }
 
-// Called every 10 ms
 void towerTimerCb(xTimerHandle timer) {
   // First make sure we respond to incoming messages
   const uint32_t now = xTaskGetTickCount();
-  if (0 != nextPromiseTxTime && now > nextPromiseTxTime) {
+  if (0 != nextPromiseTxTime && now >= nextPromiseTxTime) {
     acceptorSendPromise();
     nextPromiseTxTime = 0;
 
@@ -368,6 +367,7 @@ static void p2pRxCallback(P2PPacket *packet) {
 }
 
 static void acceptorHandleProposition(const Proposition* data) {
+  DEBUG_PRINT("Proposition f: %u, %lu\n", data->nodeId, data->proposalNr);
   if (data->proposalNr > acceptorPromisedProposalNr) {
     acceptorPromisedProposalNr = data->proposalNr;
     nextPromise.proposalNr = data->proposalNr;
@@ -381,11 +381,13 @@ static void acceptorHandleProposition(const Proposition* data) {
 }
 
 static void initiatorHandlePromise(const Promise* data) {
+  DBG_FLOW("Promise from %i, prop: %lu\n", data->nodeId, data->proposalNr);
   if (data->propositionAccepted) {
     if (data->proposalNr == initiatorCurrentProposalNr) {
       initiatorPromiseCount++;
 
-      DBG_FLOW("Promise from %i, count: %i\n", data->nodeId, initiatorPromiseCount);
+      // DBG_FLOW("Promise from %i, count: %i\n", data->nodeId, initiatorPromiseCount);
+      DBG_FLOW("count: %i\n", initiatorPromiseCount);
 
       if (data->previousProposalNr > initiatorHighestProposalNr) {
         initiatorHighestProposalNr = data->previousProposalNr;
@@ -541,9 +543,8 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     case 1:
       {
         const uint32_t currentTakeOffTime = closestEndTime - fullFlightTime;
-        const uint32_t slotBaseTime = currentTakeOffTime + flightCycleTime / 2;
-        const uint32_t earliestPossibleTakeOffTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime - flightCycleTime);
-        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, earliestPossibleTakeOffTime);
+        const uint32_t slotBaseTime = currentTakeOffTime + 3 * flightCycleTime / 2;
+        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, true, now + MIN_PREPARATION_TIME);
         planSuccess = true;
         DEBUG_PRINT("Flight plan: One other copter flying, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
       }
@@ -551,9 +552,9 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     case 2:
       {
         const uint32_t currentTakeOffTime = nextEndTime - fullFlightTime;
-        const uint32_t slotBaseTime = currentTakeOffTime + flightCycleTime / 2;
-        const uint32_t earliestPossibleTakeOffTime = MAX(now + MIN_PREPARATION_TIME, closestEndTime + flightCycleTime / 2);
-        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, earliestPossibleTakeOffTime);
+        const uint32_t slotBaseTime = currentTakeOffTime + 3 * flightCycleTime / 2;
+        bool blockStep0 = (nextEndTime - closestEndTime) < flightCycleTime;
+        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, blockStep0, now + MIN_PREPARATION_TIME);
         planSuccess = true;
         DEBUG_PRINT("Flight plan: two other copters flying, wait for one to land, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
       }
@@ -606,10 +607,13 @@ static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t
   return usedCount;
 }
 
-static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const uint32_t targetTime) {
+static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const bool blockStep0, const uint32_t earliestTakeOffTime) {
   uint32_t result = baseTime;
+  if (blockStep0) {
+    result += 2 * flightCycleTime;
+  }
 
-  while(result < targetTime) {
+  while(result < earliestTakeOffTime) {
     result += flightCycleTime;
   }
 
