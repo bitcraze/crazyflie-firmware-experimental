@@ -12,10 +12,17 @@ typedef struct {
   DeltaTimedLock lock[LOCK_COUNT];
 } __attribute__((packed)) DeltaState;
 
+#define MSG_INDEX_TYPE 0
+#define MSG_INDEX_ID 1
+#define MSG_INDEX_SEQ 2
+#define MSG_INDEX_PROPOSAL_NR 3
+
+
 #define MSG_TYPE_PROPOSITION 1
 typedef struct {
   uint8_t msgType; // = 1
   uint8_t nodeId;
+  uint8_t seqNr;
   uint32_t proposalNr;
 } __attribute__((packed)) Proposition;
 
@@ -23,6 +30,7 @@ typedef struct {
 typedef struct {
   uint8_t msgType; // = 2
   uint8_t nodeId;
+  uint8_t seqNr;
   uint32_t proposalNr;
   uint32_t previousProposalNr;
   uint8_t propositionAccepted;
@@ -33,6 +41,7 @@ typedef struct {
 typedef struct {
   uint8_t msgType; // = 3
   uint8_t nodeId;
+  uint8_t seqNr;
   uint32_t proposalNr;
   DeltaState newState;
 } __attribute__((packed)) StateUpdateRequest;
@@ -41,6 +50,7 @@ typedef struct {
 typedef struct {
   uint8_t msgType; // = 4
   uint8_t nodeId;
+  uint8_t seqNr;
   uint32_t proposalNr;
   uint8_t updateAccepted;
   DeltaState newState;

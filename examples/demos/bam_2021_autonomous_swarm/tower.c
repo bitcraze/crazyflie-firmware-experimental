@@ -6,6 +6,9 @@
 #include "protocol.h"
 #include "configblock.h"
 #include "cf_math.h"
+#include "queue.h"
+#include "static_mem.h"
+
 
 #include "tower.h"
 #include "pilot.h"
@@ -18,6 +21,10 @@
 #else
   #define DBG_FLOW(...)
 #endif
+
+static xQueueHandle txQueue;
+STATIC_MEM_QUEUE_ALLOC(txQueue, 20, sizeof(P2PPacket));
+
 
 typedef struct {
   uint8_t nodeId;
@@ -32,6 +39,7 @@ typedef struct {
 static void initiatorSendProposition(const uint32_t proposalNr);
 static void initiatorSendStateUpdateRequest(const uint32_t proposalNr, const SwarmState* newState);
 static void sendTowerMessage(const uint8_t* msg, const uint8_t size);
+static void transmitFromQueue();
 
 static void p2pRxCallback(P2PPacket *packet);
 static void acceptorHandleProposition(const Proposition* data);
@@ -49,13 +57,18 @@ static void setDeltaStateFromSwarmState(DeltaState* target, const SwarmState* so
 static uint8_t nodeId = 0;
 
 // Total nr of nodes
-static const int NODE_COUNT = 9;
+#define NODE_COUNT 9
 // Nr of nodes required for majority
 static const int MAJORITY_COUNT = 5;
 
 static const uint32_t TX_DELAY_SLOT_TIME = T2M(20);
 static uint32_t responseTxDelay = 0;
 static uint32_t getTxSlotTick();
+
+// The number of times we send each broadcast
+static const int RE_BROADCAST_COUNT = 3;
+static uint8_t txSeqNr = 0;
+static uint8_t latestRxSeqNr[NODE_COUNT];
 
 static const int NO_FLIGHT_SLOT_EMPTY = -1;
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state);
@@ -145,6 +158,8 @@ void initTower() {
   DEBUG_PRINT("I have node id %d\n", nodeId);
   srand(nodeId);
 
+  txQueue = STATIC_MEM_QUEUE_CREATE(txQueue);
+
   responseTxDelay = TX_DELAY_SLOT_TIME * (nodeId + 2);
 
   // Randomize startup
@@ -154,8 +169,9 @@ void initTower() {
 }
 
 void towerTimerCb(xTimerHandle timer) {
-  // First make sure we respond to incoming messages
   const uint32_t now = xTaskGetTickCount();
+
+  // First make sure we respond to incoming messages
   if (0 != nextPromiseTxTime && now >= nextPromiseTxTime) {
     acceptorSendPromise();
     nextPromiseTxTime = 0;
@@ -263,6 +279,8 @@ void towerTimerCb(xTimerHandle timer) {
   if (oldTowerdState != towerState) {
     DBG_FLOW("%d New state: %d\n", nodeId, towerState);
   }
+
+  transmitFromQueue();
 }
 
 static void initiatorSendProposition(const uint32_t proposalNr) {
@@ -270,7 +288,6 @@ static void initiatorSendProposition(const uint32_t proposalNr) {
     .msgType = 1
   };
 
-  msg.nodeId = nodeId;
   msg.proposalNr = proposalNr;
 
   sendTowerMessage((uint8_t*)&msg, sizeof(msg));
@@ -278,7 +295,6 @@ static void initiatorSendProposition(const uint32_t proposalNr) {
 
 static void acceptorSendPromise() {
   nextPromise.msgType = MSG_TYPE_PROMISE;
-  nextPromise.nodeId = nodeId;
 
   // proposalNr and propositionAccepted filled in earlier
   nextPromise.previousProposalNr = acceptorCommitedProposalNr;
@@ -292,7 +308,6 @@ static void initiatorSendStateUpdateRequest(const uint32_t proposalNr, const Swa
     .msgType = MSG_TYPE_STATE_UPDATE_REQUEST
   };
 
-  msg.nodeId = nodeId;
   msg.proposalNr = proposalNr;
   setDeltaStateFromSwarmState(&msg.newState, newState);
 
@@ -303,7 +318,6 @@ static void acceptorSendStateUpdateAccept() {
   StateUpdateAccept nextStateUpdateAccept;
 
   nextStateUpdateAccept.msgType = MSG_TYPE_STATE_UPDATE_ACCEPT;
-  nextStateUpdateAccept.nodeId = nodeId;
   nextStateUpdateAccept.proposalNr = acceptorCommitedProposalNr;
   nextStateUpdateAccept.updateAccepted = true;
   setDeltaStateFromSwarmState(&nextStateUpdateAccept.newState, &acceptorCommitedState);
@@ -316,11 +330,21 @@ static void sendTowerMessage(const uint8_t* msg, const uint8_t size) {
 
   pk.port = 0;
   pk.size = size;
+
   memcpy(pk.data, msg, size);
-  radiolinkSendP2PPacketBroadcast(&pk);
+
+  pk.data[MSG_INDEX_ID] = nodeId;
+  pk.data[MSG_INDEX_SEQ] = txSeqNr;
+
+  // Push to the tx queue
+  for (int i = 0; i < RE_BROADCAST_COUNT; i++) {
+    xQueueSend(txQueue, &pk, 0);
+  }
 
   // Feed the message into our own handling flow as well
   p2pRxCallback(&pk);
+
+  txSeqNr += 1;
 }
 
 
@@ -334,35 +358,41 @@ static uint32_t generateProposalNr() {
 
 
 static void p2pRxCallback(P2PPacket *packet) {
-  const uint8_t msgType = packet->data[0];
-  uint32_t proposalNr = 0;
-  memcpy(&proposalNr, &packet->data[2], sizeof(uint32_t));
+  const uint8_t msgType = packet->data[MSG_INDEX_TYPE];
+  const uint8_t nodeId = packet->data[MSG_INDEX_ID];
+  const uint8_t seqNr = packet->data[MSG_INDEX_SEQ];
+  if (nodeId < NODE_COUNT && seqNr != latestRxSeqNr[nodeId]) {
+    latestRxSeqNr[nodeId] = seqNr;
 
-  if (proposalNr > highestSeenId) {
-    highestSeenId = proposalNr;
-  }
+    uint32_t proposalNr = 0;
+    memcpy(&proposalNr, &packet->data[MSG_INDEX_PROPOSAL_NR], sizeof(uint32_t));
 
-  switch(msgType) {
-    case MSG_TYPE_PROPOSITION:
-      holdBackNewInitiations();
-      acceptorHandleProposition((Proposition*)packet->data);
-      break;
-    case MSG_TYPE_PROMISE:
-      initiatorHandlePromise((Promise*)packet->data);
-      break;
-    case MSG_TYPE_STATE_UPDATE_REQUEST:
-      holdBackNewInitiations();
-      acceptorHandleStateUpdateRequest((StateUpdateRequest*)packet->data);
-      break;
-    case MSG_TYPE_STATE_UPDATE_ACCEPT:
-      learnerHandleStateUpdateAccept((StateUpdateAccept*)packet->data);
-      break;
-    case MSG_TYPE_ACTIVATION_UPDATE:
-      pilotSetActivation(((ActivationUpdate*)packet->data)->isActive);
-      break;
-    default:
-      // Unhandled message type
-      break;
+    if (proposalNr > highestSeenId) {
+      highestSeenId = proposalNr;
+    }
+
+    switch(msgType) {
+      case MSG_TYPE_PROPOSITION:
+        holdBackNewInitiations();
+        acceptorHandleProposition((Proposition*)packet->data);
+        break;
+      case MSG_TYPE_PROMISE:
+        initiatorHandlePromise((Promise*)packet->data);
+        break;
+      case MSG_TYPE_STATE_UPDATE_REQUEST:
+        holdBackNewInitiations();
+        acceptorHandleStateUpdateRequest((StateUpdateRequest*)packet->data);
+        break;
+      case MSG_TYPE_STATE_UPDATE_ACCEPT:
+        learnerHandleStateUpdateAccept((StateUpdateAccept*)packet->data);
+        break;
+      case MSG_TYPE_ACTIVATION_UPDATE:
+        pilotSetActivation(((ActivationUpdate*)packet->data)->isActive);
+        break;
+      default:
+        // Unhandled message type
+        break;
+    }
   }
 }
 
@@ -618,4 +648,12 @@ static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCy
   }
 
   return result;
+}
+
+static void transmitFromQueue() {
+  static P2PPacket packet;
+
+  if (xQueueReceive(txQueue, &packet, 0) == pdTRUE) {
+    radiolinkSendP2PPacketBroadcast(&packet);
+  }
 }

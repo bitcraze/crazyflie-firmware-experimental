@@ -72,20 +72,20 @@ class Sniffer:
         print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
 
         if msg_type == 1:
-            vals = struct.unpack('<BL', data[1:])
-            print("From {}, Proposal,           proposalNr: {:3d}".format(*vals))
+            vals = struct.unpack('<BBL', data[1:])
+            print("From {}, seq {}, Proposal,           proposalNr: {:3d}".format(*vals))
         elif msg_type == 2:
-            vals = struct.unpack('<BLL?', data[1:11])
-            print("From {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[11:26]))
+            vals = struct.unpack('<BBLL?', data[1:12])
+            print("From {}, seq {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
+            self.print_state(self.unpack_state(data[12:27]))
         elif msg_type == 3:
-            vals = struct.unpack('<BL', data[1:6])
-            print("From {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[6:21]))
+            vals = struct.unpack('<BBL', data[1:7])
+            print("From {}, seq {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
+            self.print_state(self.unpack_state(data[7:22]))
         elif msg_type == 4:
-            vals = struct.unpack('<BL?', data[1:7])
-            print("From {},  StateUpdateAccept, proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
-            state = self.unpack_state(data[7:22])
+            vals = struct.unpack('<BBL?', data[1:8])
+            print("From {}, seq {},  StateUpdateAccept, proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
+            state = self.unpack_state(data[8:23])
             self.print_state(state)
 
             proposalNr = vals[1]
