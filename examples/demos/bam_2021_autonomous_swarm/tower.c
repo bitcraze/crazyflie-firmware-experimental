@@ -185,7 +185,7 @@ void towerTimerCb(xTimerHandle timer) {
         if (isReadyForFlight) {
           bool isAFlightSlotEmpty = (findEmptyFlightSlot(now, &latestKnownConcensusState) != NO_FLIGHT_SLOT_EMPTY);
           if (isAFlightSlotEmpty) {
-            DEBUG_PRINT("Proposing flight plan\n");
+            DEBUG_PRINT("%d Proposing flight plan\n", nodeId);
             initiateNewProposition(now);
             towerState = STATE_WAIT_FOR_PROMISE;
           } else {
@@ -205,15 +205,15 @@ void towerTimerCb(xTimerHandle timer) {
             towerState = STATE_PLAN_FLIGHT;
           } else {
             // Seems as our known accepted state is not up to date, resend the newer one and start over.
-            DBG_FLOW("Promise majority, bad state. %lu VS %lu\n", initiatorHighestProposalNr, latestKnownConcensusStateProposalNr);
-            DBG_FLOW("Resending state on %lu\n", initiatorCurrentProposalNr);
+            DBG_FLOW("%d Promise majority, bad state. %lu VS %lu\n", nodeId, initiatorHighestProposalNr, latestKnownConcensusStateProposalNr);
+            DBG_FLOW("%d Resending state on %lu\n", nodeId, initiatorCurrentProposalNr);
             initiatorSendStateUpdateRequest(initiatorCurrentProposalNr, &initiatorPromiseState);
             towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
           }
         } else {
           // No majority, go back to idle to start over
           towerState = goToIdle(now, PROPOSAL_FAILED_HOLD_BACK_TIME);
-          DBG_FLOW("No promise majority, %d\n", initiatorPromiseCount);
+          DBG_FLOW("%d No promise majority, %d\n", nodeId, initiatorPromiseCount);
         }
       }
       break;
@@ -222,19 +222,19 @@ void towerTimerCb(xTimerHandle timer) {
         SwarmState newState;
         bool planSuccess = planFlight(now, &newState, &latestTakeOffTime);
         if (planSuccess) {
-          DEBUG_PRINT("Flight plan submitted\n");
+          DEBUG_PRINT("%d Flight plan submitted\n", nodeId);
           initiatorSendStateUpdateRequest(initiatorCurrentProposalNr, &newState);
           learnerAcceptVoteEndTime = now + VOTE_TIME;
           towerState = STATE_WAIT_FOR_ACCEPTED_STATE_UPDATE;
         } else {
-          DBG_FLOW("Flight plan failed\n");
+          DBG_FLOW("%d Flight plan failed\n", nodeId);
           towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
         }
       }
       break;
     case STATE_WAIT_FOR_ACCEPTED_STATE_UPDATE:
       if (latestKnownConcensusStateProposalNr == initiatorCurrentProposalNr) {
-        DEBUG_PRINT("Flight plan accepted\n");
+        DEBUG_PRINT("%d Flight plan accepted, take off in %f s\n", nodeId, (latestTakeOffTime - now) / 1000.0);
 
         if (latestTakeOffTime > now) {
           takeOffAt(latestTakeOffTime);
@@ -245,7 +245,7 @@ void towerTimerCb(xTimerHandle timer) {
         }
       } else {
         if (now > learnerAcceptVoteEndTime) {
-          DBG_FLOW("No majority for flight plan\n");
+          DBG_FLOW("%d No majority for flight plan\n", nodeId);
           towerState = goToIdle(now, WAIT_FOR_RETRY_INITIATE_TIME);
         }
       }
@@ -261,7 +261,7 @@ void towerTimerCb(xTimerHandle timer) {
   }
 
   if (oldTowerdState != towerState) {
-    DBG_FLOW("New state: %d\n", towerState);
+    DBG_FLOW("%d New state: %d\n", nodeId, towerState);
   }
 }
 
@@ -367,7 +367,7 @@ static void p2pRxCallback(P2PPacket *packet) {
 }
 
 static void acceptorHandleProposition(const Proposition* data) {
-  DEBUG_PRINT("Proposition f: %u, %lu\n", data->nodeId, data->proposalNr);
+  DEBUG_PRINT("%d Proposition f: %u, %lu\n", nodeId, data->nodeId, data->proposalNr);
   if (data->proposalNr > acceptorPromisedProposalNr) {
     acceptorPromisedProposalNr = data->proposalNr;
     nextPromise.proposalNr = data->proposalNr;
@@ -381,13 +381,13 @@ static void acceptorHandleProposition(const Proposition* data) {
 }
 
 static void initiatorHandlePromise(const Promise* data) {
-  DBG_FLOW("Promise from %i, prop: %lu\n", data->nodeId, data->proposalNr);
+  DBG_FLOW("%d Promise from %i, prop: %lu\n", nodeId, data->nodeId, data->proposalNr);
   if (data->propositionAccepted) {
     if (data->proposalNr == initiatorCurrentProposalNr) {
       initiatorPromiseCount++;
 
       // DBG_FLOW("Promise from %i, count: %i\n", data->nodeId, initiatorPromiseCount);
-      DBG_FLOW("count: %i\n", initiatorPromiseCount);
+      DBG_FLOW("%d count: %i\n", nodeId, initiatorPromiseCount);
 
       if (data->previousProposalNr > initiatorHighestProposalNr) {
         initiatorHighestProposalNr = data->previousProposalNr;
@@ -414,17 +414,17 @@ static void learnerHandleStateUpdateAccept(const StateUpdateAccept* data) {
     if (data->proposalNr > learnerConcensusStatePropositionNr) {
       learnerConcensusStatePropositionNr = data->proposalNr;
       learnerConcensusStateCount = 0;
-      DBG_FLOW("New learner id %lu\n", learnerConcensusStatePropositionNr);
+      DBG_FLOW("%d New learner id %lu\n", nodeId, learnerConcensusStatePropositionNr);
     }
 
     if (data->proposalNr == learnerConcensusStatePropositionNr) {
       learnerConcensusStateCount++;
-      DBG_FLOW("Update accept from %i, count: %i\n", data->nodeId, learnerConcensusStateCount);
+      DBG_FLOW("%d Update accept from %i, count: %i\n", nodeId, data->nodeId, learnerConcensusStateCount);
       if (learnerConcensusStateCount == MAJORITY_COUNT) {
         // We have a majority! Save the state as the new concensus.
         setSwarmStateFromDeltaState(&latestKnownConcensusState, &data->newState);
         latestKnownConcensusStateProposalNr = data->proposalNr;
-        DBG_FLOW("New concensus! Id: %lu\n", latestKnownConcensusStateProposalNr);
+        DBG_FLOW("%d New concensus! Id: %lu\n", nodeId, latestKnownConcensusStateProposalNr);
       }
     }
   }
@@ -538,7 +538,7 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
     case 0:
       *latestTakeOffTime = now + MIN_PREPARATION_TIME;
       planSuccess = true;
-      DEBUG_PRINT("Flight plan: No traffic in airspace, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
+      DEBUG_PRINT("%d Flight plan: No traffic in airspace, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
       break;
     case 1:
       {
@@ -546,7 +546,7 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
         const uint32_t slotBaseTime = currentTakeOffTime + 3 * flightCycleTime / 2;
         *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, true, now + MIN_PREPARATION_TIME);
         planSuccess = true;
-        DEBUG_PRINT("Flight plan: One other copter flying, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
+        DEBUG_PRINT("%d Flight plan: One other copter flying, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
       }
       break;
     case 2:
@@ -556,11 +556,11 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
         bool blockStep0 = (nextEndTime - closestEndTime) < flightCycleTime;
         *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, blockStep0, now + MIN_PREPARATION_TIME);
         planSuccess = true;
-        DEBUG_PRINT("Flight plan: two other copters flying, wait for one to land, take off at T -%f s\n", (*latestTakeOffTime - now) / 1000.0);
+        DEBUG_PRINT("%d Flight plan: two other copters flying, wait for one to land, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
       }
       break;
     default:
-      DEBUG_PRINT("Flight plan: air space occupied, flight not possible\n");
+      DEBUG_PRINT("%d Flight plan: air space occupied, flight not possible\n", nodeId);
       break;
   }
 

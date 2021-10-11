@@ -231,7 +231,7 @@ void takeOffAt(const uint32_t time) {
 }
 
 bool hasPilotLanded() {
-  return STATE_WAIT_FOR_TAKE_OFF == state;
+  return (STATE_WAIT_FOR_TAKE_OFF == state) && (takeOffTime == 0);
 }
 
 bool hasCrashed() {
