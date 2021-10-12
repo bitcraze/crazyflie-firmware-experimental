@@ -66,7 +66,7 @@ static uint32_t responseTxDelay = 0;
 static uint32_t getTxSlotTick();
 
 // The number of times we send each broadcast
-static const int RE_BROADCAST_COUNT = 3;
+static const int RE_BROADCAST_COUNT = 5;
 static uint8_t txSeqNr = 0;
 static uint8_t latestRxSeqNr[NODE_COUNT];
 
