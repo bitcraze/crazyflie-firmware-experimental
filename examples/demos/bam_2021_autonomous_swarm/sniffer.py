@@ -63,11 +63,15 @@ class Sniffer:
         self.concensusState = State()
         self.concensusStateAcceptCount = 0
 
+        self.latestSeqNr = [0] * 9
+
         self.MAJORITY = 5
 
     def handle_packet(self, data):
         # print(len(data), data)
         msg_type = data[0]
+        nodeId = data[1]
+        seqNr = data[2]
 
         print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
 
@@ -88,14 +92,18 @@ class Sniffer:
             state = self.unpack_state(data[8:23])
             self.print_state(state)
 
-            proposalNr = vals[1]
-            self.handle_state_update_accept(proposalNr, state)
+            if seqNr != self.latestSeqNr[nodeId]:
+                proposalNr = vals[2]
+                self.handle_state_update_accept(proposalNr, state)
         elif msg_type == 5:
             vals = struct.unpack('<B', data[1:])
             print("ActivationUpdate,  isActive: {}".format(*vals))
         else:
             print("Warning! unknown message type:", msg_type)
             print(data)
+
+        self.latestSeqNr[nodeId] = seqNr
+
 
     def handle_state_update_accept(self, proposalNr, state):
         if proposalNr == self.concensusStateProposalNr:
