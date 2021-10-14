@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 file="cf2.bin"
-baseUri="radio://0/100/2M/E7E7E7E7"
+baseUri="radio://0/20/2M/E7E7E7E7"
 
 echo "Flasing 1"
 python3 -m cfloader flash ${file} stm32-fw -w ${baseUri}00
