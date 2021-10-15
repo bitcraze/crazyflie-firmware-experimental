@@ -70,39 +70,42 @@ class Sniffer:
     def handle_packet(self, data):
         # print(len(data), data)
         msg_type = data[0]
-        nodeId = data[1]
-        seqNr = data[2]
 
-        print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
+        if msg_type < 5:
+            nodeId = data[1]
+            seqNr = data[2]
 
-        if msg_type == 1:
-            vals = struct.unpack('<BBL', data[1:])
-            print("From {}, seq {}, Proposal,           proposalNr: {:3d}".format(*vals))
-        elif msg_type == 2:
-            vals = struct.unpack('<BBLL?', data[1:12])
-            print("From {}, seq {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[12:27]))
-        elif msg_type == 3:
-            vals = struct.unpack('<BBL', data[1:7])
-            print("From {}, seq {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
-            self.print_state(self.unpack_state(data[7:22]))
-        elif msg_type == 4:
-            vals = struct.unpack('<BBL?', data[1:8])
-            print("From {}, seq {},  StateUpdateAccept, proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
-            state = self.unpack_state(data[8:23])
-            self.print_state(state)
+            print(datetime.now().strftime("%H:%M:%S.%f: "), end='')
 
-            if seqNr != self.latestSeqNr[nodeId]:
-                proposalNr = vals[2]
-                self.handle_state_update_accept(proposalNr, state)
+            if msg_type == 1:
+                vals = struct.unpack('<BBL', data[1:])
+                print("From {}, seq {}, Proposal,           proposalNr: {:3d}".format(*vals))
+            elif msg_type == 2:
+                vals = struct.unpack('<BBLL?', data[1:12])
+                print("From {}, seq {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
+                self.print_state(self.unpack_state(data[12:27]))
+            elif msg_type == 3:
+                vals = struct.unpack('<BBL', data[1:7])
+                print("From {}, seq {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
+                self.print_state(self.unpack_state(data[7:22]))
+            elif msg_type == 4:
+                vals = struct.unpack('<BBL?', data[1:8])
+                print("From {}, seq {},  StateUpdateAccept, proposalNr: {:3d}, updateAccepted: {}, newState: ".format(*vals), end='')
+                state = self.unpack_state(data[8:23])
+                self.print_state(state)
+
+                if seqNr != self.latestSeqNr[nodeId]:
+                    proposalNr = vals[2]
+                    self.handle_state_update_accept(proposalNr, state)
+
+            self.latestSeqNr[nodeId] = seqNr
+
         elif msg_type == 5:
             vals = struct.unpack('<B', data[1:])
             print("ActivationUpdate,  isActive: {}".format(*vals))
         else:
             print("Warning! unknown message type:", msg_type)
             print(data)
-
-        self.latestSeqNr[nodeId] = seqNr
 
 
     def handle_state_update_accept(self, proposalNr, state):
