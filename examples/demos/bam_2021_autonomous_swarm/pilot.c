@@ -75,6 +75,7 @@ static uint8_t remainingTrajectories = 0;
 static uint8_t isActive = 0;
 static uint8_t allActivate = 0;
 static uint8_t allDeactivate = 0;
+static bool hasAutoActivationTokenBeenUsed = false;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -195,6 +196,16 @@ void activateAll(const uint8_t isActive) {
   radiolinkSendP2PPacketBroadcast(&pk);
 
   pilotSetActivation(isActive);
+}
+
+void pilotP2PNetworkIsActive() {
+  // Automatically activate if we receive P2P traffic.
+  // This functionality activates a crashed and restarted CF in a running swarm.
+  if (!hasAutoActivationTokenBeenUsed) {
+    hasAutoActivationTokenBeenUsed = true;
+    pilotSetActivation(true);
+
+  }
 }
 
 static void defineTrajectory() {

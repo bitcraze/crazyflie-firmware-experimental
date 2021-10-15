@@ -371,6 +371,8 @@ static void p2pRxCallback(P2PPacket *packet) {
       highestSeenId = proposalNr;
     }
 
+    pilotP2PNetworkIsActive();
+
     switch(msgType) {
       case MSG_TYPE_PROPOSITION:
         holdBackNewInitiations();

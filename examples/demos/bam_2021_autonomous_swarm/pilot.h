@@ -10,3 +10,4 @@ void takeOffAt(const uint32_t takeOffTime);
 bool hasPilotLanded();
 bool hasCrashed();
 void pilotSetActivation(const uint8_t isActive);
+void pilotP2PNetworkIsActive();
