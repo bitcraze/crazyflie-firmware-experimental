@@ -82,8 +82,8 @@ class Sniffer:
                 print("From {}, seq {}, Proposal,           proposalNr: {:3d}".format(*vals))
             elif msg_type == 2:
                 vals = struct.unpack('<BBLL?', data[1:12])
-                print("From {}, seq {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals), end='')
-                self.print_state(self.unpack_state(data[12:27]))
+                print("From {}, seq {},  Promise,           proposalNr: {:3d}, previousProposalId: {:3d}, propositionAccepted: {}, currentState: ".format(*vals))
+                # self.print_state(self.unpack_state(data[12:27]))
             elif msg_type == 3:
                 vals = struct.unpack('<BBL', data[1:7])
                 print("From {}, seq {}, StateUpdateRequest, proposalNr: {:3d}, newState: ".format(*vals), end='')
