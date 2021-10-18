@@ -324,7 +324,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_WAIT_FOR_TAKE_OFF:
       trajectoryStartTime = 0;
-      if (takeOffTime != 0 && takeOffTime <= now) {
+      if (takeOffTime != 0 && takeOffTime <= now && isActive) {
         takeOffTime = 0;
         DEBUG_PRINT("Taking off!\n");
 
@@ -359,7 +359,7 @@ void pilotTimerCb(xTimerHandle timer) {
       break;
     case STATE_RUNNING_TRAJECTORY:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
+        if (terminateTrajectoryAndLand || (remainingTrajectories == 0) || !isActive) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going back to pad\n");
           float timeToPadPosition = 2.0;
