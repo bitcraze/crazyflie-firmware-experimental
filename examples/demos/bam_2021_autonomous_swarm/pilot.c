@@ -285,6 +285,10 @@ void initPilot() {
   defineTrajectory();
   defineLedSequence();
   resetPositionLockData();
+
+  // Hack to work around bug in high level commander
+  setpoint_t setpoint = {0};
+  commanderSetSetpoint(&setpoint, 3);
 }
 
 void pilotTimerCb(xTimerHandle timer) {
