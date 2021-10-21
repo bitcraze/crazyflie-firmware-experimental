@@ -35,7 +35,9 @@
 #define MAX_PAD_ERR 0.005
 #define TAKE_OFF_HEIGHT 0.2f
 #define TAKE_OFF_TIME 1.0f
+#define DURATION_TO_PAD_POSITION 2.0f
 #define LANDING_HEIGHT 0.12f
+#define LANDING_DURATION 1.0f
 #define SEQUENCE_SPEED 1.0f
 #define DURATION_TO_INITIAL_POSITION 2.0f
 
@@ -223,7 +225,15 @@ int getFlightCycleTimeMs() {
 
 // The flight time from take off to the end of the last spiral
 int getFullFlightTimeMs() {
-  return (TAKE_OFF_TIME + DURATION_TO_INITIAL_POSITION)* 1000 + trajectoryDurationMs;
+  return (TAKE_OFF_TIME + DURATION_TO_INITIAL_POSITION)* 1000 + getFlightCycleTimeMs() * 2 + DURATION_TO_PAD_POSITION + LANDING_DURATION;
+}
+
+int getLandingDurationMs() {
+  return LANDING_DURATION;
+}
+
+int getTakeOffDurationMs() {
+  return TAKE_OFF_TIME;
 }
 
 bool isPilotReadyForFlight() {
@@ -366,8 +376,7 @@ void pilotTimerCb(xTimerHandle timer) {
         if (terminateTrajectoryAndLand || (remainingTrajectories == 0) || !isActive) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going back to pad\n");
-          float timeToPadPosition = 2.0;
-          crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
+          crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, DURATION_TO_PAD_POSITION, false);
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
@@ -394,7 +403,7 @@ void pilotTimerCb(xTimerHandle timer) {
         }
 
         DEBUG_PRINT("Landing...\n");
-        crtpCommanderHighLevelLand(padZ, 1.0);
+        crtpCommanderHighLevelLand(padZ, LANDING_DURATION);
         state = STATE_LANDING;
       }
       flightTime += delta;

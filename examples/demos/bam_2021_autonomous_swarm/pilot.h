@@ -11,3 +11,5 @@ bool hasPilotLanded();
 bool hasCrashed();
 void pilotSetActivation(const uint8_t isActive);
 void pilotP2PNetworkIsActive();
+int getTakeOffDurationMs();
+int getLandingDurationMs();

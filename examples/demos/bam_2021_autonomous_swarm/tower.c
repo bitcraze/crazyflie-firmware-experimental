@@ -74,7 +74,6 @@ static const int NO_FLIGHT_SLOT_EMPTY = -1;
 static int findEmptyFlightSlot(uint32_t now, const SwarmState* state);
 static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeOffTime);
 static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t* nextEndTime, int* slotToUse);
-static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const bool blockStep0, const uint32_t earliestTakeOffTime);
 
 // Distributed concensus data ****************************************
 // General data ======================================================
@@ -546,8 +545,9 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
 
   // Some extra time to finalize the concensus
   const uint32_t MIN_PREPARATION_TIME = M2T(1700);
-  const uint32_t flightCycleTime = M2T(getFlightCycleTimeMs());
   const uint32_t fullFlightTime = M2T(getFullFlightTimeMs());
+  const uint32_t landingDuration = M2T(getLandingDurationMs());
+  const uint32_t takeOffDuration = M2T(getTakeOffDurationMs());
 
   // Use initiatorPromiseState, we are sure it has not been updated
   // since the majority was received. It is possible (but unlikely)
@@ -573,22 +573,11 @@ static bool planFlight(uint32_t now, SwarmState* newState, uint32_t* latestTakeO
       DEBUG_PRINT("%d Flight plan: No traffic in airspace, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
       break;
     case 1:
-      {
-        const uint32_t currentTakeOffTime = closestEndTime - fullFlightTime;
-        const uint32_t slotBaseTime = currentTakeOffTime + 3 * flightCycleTime / 2;
-        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, true, now + MIN_PREPARATION_TIME);
-        planSuccess = true;
-        DEBUG_PRINT("%d Flight plan: One other copter flying, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
-      }
-      break;
     case 2:
       {
-        const uint32_t currentTakeOffTime = nextEndTime - fullFlightTime;
-        const uint32_t slotBaseTime = currentTakeOffTime + 3 * flightCycleTime / 2;
-        bool blockStep0 = (nextEndTime - closestEndTime) < flightCycleTime;
-        *latestTakeOffTime = stepTimeForward(slotBaseTime, flightCycleTime, blockStep0, now + MIN_PREPARATION_TIME);
+        *latestTakeOffTime = nextEndTime - landingDuration - takeOffDuration;
         planSuccess = true;
-        DEBUG_PRINT("%d Flight plan: two other copters flying, wait for one to land, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
+        DEBUG_PRINT("%d Flight plan: One or two other copter(s) flying, take off at T -%f s\n", nodeId, (*latestTakeOffTime - now) / 1000.0);
       }
       break;
     default:
@@ -637,19 +626,6 @@ static int sortLocks(const SwarmState* state, uint32_t* closestEndTime, uint32_t
   }
 
   return usedCount;
-}
-
-static uint32_t stepTimeForward(const uint32_t baseTime, const uint32_t flightCycleTime, const bool blockStep0, const uint32_t earliestTakeOffTime) {
-  uint32_t result = baseTime;
-  if (blockStep0) {
-    result += 2 * flightCycleTime;
-  }
-
-  while(result < earliestTakeOffTime) {
-    result += flightCycleTime;
-  }
-
-  return result;
 }
 
 static void transmitFromQueue() {
