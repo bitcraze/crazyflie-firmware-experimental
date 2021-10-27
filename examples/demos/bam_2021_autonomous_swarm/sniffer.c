@@ -13,5 +13,5 @@ static void rxCallback(P2PPacket *packet) {
     // Note: p2p packets can be larger than what can be transmitted on the
     // app channel. We design our p2p protocol in this application to use
     // small packets and this limitation should not be a problem here
-    appchannelSendPacket(packet->data, packet->size);
+    appchannelSendDataPacket(packet->data, packet->size);
 }
