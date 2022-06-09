@@ -1,3 +1,4 @@
+from cProfile import label
 import stat
 import casadi.casadi as cs
 import opengen as og
@@ -8,6 +9,10 @@ from plotting import *
 
 
 def dynamics_ct(_x, _u):
+    """
+    Returns the dx dynamics of the system given the current state x and the
+    control input u.
+    """
     return [_u[0],
             _u[1],
             _u[2]]
@@ -46,23 +51,25 @@ xrefs = [
 
 z = concatenate_xs(x0s, xrefs)
 print("z:", z)
-input("Press Enter to continue...")
+# input("Press Enter to continue...")
 simulation_steps = 1000
 
 state_sequence = []
+# call the solver with the initial and reference states
 solver_status = mng.call(z)
 
 us = solver_status['solution']
+
 print("us: ", us)
 print("us length:", len(us))
 
 MAV_sequences = []
 # state_sequence.append(x0)
-for i in range(N_MAV):
+for i in range(N_MAV):# for each mav
     state_sequence = []
     MAV_offset = i*nx*N
     x = x0s[i]
-    for k in range(N):
+    for k in range(N):# for each time step in the horizon
         print("===========================================================")
         u = us[MAV_offset+3*k:MAV_offset+3*k+3]
         print("x_prev:", x)
@@ -86,21 +93,35 @@ MAV_sequences = np.array(MAV_sequences)
 time = np.arange(0, ts*N, ts)
 
 plt.figure()
-
+plt.subplot(211)
 for i in range(N_MAV):
-    plt.plot(MAV_sequences[i, :, 0], MAV_sequences[i, :, 1])
+    plt.plot(MAV_sequences[i, :, 0], MAV_sequences[i, :, 1],label="MAV "+str(i+1))
 
+plt.xlabel('X')
+plt.ylabel('Y')
+
+#add legend
+plt.legend()
 plt.grid()
 plt.xlim(-2, 2)
 plt.ylim(-2, 2)
 
+plt.subplot(212)
+for i in range(N_MAV):
+    plt.plot(MAV_sequences[i, :, 2],label="MAV "+str(i+1))
+
+plt.grid()
+plt.ylabel('Z')
+plt.xlabel('Horizon steps')
+plt.legend()
 # 3D plot
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 for i in range(N_MAV):
     ax.plot(MAV_sequences[i, :, 0],
             MAV_sequences[i, :, 1],
-            MAV_sequences[i, :, 2])
+            MAV_sequences[i, :, 2],label='MAV '+str(i+1))
+
 
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
@@ -108,6 +129,7 @@ ax.set_zlabel('Z')
 ax.set_xlim(-1, 1)
 ax.set_ylim(-1, 1)
 ax.set_zlim(0, 2)
+plt.legend()
 
 # cyl_center = [0.5, 0.5]
 # cyl_radius = 0.15
