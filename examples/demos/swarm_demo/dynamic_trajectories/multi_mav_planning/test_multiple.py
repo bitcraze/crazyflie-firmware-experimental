@@ -88,7 +88,7 @@ if __name__ == "__main__":
         [0, 0, 1],
         [1, 0, 1]
     ]
-    
+
     xrefs = [
         [1, 1, 1.5],
         [0, 1, 1.5]
@@ -98,4 +98,6 @@ if __name__ == "__main__":
 
     MAV_sequences = getMAVPaths(us)
 
-    plotting(MAV_sequences)
+    # plotting(MAV_sequences)
+
+    plotGridSpec(MAV_sequences)

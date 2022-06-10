@@ -1,6 +1,9 @@
+from ast import Pass
 import matplotlib.pyplot as plt
 import numpy as np
 from constants import *
+
+from matplotlib.gridspec import GridSpec
 
 def plot_circle2D(center, radius, n_points=100):
     theta = np.linspace(0, 2*np.pi, n_points)
@@ -17,51 +20,52 @@ def data_for_cylinder_along_z(center_x, center_y, radius, height_z):
     y_grid = radius*np.sin(theta_grid) + center_y
     return x_grid, y_grid, z_grid
 
-def plot2D(MAV_sequences):
-        plt.figure()
-        plt.subplot(211)
+def plot2D(MAV_sequences,ax2D=None,axZ=None):
+        print("ax2D:", ax2D)
+        print("axZ:", axZ)
+
+        # 2D plot
         for i in range(N_MAV):
-            plt.plot(MAV_sequences[i, :, 0],
+            ax2D.plot(MAV_sequences[i, :, 0],
                      MAV_sequences[i, :, 1], label="MAV "+str(i+1))
         
-        plot_start_and_goal(MAV_sequences)
+        # plot_start_and_goal(MAV_sequences,ax2D)
 
-        plt.xlabel('X')
-        plt.ylabel('Y')
+        ax2D.set_xlabel('X')
+        ax2D.set_ylabel('Y')
 
         # add legend
-        plt.legend()
-        plt.grid()
-        plt.xlim(-2, 2)
-        plt.ylim(-2, 2)
+        ax2D.legend()
+        ax2D.grid()
+        ax2D.set_xlim(-2, 2)
+        ax2D.set_ylim(-2, 2)
 
-        plt.subplot(212)
+        # z plot
         for i in range(N_MAV):
-            plt.plot(MAV_sequences[i, :, 2], label="MAV "+str(i+1))
+            axZ.plot(MAV_sequences[i, :, 2], label="MAV "+str(i+1))
 
-        plt.grid()
-        plt.ylabel('Z')
-        plt.xlabel('Horizon steps')
-        plt.legend()
+        axZ.grid()
+        axZ.set_ylabel('Z')
+        axZ.set_xlabel('Horizon steps')
+        axZ.legend()
 
-def plot3D(MAV_sequences): 
+def plot3D(MAV_sequences,ax3D=None):
+    
     # 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
     for i in range(N_MAV):
-        ax.plot(MAV_sequences[i, :, 0],
+        ax3D.plot(MAV_sequences[i, :, 0],
                 MAV_sequences[i, :, 1],
                 MAV_sequences[i, :, 2], label='MAV '+str(i+1))
     
-    plot_start_and_goal(MAV_sequences,ax)
+    plot_start_and_goal(MAV_sequences,ax3D)
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_xlim(-1, 1)
-    ax.set_ylim(-1, 1)
-    ax.set_zlim(0, 2)
-    plt.legend()
+    ax3D.set_xlabel('X')
+    ax3D.set_ylabel('Y')
+    ax3D.set_zlabel('Z')
+    ax3D.set_xlim(-1, 1)
+    ax3D.set_ylim(-1, 1)
+    ax3D.set_zlim(0, 2)
+    ax3D.legend()
 
 def plotting(MAV_sequences):
     time = np.arange(0, ts*N, ts)
@@ -79,4 +83,23 @@ def plot_start_and_goal(MAV_sequences,ax=None):
         for seq in MAV_sequences:
             ax.plot(seq[0,0],seq[0,1],seq[0,2],'o',color='green')
             ax.plot(seq[-1,0],seq[-1,1],seq[-1,2],'o',color='red')
-    
+
+def plotGridSpec(MAV_sequences):
+    fig = plt.figure(constrained_layout=True)
+
+    gs = GridSpec(2, 2)
+
+    ax2D = fig.add_subplot(gs[0, 0])
+    axZ = fig.add_subplot(gs[1, 0])
+    ax3D = fig.add_subplot(gs[:, 1], projection='3d')
+
+    # 2D plot
+    plot2D(MAV_sequences,ax2D,axZ)
+
+    # # 3D plot
+    plot3D(MAV_sequences,ax3D)
+
+    plt.show()
+
+if __name__ == "__main__":
+    plotGridSpec([])
