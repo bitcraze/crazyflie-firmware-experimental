@@ -101,7 +101,9 @@ def plotGridSpec(MAV_sequences):
 
     ax2D = fig.add_subplot(gs[0, 0])
     axZ = fig.add_subplot(gs[1, 0])
-    ax3D = fig.add_subplot(gs[:, 1], projection='3d')
+    ax3D = fig.add_subplot(gs[0, 1], projection='3d')
+
+    ax3D_anim=fig.add_subplot(gs[1, 1], projection='3d')
 
     # 2D plot
     plot2D(MAV_sequences, ax2D, axZ)
@@ -109,12 +111,14 @@ def plotGridSpec(MAV_sequences):
     # 3D plot
     plot3D(MAV_sequences, ax3D)
 
+    #Animation 3D
+    animate3D(MAV_sequences, ax3D_anim,fig)
     # plt.show()
 
-def animate3D(MAV_sequences):
-    fig = plt.figure(constrained_layout=True)
-    ax = fig.add_subplot(1, 1, 1, projection='3d')
-    
+def animate3D(MAV_sequences,ax=None,fig=None):
+    if ax is None and fig is None:
+        fig = plt.figure(constrained_layout=True)
+        ax = fig.add_subplot(1, 1, 1, projection='3d')
     
     lines=[]
     for i in range(len(MAV_sequences)):

@@ -82,29 +82,33 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
-def main():
+def main(case=2):
     # Run simulations
     x0s = [
-        [0, 0, 1],
-        [1, 0, 1]
+        [ [0.5, 0, 1],[0.5, 1, 1] ],
+        [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
+        [ [0, 0, 1],[1, 0, 1] ],
     ]
 
     xrefs = [
-        [1, 1, 1.5],
-        [0, 1, 1.5]
+        [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
+        [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
+        [ [1, 1, 1.5],[0, 1, 1.5] ],
     ]
 
-    us = solve_multiple_MAV_problem(x0s, xrefs)
+    
+    us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
 
-    MAV_sequences = getMAVPaths(us,x0s)
+    MAV_sequences = getMAVPaths(us,x0s[case])
 
     # plotting(MAV_sequences)
 
     plotGridSpec(MAV_sequences)
 
-    animate3D(MAV_sequences)
+    # animate3D(MAV_sequences)
 
     plt.show()
 
 if __name__ == "__main__":
-    main()    
+    for i in range(3):
+        main(i)
