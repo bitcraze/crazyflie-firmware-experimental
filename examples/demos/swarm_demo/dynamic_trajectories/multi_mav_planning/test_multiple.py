@@ -94,7 +94,7 @@ if __name__ == "__main__":
         [0, 1, 1.5]
     ]
 
-    us=solve_multiple_MAV_problem(x0s, xrefs)
+    us = solve_multiple_MAV_problem(x0s, xrefs)
 
     MAV_sequences = getMAVPaths(us)
 
