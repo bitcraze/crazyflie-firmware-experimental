@@ -1,10 +1,9 @@
-from ast import Pass
 import matplotlib.pyplot as plt
 import numpy as np
 from constants import *
 
 from matplotlib.gridspec import GridSpec
-
+from matplotlib import animation
 
 def plot_circle2D(center, radius, n_points=100):
     theta = np.linspace(0, 2*np.pi, n_points)
@@ -114,6 +113,36 @@ def plotGridSpec(MAV_sequences):
 
     plt.show()
 
+def animate3D(MAV_sequences):
+    fig = plt.figure(constrained_layout=True)
+    ax = fig.add_subplot(1, 1, 1, projection='3d')
+    
+    
+    lines=[]
+    for i in range(len(MAV_sequences)):
+        line, = ax.plot(MAV_sequences[i,0:1,0], MAV_sequences[i,0:1,1], MAV_sequences[i,0:1,2])
+        lines.append(line)
+
+    plot_start_and_goal(MAV_sequences, ax)
+
+    ax.set_xlim(-0.1,1.1)
+    ax.set_ylim(-0.1,1.1)
+    ax.set_zlim(0.5,1.5)
+    
+    def update(num, MAV_sequences, lines):
+        if num<2:
+            num=2
+        
+        for i in range(len(MAV_sequences)):
+
+            lines[i].set_data(MAV_sequences[i,:num,0], MAV_sequences[i,:num,1])
+            lines[i].set_3d_properties(MAV_sequences[i,:num,2])
+    
+    frames=N
+    fps=60
+    interval=1000/fps
+    ani = animation.FuncAnimation(fig, update, frames, fargs=(MAV_sequences, lines), interval=interval, blit=False)
+    plt.show()
 
 if __name__ == "__main__":
     plotGridSpec([])
