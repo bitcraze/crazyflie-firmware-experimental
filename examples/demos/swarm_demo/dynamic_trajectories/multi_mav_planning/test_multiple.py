@@ -1,5 +1,3 @@
-from cProfile import label
-import stat
 import casadi.casadi as cs
 import opengen as og
 import matplotlib.pyplot as plt
@@ -33,109 +31,71 @@ def concatenate_xs(x0s, xrefs):
     return np.concatenate(z)
 
 
-# Create a TCP connection manager
-mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
+def getMAVPaths(us):
+    MAV_sequences = []
+    for i in range(N_MAV):  # for each mav
+        state_sequence = []
+        MAV_offset = i*nx*N
+        x = x0s[i]
+        for k in range(N):  # for each time step in the horizon
+            print("===========================================================")
+            u = us[MAV_offset+3*k:MAV_offset+3*k+3]
+            print("x_prev:", x)
+            print("u:", u)
 
-# Start the TCP server
-mng.start()
+            x_next = dynamics_dt(x, u)
+            print("x_next:", x_next)
 
-# Run simulations
-x0s = [
-    [0, 0, 1],
-    [1, 0, 1]
-]
-xrefs = [
-    [1, 1, 1.5],
-    [0, 1, 1.5]
-]
+            state_sequence.append(x_next)
+            x = x_next
 
-z = concatenate_xs(x0s, xrefs)
-print("z:", z)
-# input("Press Enter to continue...")
-simulation_steps = 1000
+        MAV_sequences.append(state_sequence)
 
-state_sequence = []
-# call the solver with the initial and reference states
-solver_status = mng.call(z)
+    MAV_sequences = np.array(MAV_sequences)
 
-us = solver_status['solution']
-
-print("us: ", us)
-print("us length:", len(us))
-
-MAV_sequences = []
-# state_sequence.append(x0)
-for i in range(N_MAV):# for each mav
-    state_sequence = []
-    MAV_offset = i*nx*N
-    x = x0s[i]
-    for k in range(N):# for each time step in the horizon
-        print("===========================================================")
-        u = us[MAV_offset+3*k:MAV_offset+3*k+3]
-        print("x_prev:", x)
-        print("u:", u)
-
-        x_next = dynamics_dt(x, u)
-        print("x_next:", x_next)
-
-        state_sequence.append(x_next)
-        x = x_next
-
-    MAV_sequences.append(state_sequence)
-
-# Thanks TCP server; we won't be needing you any more
-mng.kill()
-
-MAV_sequences = np.array(MAV_sequences)
+    return MAV_sequences
 
 
-# ================= PLOTTING STUFF ======================
-time = np.arange(0, ts*N, ts)
+def solve_multiple_MAV_problem(x0s, xrefs):
+    """Solves the multiple MAV path planning problem and returns the velocity control inputs each MAV."""
+    # Create a TCP connection manager
+    mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
 
-plt.figure()
-plt.subplot(211)
-for i in range(N_MAV):
-    plt.plot(MAV_sequences[i, :, 0], MAV_sequences[i, :, 1],label="MAV "+str(i+1))
+    # Start the TCP server
+    mng.start()
 
-plt.xlabel('X')
-plt.ylabel('Y')
+    z = concatenate_xs(x0s, xrefs)
+    print("z:", z)
+    # input("Press Enter to continue...")
 
-#add legend
-plt.legend()
-plt.grid()
-plt.xlim(-2, 2)
-plt.ylim(-2, 2)
+    # call the solver with the initial and reference states
+    solver_status = mng.call(z)
 
-plt.subplot(212)
-for i in range(N_MAV):
-    plt.plot(MAV_sequences[i, :, 2],label="MAV "+str(i+1))
+    us = solver_status['solution']
 
-plt.grid()
-plt.ylabel('Z')
-plt.xlabel('Horizon steps')
-plt.legend()
-# 3D plot
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-for i in range(N_MAV):
-    ax.plot(MAV_sequences[i, :, 0],
-            MAV_sequences[i, :, 1],
-            MAV_sequences[i, :, 2],label='MAV '+str(i+1))
+    print("us: ", us)
+    print("us length:", len(us))
+
+    # Thanks TCP server; we won't be needing you any more
+    mng.kill()
+
+    return us
 
 
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Z')
-ax.set_xlim(-1, 1)
-ax.set_ylim(-1, 1)
-ax.set_zlim(0, 2)
-plt.legend()
+if __name__ == "__main__":
+    # Run simulations
+    x0s = [
+        [0, 0, 1],
+        [1, 0, 1]
+    ]
+    
+    xrefs = [
+        [1, 1, 1.5],
+        [0, 1, 1.5]
+    ]
 
-# cyl_center = [0.5, 0.5]
-# cyl_radius = 0.15
-# cyl_height = 4.0
-# Xc, Yc, Zc = data_for_cylinder_along_z(
-# cyl_center[0], cyl_center[1], cyl_radius, cyl_height)
-# ax.plot_surface(Xc, Yc, Zc, alpha=0.5)
+    us=solve_multiple_MAV_problem(x0s, xrefs)
 
-plt.show()
+    MAV_sequences = getMAVPaths(us)
+
+    plotting(MAV_sequences)
