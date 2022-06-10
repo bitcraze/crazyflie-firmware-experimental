@@ -62,7 +62,7 @@ for t in range(0, N):  # for each time step in the horizon
     print("xrefs[0] length:", len(xrefs[0]))
     print("xrefs[0]:", xrefs[0])
 
-    h = 0.1 - (x0s[0][2]-x0s[1][2])
+    h = 0.1 - cs.sqrt(x0s[0][2]-x0s[1][2])**2
 
     cost += 10000*cs.fmax(0, h)
     # print("cost:", cost)
