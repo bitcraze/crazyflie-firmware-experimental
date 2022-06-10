@@ -82,8 +82,6 @@ def plotting(MAV_sequences):
     plot2D(MAV_sequences, ax2D, axZ)
     plot3D(MAV_sequences, ax3D)
 
-    plt.show()
-
 
 def plot_start_and_goal(MAV_sequences, ax: plt.Axes = None):
     if ax.name != "3d":
@@ -111,7 +109,7 @@ def plotGridSpec(MAV_sequences):
     # 3D plot
     plot3D(MAV_sequences, ax3D)
 
-    plt.show()
+    # plt.show()
 
 def animate3D(MAV_sequences):
     fig = plt.figure(constrained_layout=True)

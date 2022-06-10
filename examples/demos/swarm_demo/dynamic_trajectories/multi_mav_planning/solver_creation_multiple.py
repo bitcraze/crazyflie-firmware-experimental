@@ -55,14 +55,9 @@ for t in range(0, N):  # for each time step in the horizon
         #  (x0s[0][1]-x0s[1][1])**2 +
         #  (x0s[0][2]-x0s[1][2])**2)
 
-    h_dist = dMAV - cs.sqrt((x0s[0][2]-x0s[1][2])**2)
-    print("x0s[0] length:", len(x0s[0]))
-    print("xos[0]:", x0s[0])
-
-    print("xrefs[0] length:", len(xrefs[0]))
-    print("xrefs[0]:", xrefs[0])
-
-    h = 0.1 - cs.sqrt(x0s[0][2]-x0s[1][2])**2
+   
+    epsilon=0.0000001
+    h = 0.3 - cs.sqrt((x0s[0][2]-x0s[1][2]+epsilon)**2 + (x0s[0][0]-x0s[1][0]+epsilon)**2 + (x0s[0][1]-x0s[1][1]+epsilon)**2)
 
     cost += 10000*cs.fmax(0, h)
     # print("cost:", cost)
@@ -101,3 +96,6 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                           build_config,
                                           solver_config)
 builder.build()
+
+from test_multiple import main 
+main()

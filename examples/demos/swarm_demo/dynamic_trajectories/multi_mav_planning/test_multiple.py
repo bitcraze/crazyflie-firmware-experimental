@@ -31,20 +31,20 @@ def concatenate_xs(x0s, xrefs):
     return np.concatenate(z)
 
 
-def getMAVPaths(us):
+def getMAVPaths(us,x0s):
     MAV_sequences = []
     for i in range(N_MAV):  # for each mav
         state_sequence = []
         MAV_offset = i*nx*N
         x = x0s[i]
         for k in range(N):  # for each time step in the horizon
-            print("===========================================================")
+            # print("===========================================================")
             u = us[MAV_offset+3*k:MAV_offset+3*k+3]
-            print("x_prev:", x)
-            print("u:", u)
+            # print("x_prev:", x)
+            # print("u:", u)
 
             x_next = dynamics_dt(x, u)
-            print("x_next:", x_next)
+            # print("x_next:", x_next)
 
             state_sequence.append(x_next)
             x = x_next
@@ -65,24 +65,24 @@ def solve_multiple_MAV_problem(x0s, xrefs):
     mng.start()
 
     z = concatenate_xs(x0s, xrefs)
-    print("z:", z)
-    # input("Press Enter to continue...")
+    # print("z:", z)
 
     # call the solver with the initial and reference states
     solver_status = mng.call(z)
-
+    
+    print("solver_status:", solver_status["exit_status"])
+    # print("solver_status:", solver_status["max_constraint_violation"])
     us = solver_status['solution']
 
-    print("us: ", us)
-    print("us length:", len(us))
+    # print("us: ", us)
+    # print("us length:", len(us))
 
     # Thanks TCP server; we won't be needing you any more
     mng.kill()
 
     return us
 
-
-if __name__ == "__main__":
+def main():
     # Run simulations
     x0s = [
         [0, 0, 1],
@@ -96,10 +96,15 @@ if __name__ == "__main__":
 
     us = solve_multiple_MAV_problem(x0s, xrefs)
 
-    MAV_sequences = getMAVPaths(us)
+    MAV_sequences = getMAVPaths(us,x0s)
 
     # plotting(MAV_sequences)
 
-    # plotGridSpec(MAV_sequences)
+    plotGridSpec(MAV_sequences)
 
     animate3D(MAV_sequences)
+
+    plt.show()
+
+if __name__ == "__main__":
+    main()    
