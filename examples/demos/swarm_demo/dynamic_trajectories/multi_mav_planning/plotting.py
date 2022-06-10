@@ -29,7 +29,7 @@ def plot2D(MAV_sequences,ax2D=None,axZ=None):
             ax2D.plot(MAV_sequences[i, :, 0],
                      MAV_sequences[i, :, 1], label="MAV "+str(i+1))
         
-        # plot_start_and_goal(MAV_sequences,ax2D)
+        plot_start_and_goal(MAV_sequences,ax2D)
 
         ax2D.set_xlabel('X')
         ax2D.set_ylabel('Y')
@@ -69,16 +69,23 @@ def plot3D(MAV_sequences,ax3D=None):
 
 def plotting(MAV_sequences):
     time = np.arange(0, ts*N, ts)
+    fig1 = plt.figure(constrained_layout=True)
+    ax2D = fig1.add_subplot(2, 1, 1)
+    axZ  = fig1.add_subplot(2, 1, 2)
 
-    plot2D(MAV_sequences)
-    plot3D(MAV_sequences)
+    fig2 = plt.figure(constrained_layout=True)
+    ax3D = fig2.add_subplot(1,1,1, projection='3d')
+    
+    plot2D(MAV_sequences,ax2D,axZ)
+    plot3D(MAV_sequences,ax3D)
+
     plt.show()
 
-def plot_start_and_goal(MAV_sequences,ax=None):
-    if ax is None:
+def plot_start_and_goal(MAV_sequences,ax:plt.Axes=None):
+    if  ax.name != "3d":
         for seq in MAV_sequences:
-            plt.plot(seq[0,0],seq[0,1],'o',color='green')
-            plt.plot(seq[-1,0],seq[-1,1],'o',color='red')
+            ax.plot(seq[0,0],seq[0,1],'o',color='green')
+            ax.plot(seq[-1,0],seq[-1,1],'o',color='red')
     else:
         for seq in MAV_sequences:
             ax.plot(seq[0,0],seq[0,1],seq[0,2],'o',color='green')
@@ -96,7 +103,7 @@ def plotGridSpec(MAV_sequences):
     # 2D plot
     plot2D(MAV_sequences,ax2D,axZ)
 
-    # # 3D plot
+    # 3D plot
     plot3D(MAV_sequences,ax3D)
 
     plt.show()

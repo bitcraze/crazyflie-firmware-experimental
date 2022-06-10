@@ -98,6 +98,6 @@ if __name__ == "__main__":
 
     MAV_sequences = getMAVPaths(us)
 
-    # plotting(MAV_sequences)
+    plotting(MAV_sequences)
 
-    plotGridSpec(MAV_sequences)
+    # plotGridSpec(MAV_sequences)
