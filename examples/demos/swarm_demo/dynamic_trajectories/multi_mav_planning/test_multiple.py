@@ -83,20 +83,7 @@ def solve_multiple_MAV_problem(x0s, xrefs):
     return us
 
 def main(case=2):
-    # Run simulations
-    x0s = [
-        [ [0.5, 0, 1],[0.5, 1, 1] ],
-        [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
-        [ [0, 0, 1],[1, 0, 1] ],
-    ]
-
-    xrefs = [
-        [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
-        [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
-        [ [1, 1, 1.5],[0, 1, 1.5] ],
-    ]
-
-    
+    # Run simulations    
     us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
 
     MAV_sequences = getMAVPaths(us,x0s[case])
@@ -109,6 +96,20 @@ def main(case=2):
 
     plt.show()
 
+x0s = [
+       [ [0, 0, 1],[0, 1, 1] ],
+       [ [0.5, 0, 1],[0.5, 1, 1] ], 
+       [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
+       [ [0, 0, 1],[1, 0, 1] ],
+   ]
+
+xrefs = [
+    [ [1, 1, 1],[1, 0, 1] ],
+    [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
+    [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
+    [ [1, 1, 1.5],[0, 1, 1.5] ],
+]
+
 if __name__ == "__main__":
-    for i in range(3):
+    for i in range(len(x0s)):
         main(i)
