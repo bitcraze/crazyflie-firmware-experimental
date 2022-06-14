@@ -7,8 +7,11 @@ import matplotlib.gridspec as gridspec
 import argparse
 # import scipy.interpolate
 import scipy.optimize
-
-import uav_trajectory
+try:
+    import uav_trajectory
+except:
+    from . import uav_trajectory
+    
 import time
 
 # computes the difference between current interpolation and desired values

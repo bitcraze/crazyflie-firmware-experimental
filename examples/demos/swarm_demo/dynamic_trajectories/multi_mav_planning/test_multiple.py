@@ -5,6 +5,7 @@ import numpy as np
 from constants import *
 from plotting import *
 
+import trajectory_gen.testing as tg
 
 def dynamics_ct(_x, _u):
     """
@@ -59,7 +60,12 @@ def getMAVPaths(us,x0s):
 def solve_multiple_MAV_problem(x0s, xrefs):
     """Solves the multiple MAV path planning problem and returns the velocity control inputs each MAV."""
     # Create a TCP connection manager
-    mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
+    try:
+        mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
+    except:
+        print("Could not create a TCP connection manager with short path")
+        path="/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/dynamic_trajectories/multi_mav_planning/my_optimizers/navigation_multiple"
+        mng = og.tcp.OptimizerTcpManager(path)
 
     # Start the TCP server
     mng.start()
@@ -87,7 +93,26 @@ def main(case=2):
     us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
 
     MAV_sequences = getMAVPaths(us,x0s[case])
+    trajs=[]
+    
+    for i in range(N_MAV):
+        waypoints=MAV_sequences[i]
+        #insert column of zeros at the end
+        waypoints=waypoints[::6,:]
 
+        print("waypoints:", waypoints.shape)
+        waypoints=np.insert(waypoints,3,0,axis=1)
+        print("waypoints:", waypoints.shape)
+        tr=tg.marios(waypoints)
+        trajs.append( tr )
+
+    fig=plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    for i in range(N_MAV):
+        trajs[i].plot(timestep=0.1,ax=ax)
+
+    print("waypoints.shape:", waypoints.shape)
     # plotting(MAV_sequences)
 
     plotGridSpec(MAV_sequences)

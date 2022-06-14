@@ -219,7 +219,7 @@ class Trajectory:
             data[i, 25:33] = p.pyaw.p
         return data
 
-    def plot(self, timestep: float):
+    def plot(self, timestep: float,ax=None):
         size = int(self.duration / timestep+0.5)
         print("size:", size)
         x = np.zeros(size)
@@ -231,21 +231,22 @@ class Trajectory:
             out: TrajectoryOutput
             x[i], y[i], z[i] = out.pos[0], out.pos[1], out.pos[2]
             # print(x[i], y[i], z[i])
-
-        fig = plt.figure()
-
-        ax = fig.add_subplot(111, projection='3d')
+        
+        if ax==None:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
 
         ax.plot(x, y, z)
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
 
-        # ax.set_xlim3d(-1, 1)
-        # ax.set_ylim3d(-1, 1)
+        ax.set_xlim3d(-1, 1)
+        ax.set_ylim3d(-1, 1)
         ax.set_zlim3d(0.5, 1.5)
 
-        plt.show()
+        if ax==None:
+            plt.show()
 
 class Waypoint():
     def __init__(self, x, y, z, yaw):

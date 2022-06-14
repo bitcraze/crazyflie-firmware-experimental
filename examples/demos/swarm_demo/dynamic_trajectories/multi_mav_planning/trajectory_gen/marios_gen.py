@@ -244,66 +244,172 @@ def visualize_trajectory3D(pols):
     plt.show()
 
 
-timestep = 100/50
-yaw_ref = 0
-height = 1
-waypoints = [
-    [ 0.0, 0.0, height, yaw_ref],
-    [ 1.0, 0.0, height, yaw_ref],
-    [ 1.0, 1.0, height, yaw_ref],
-    [ 0.0, 1.0, height, yaw_ref],
-    [ 0.0, 0.0, height, yaw_ref],
-]
+def allocateTime(waypoints: np.array, max_vel: float, max_acc: float):
+    # waypoints:list of Waypoint instances
+    # returns: list of time points
 
+    # exclude last (yaw) column from the waypoints
+
+    waypoints = waypoints[:, :-1]
+
+    print("waypoints.shape:", waypoints.shape)
+
+    N = len(waypoints)-1
+    durations = np.zeros(N)
+
+    for k in range(N):
+        p0 = waypoints[k, :]
+        p1 = waypoints[k+1, :]
+
+        # get distance between points
+        D = np.linalg.norm(np.array(p0)-np.array(p1))
+
+        acct = max_vel / max_acc
+        accd = (max_acc * acct * acct / 2)
+        dcct = max_vel / max_acc
+        dccd = max_acc * dcct * dcct / 2
+
+        if (D < accd + dccd):
+            t1 = np.sqrt(max_acc * D) / max_acc
+            t2 = (max_acc * t1) / max_acc
+            dtxyz = t1 + t2
+        else:
+            t1 = acct
+            t2 = (D - accd - dccd) / max_vel
+            t3 = dcct
+            dtxyz = t1 + t2 + t3
+
+        durations[k] = dtxyz
+
+    return durations
+
+
+def allocateTimeProportional(waypoints: np.array, total_time):
+    # waypoints:list of Waypoint instances
+    # returns: list of time points
+
+    # exclude last (yaw) column from the waypoints
+
+    # TODO: check if this time allocation leads to crazy trajectories and if so,
+    #     increase the total time
+
+    waypoints = waypoints[:, :-1]
+    
+    print("waypoints.shape:", waypoints.shape)
+    for wp in waypoints:
+        print(wp)
+
+    N = len(waypoints)-1
+    durations = np.zeros(N)
+    distances = np.zeros(N)
+
+    for k in range(N):
+        p0 = waypoints[k, :]
+        p1 = waypoints[k+1, :]
+
+        # get distance between points
+        D = np.linalg.norm(np.array(p0)-np.array(p1))
+        distances[k] = D
+
+    #find max distance
+    dist_sum = np.sum(distances)
+    
+    for k in range(N):
+        durations[k] = distances[k] / dist_sum * total_time
+
+    return durations
 
 # waypoints format: t,x,y,z,yaw
 # waypoints = [
 #     [0.0, 0.0, height, yaw_ref],
-
+# #
 #     [0.0, 1.0 - 0.1, height, yaw_ref],
 #     [0.0, 1.0, height, yaw_ref],
 #     [0.1, 1.0 + 0.1, height, yaw_ref],
-
+# #
 #     [1.0-0.1, 1.0, height, yaw_ref],
 #     [1.0, 1.0, height, yaw_ref],
 #     [1.0, 1.0-0.1, height, yaw_ref],
-
+# #
 #     [1.0, 0.0 + 0.1, height, yaw_ref],
 #     [1.0, 0.0, height, yaw_ref],
 #     [1.0 - 0.1, 0.0, height, yaw_ref],
-
+# #
 #     [0.0, 0.0, height, yaw_ref],
 # ]
 
 
-if __name__ == "__main__":
+def generate_traj(waypoints: np.array):
     traj_points = []
-    
-    t0=time.time()
+    t = 0
+    # time_allocation = allocateTime(waypoints,MAX_VEL,MAX_ACC)
+
+    time_allocation = allocateTimeProportional(waypoints, 35)
+    print("time_allocation:", time_allocation)
 
     for i, point in enumerate(waypoints):
+        # time allocation
+        if i != 0:
+            t = t+time_allocation[i-1]
+
         traj_points.append(Point_time(
-            Waypoint(point[0], point[1], point[2], point[3]), t=i*timestep))
+            Waypoint(point[0], point[1], point[2], point[3]), t=t))
 
     pols_coeffs, pc_pols = calculate_trajectory4D(traj_points)
 
+    return pols_coeffs, pc_pols
+
+
+def create_traj(pols_coeffs, pc_pols):
     segments_number = len(pols_coeffs[0])
     matrix = np.zeros((segments_number, 4*8+1))
 
     for i in range(segments_number):
+        prev_time = matrix[i-1, 0] if i > 0 else 0
+        matrix[i, 0] = pc_pols[0].time_durations[i] + prev_time
         matrix[i, 0] = i*1
         matrix[i:i+1, 1:9] = pols_coeffs[0][i].p.T
         matrix[i, 9:17] = pols_coeffs[1][i].p.T
         matrix[i, 17:25] = pols_coeffs[2][i].p.T
         matrix[i, 25:33] = pols_coeffs[3][i].p.T
 
-    dt=time.time()-t0
-    print("dt:", dt)
-    
     matrix = np.array(matrix)
     print("matrix.shape: ", matrix.shape)
 
     tr = Trajectory()
     tr.load_from_matrix(matrix)
 
-    tr.plot(timestep=0.2)
+    # tr.plot(timestep=0.2)
+    return tr
+
+def main(waypoints):
+    pols_coeffs, pc_pols = generate_traj(waypoints)
+    tr = create_traj(pols_coeffs, pc_pols)
+    
+    return tr
+    
+if __name__ == "__main__":
+    yaw_ref = 0
+    height = 1
+    
+    waypoints = [
+        [0.0, 0.0, height, yaw_ref],
+        [0.5, 0.0, height, yaw_ref],
+
+        [1.0, 0.0, height, yaw_ref],
+        [1.0, 0.5, height, yaw_ref],
+
+        [1.0, 1.0, height, yaw_ref],
+
+        [0.5, 1.0, height, yaw_ref],
+
+        [0.0, 1.0, height, yaw_ref],
+
+        [0.0, 0.5, height, yaw_ref],
+        [0.0, 0.0, height, yaw_ref],
+    ]
+    MAX_VEL = 3
+    MAX_ACC = 3
+    
+    waypoints = np.array(waypoints)
+    main(waypoints)
