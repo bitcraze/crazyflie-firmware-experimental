@@ -5,7 +5,7 @@ import numpy as np
 from constants import *
 from plotting import *
 
-import trajectory_gen.testing as tg
+import trajectory_gen.marios_gen as min_snap_tg
 
 def dynamics_ct(_x, _u):
     """
@@ -88,22 +88,21 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
-def main(case=2):
-    # Run simulations    
-    us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
-
-    MAV_sequences = getMAVPaths(us,x0s[case])
+def generate_trajectories(MAV_sequences):
+    """Generates the trajectories for the MAVs."""
     trajs=[]
     
     for i in range(N_MAV):
         waypoints=MAV_sequences[i]
-        #insert column of zeros at the end
-        waypoints=waypoints[::6,:]
 
-        print("waypoints:", waypoints.shape)
+        #downsample the trajectory
+        downsample_step=6
+        waypoints=waypoints[::downsample_step,:]
+
+        #insert column of zeros at the end
         waypoints=np.insert(waypoints,3,0,axis=1)
-        print("waypoints:", waypoints.shape)
-        tr=tg.marios(waypoints)
+
+        tr=min_snap_tg.min_snap_traj_generation(waypoints)
         trajs.append( tr )
 
     fig=plt.figure()
@@ -111,8 +110,17 @@ def main(case=2):
 
     for i in range(N_MAV):
         trajs[i].plot(timestep=0.1,ax=ax)
+    
+    return trajs
 
-    print("waypoints.shape:", waypoints.shape)
+
+def main(case=2):
+    # Run simulations
+    us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
+
+    MAV_sequences = getMAVPaths(us,x0s[case])
+    
+    generate_trajectories(MAV_sequences)
     # plotting(MAV_sequences)
 
     plotGridSpec(MAV_sequences)

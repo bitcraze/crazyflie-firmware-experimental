@@ -319,26 +319,6 @@ def allocateTimeProportional(waypoints: np.array, total_time):
 
     return durations
 
-# waypoints format: t,x,y,z,yaw
-# waypoints = [
-#     [0.0, 0.0, height, yaw_ref],
-# #
-#     [0.0, 1.0 - 0.1, height, yaw_ref],
-#     [0.0, 1.0, height, yaw_ref],
-#     [0.1, 1.0 + 0.1, height, yaw_ref],
-# #
-#     [1.0-0.1, 1.0, height, yaw_ref],
-#     [1.0, 1.0, height, yaw_ref],
-#     [1.0, 1.0-0.1, height, yaw_ref],
-# #
-#     [1.0, 0.0 + 0.1, height, yaw_ref],
-#     [1.0, 0.0, height, yaw_ref],
-#     [1.0 - 0.1, 0.0, height, yaw_ref],
-# #
-#     [0.0, 0.0, height, yaw_ref],
-# ]
-
-
 def generate_traj(waypoints: np.array):
     traj_points = []
     t = 0
@@ -382,11 +362,30 @@ def create_traj(pols_coeffs, pc_pols):
     # tr.plot(timestep=0.2)
     return tr
 
-def main(waypoints):
+def min_snap_traj_generation(waypoints):
     pols_coeffs, pc_pols = generate_traj(waypoints)
     tr = create_traj(pols_coeffs, pc_pols)
     
     return tr
+
+# waypoints format: t,x,y,z,yaw
+# waypoints = [
+#     [0.0, 0.0, height, yaw_ref],
+# #
+#     [0.0, 1.0 - 0.1, height, yaw_ref],
+#     [0.0, 1.0, height, yaw_ref],
+#     [0.1, 1.0 + 0.1, height, yaw_ref],
+# #
+#     [1.0-0.1, 1.0, height, yaw_ref],
+#     [1.0, 1.0, height, yaw_ref],
+#     [1.0, 1.0-0.1, height, yaw_ref],
+# #
+#     [1.0, 0.0 + 0.1, height, yaw_ref],
+#     [1.0, 0.0, height, yaw_ref],
+#     [1.0 - 0.1, 0.0, height, yaw_ref],
+# #
+#     [0.0, 0.0, height, yaw_ref],
+# ]
     
 if __name__ == "__main__":
     yaw_ref = 0
@@ -408,8 +407,9 @@ if __name__ == "__main__":
         [0.0, 0.5, height, yaw_ref],
         [0.0, 0.0, height, yaw_ref],
     ]
-    MAX_VEL = 3
-    MAX_ACC = 3
+
+    # MAX_VEL = 3
+    # MAX_ACC = 3
     
     waypoints = np.array(waypoints)
-    main(waypoints)
+    min_snap_traj_generation(waypoints)

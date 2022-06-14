@@ -105,7 +105,7 @@ def wolfgang(waypoints):
 
 def marios(waypoints):
     # remove fist column (time) of waypoints
-    return marios_gen.main(waypoints)
+    return marios_gen.min_snap_traj_generation(waypoints)
 
 test=[
  [0.02382189, 0.0156142,  1.00382214,0.0],
