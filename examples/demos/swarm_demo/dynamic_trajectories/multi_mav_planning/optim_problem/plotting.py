@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from constants import *
+from .constants import *
 
 from matplotlib.gridspec import GridSpec
 from matplotlib import animation

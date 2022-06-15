@@ -2,8 +2,12 @@ import casadi.casadi as cs
 import opengen as og
 import matplotlib.pyplot as plt
 import numpy as np
-from constants import *
-from plotting import *
+try:
+    from constants import *
+    from plotting import *
+except:
+    from .constants import *
+    from .plotting import *
 
 import trajectory_gen.marios_gen as min_snap_tg
 

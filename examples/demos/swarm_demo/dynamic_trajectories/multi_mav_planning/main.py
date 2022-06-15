@@ -2,7 +2,7 @@ import trajectory_gen.marios_gen as min_snap_tg
 import matplotlib.pyplot as plt
 import numpy as np
 
-from test_multiple import *
+from optim_problem.test_multiple import * 
 
 x0s = [
        [ [0, 0, 1],[0, 1, 1] ],
