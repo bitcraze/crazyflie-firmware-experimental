@@ -114,13 +114,13 @@ def generate_trajectories(MAV_sequences):
     return trajs
 
 
-def main(case=2):
+def main_solver(case=2):
     # Run simulations
     us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
 
     MAV_sequences = getMAVPaths(us,x0s[case])
     
-    generate_trajectories(MAV_sequences)
+    # generate_trajectories(MAV_sequences)
     # plotting(MAV_sequences)
 
     plotGridSpec(MAV_sequences)
@@ -145,4 +145,4 @@ xrefs = [
 
 if __name__ == "__main__":
     for i in range(len(x0s)):
-        main(i)
+        main_solver(i)
