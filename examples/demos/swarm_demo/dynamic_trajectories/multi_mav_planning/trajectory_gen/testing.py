@@ -1,9 +1,12 @@
 from numpy import dsplit, matrix
+from matplotlib import pyplot as plt
+
 try:
     from bezier_trajectory import *
     import uav_trajectory
     from generate_trajectory import generate_trajectory
     import marios_gen
+    from uav_trajectory import Trajectory
 
 except:
     print("Could not import bezier_trajectory")
@@ -11,6 +14,7 @@ except:
     from . import uav_trajectory
     from .generate_trajectory import generate_trajectory
     from . import marios_gen
+    from .uav_trajectory import Trajectory
 import time
 
 
@@ -103,9 +107,9 @@ def wolfgang(waypoints):
     traj.plot(timestep=0.2)
 
 
-def marios(waypoints):
+def marios(waypoints,total_time)->Trajectory:
     # remove fist column (time) of waypoints
-    return marios_gen.min_snap_traj_generation(waypoints)
+    return marios_gen.min_snap_traj_generation(waypoints,total_time)
 
 test=[
  [0.02382189, 0.0156142,  1.00382214,0.0],
@@ -190,6 +194,9 @@ if __name__ == "__main__":
     waypoints = waypoints[::6,:]
     # wolfgang(waypoints)
 
-    marios(waypoints)
+    tr=marios(waypoints,5)
+    tr.savecsv(filename="marios_test2.csv")
 
+    tr.plot(timestep=0.1)
+    plt.show()
     # bezier(waypoints)

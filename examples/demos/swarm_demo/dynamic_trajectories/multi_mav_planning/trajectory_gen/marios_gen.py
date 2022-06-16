@@ -204,7 +204,7 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
     return piece_pols, total_pol
 
 
-def calculate_trajectory4D(waypoints) -> Trajectory:
+def calculate_trajectory4D(waypoints):
     # waypoints:list of Point_time instances
 
     polx, pc_polx = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_X)
@@ -319,12 +319,12 @@ def allocateTimeProportional(waypoints: np.array, total_time):
 
     return durations
 
-def generate_traj(waypoints: np.array):
+def generate_traj(waypoints: np.array,total_time):
     traj_points = []
     t = 0
     # time_allocation = allocateTime(waypoints,MAX_VEL,MAX_ACC)
 
-    time_allocation = allocateTimeProportional(waypoints, 35)
+    time_allocation = allocateTimeProportional(waypoints,total_time)
     print("time_allocation:", time_allocation)
 
     for i, point in enumerate(waypoints):
@@ -345,9 +345,9 @@ def create_traj(pols_coeffs, pc_pols):
     matrix = np.zeros((segments_number, 4*8+1))
 
     for i in range(segments_number):
-        prev_time = matrix[i-1, 0] if i > 0 else 0
-        matrix[i, 0] = pc_pols[0].time_durations[i] + prev_time
-        matrix[i, 0] = i*1
+        # prev_time = matrix[i-1, 0] if i > 0 else 0
+        matrix[i, 0] = pc_pols[0].time_durations[i] 
+        # matrix[i, 0] = i*1
         matrix[i:i+1, 1:9] = pols_coeffs[0][i].p.T
         matrix[i, 9:17] = pols_coeffs[1][i].p.T
         matrix[i, 17:25] = pols_coeffs[2][i].p.T
@@ -362,8 +362,8 @@ def create_traj(pols_coeffs, pc_pols):
     # tr.plot(timestep=0.2)
     return tr
 
-def min_snap_traj_generation(waypoints):
-    pols_coeffs, pc_pols = generate_traj(waypoints)
+def min_snap_traj_generation(waypoints,total_time):
+    pols_coeffs, pc_pols = generate_traj(waypoints,total_time)
     tr = create_traj(pols_coeffs, pc_pols)
     
     return tr

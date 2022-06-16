@@ -42,6 +42,7 @@ from cflib.crazyflie.syncLogger import SyncLogger
 from cflib.utils import uri_helper
 
 from cflib.crazyflie.mem.trajectory_memory import TrajectoryMemory
+from matplotlib import pyplot as plt
 import numpy as np
 import threading
 
@@ -65,54 +66,6 @@ figure8 = [
     [0.710000, -0.923935, 0.447832, 0.627381, -0.259808, -0.042325, -0.032258, 0.001420, 0.005294, 0.288570, 0.873350, -0.515586, -0.730207, -0.026023, 0.288755, 0.215678, -0.148061, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
     [1.053185, -0.398611, 0.850510, -0.144007, -0.485368, -0.079781, 0.176330, 0.234482, -0.153567, 0.447039, -0.532729, -0.855023, 0.878509, 0.775168, -0.391051, -0.713519, 0.391628, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
 ]
-
-def activate_high_level_commander(cf):
-    cf.param.set_value('commander.enHighLevel', '1')
-
-
-def activate_mellinger_controller(cf):
-    cf.param.set_value('stabilizer.controller', '2')
-
-
-def upload_trajectory(cf:Crazyflie, trajectory_id, trajectory:np.array):
-    """
-        Uploads a trajectory to the Crazyflie.
-        The trajectory is a list of (Duration ,x, y, z, yaw) polynomial coefficients.
-    
-        Duration,x^0,x^1,x^2,x^3,x^4,x^5,x^6,x^7,y^0,y^1,y^2,y^3,y^4,y^5,y^6,y^7,z^0,z^1,z^2,z^3,z^4,z^5,z^6,z^7,yaw^0,yaw^1,yaw^2,yaw^3,yaw^4,yaw^5,yaw^6,yaw^7
-    """
-    trajectory_mem = cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
-
-    total_duration = 0
-    for row in trajectory:
-        duration = row[0]
-        x = Poly4D.Poly(row[1:9])
-        y = Poly4D.Poly(row[9:17])
-        z = Poly4D.Poly(row[17:25])
-        yaw = Poly4D.Poly(row[25:33])
-        trajectory_mem.trajectory.append(Poly4D(duration, x, y, z, yaw))
-        total_duration += duration
-
-    upload_result = Uploader().upload(trajectory_mem)
-    if not upload_result:
-        print('Upload failed, aborting!')
-        sys.exit(1)
-    cf.high_level_commander.define_trajectory(trajectory_id, 0, len(trajectory_mem.trajectory))
-    return total_duration
-
-
-def run_sequence(cf:Crazyflie, trajectory_id, duration):
-    commander = cf.high_level_commander
-
-    commander.takeoff(1.0, 2.0)
-    time.sleep(3.0)
-    relative = True
-    commander.start_trajectory(trajectory_id, 1.0, relative)
-    time.sleep(duration)
-    commander.land(0.0, 2.0)
-    time.sleep(2)
-    commander.stop()
-
 
 class TrafficController:
     CS_DISCONNECTED = 0
@@ -174,7 +127,6 @@ class TrafficController:
 
         print("Defining trajectory ...")
         self._cf.high_level_commander.define_trajectory(self.latest_trajectory_id, 0, len(self.trajectory_mem.trajectory))
-
 
     def _upload_failed(self, mem, addr):
         print('Trajectory upload failed!')
@@ -431,15 +383,26 @@ class Master:
 
 
 
-
-if __name__ == '__main__':
+def main():
     cflib.crtp.init_drivers()
-
+ 
     uris = [
         uri_helper.uri_from_env(default='radio://0/40/2M/E7E7E7E704'),
         # uri_helper.uri_from_env(default='radio://0/40/2M/E7E7E7E704'),
         ]
-
+ 
     master = Master(uris)
     master.run()
 
+if __name__ == '__main__':
+    main()
+    # from trajectory_gen.uav_trajectory import Trajectory
+
+    # tr=Trajectory()
+    # tr.load_from_matrix(figure8)
+    
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # tr.plot(timestep=.1,ax=ax)
+    # plt.show()
+    
