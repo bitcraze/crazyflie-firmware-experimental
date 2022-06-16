@@ -60,7 +60,7 @@ static float stabilizeEndTime;
 static float currentProgressInTrajectory = NO_PROGRESS;
 static uint32_t trajectoryStartTime = 0;
 static uint32_t timeWhenToGoToInitialPosition = 0;
-static float trajectoryDurationMs = 0.0f;
+// static float trajectoryDurationMs = 0.0f;
 
 static float trajecory_center_offset_x = 0.0f;
 static float trajecory_center_offset_y = 0.0f;
@@ -69,6 +69,7 @@ static float trajecory_center_offset_z = 0.0f;
 static uint32_t now = 0;
 static uint32_t flightTime = 0;
 
+static int start_trajectory_result = 0;
 // The nr of trajectories to fly
 static uint8_t trajectoryCount = 255;
 static uint8_t remainingTrajectories = 0;
@@ -153,15 +154,15 @@ static struct poly4d sequence[] = {
   {.duration = 0.55, .p = {{2.657819140362752e-11,0.029194371526024346,-0.10554318434787024,0.05389264510610344,0.14869556371716416,-0.11729506325396347,-0.057406932212603616,0.05185415937314559}, {-0.01022225217203592,0.036960150373509054,0.00882584023135473,-0.15157853263098095,0.10194295680128089,0.12610945422193115,-0.12863100760957105,0.021560512581067035}, {0.5558712946793309,0.23395499478462367,0.03898547046555688,-0.008834723582265662,-0.0007360910302886222,0.00010007288325451688,5.591396797932501e-06,-5.806568866668146e-07}, {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,}}},
 };
 
-static float sequenceTime(struct poly4d sequence[], int count) {
-  float totalDuration = 0.0f;
+// static float sequenceTime(struct poly4d sequence[], int count) {
+//   float totalDuration = 0.0f;
 
-  for (int i = 0; i < count; i++) {
-    totalDuration += sequence[i].duration;
-  }
+//   for (int i = 0; i < count; i++) {
+//     totalDuration += sequence[i].duration;
+//   }
 
-  return totalDuration;
-}
+//   return totalDuration;
+// }
 
 static float getX() { return logGetFloat(logIdStateEstimateX); }
 static float getY() { return logGetFloat(logIdStateEstimateY); }
@@ -180,12 +181,12 @@ static void enableMellingerController() { paramSetInt(paramIdStabilizerControlle
 #endif
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 
-static void defineTrajectory() {
-  const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
-  trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
-  crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
-  crtpCommanderHighLevelDefineTrajectory(trajectoryId, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
-}
+// static void defineTrajectory() {
+//   const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
+//   trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
+//   crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
+//   crtpCommanderHighLevelDefineTrajectory(trajectoryId, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
+// }
 
 static void defineLedSequence() {
   ledseqRegisterSequence(&seq_lock);
@@ -224,7 +225,7 @@ void appMain() {
   #endif
 
   enableHighlevelCommander();
-  defineTrajectory();
+  // defineTrajectory();
   defineLedSequence();
   resetLockData();
 
@@ -243,6 +244,12 @@ static void appTimer(xTimerHandle timer) {
   if (isBatLow()) {
     terminateTrajectoryAndLand = true;
   }
+
+  if (start_trajectory_result != 0) {
+          DEBUG_PRINT("Error starting trajectory: %d\n", start_trajectory_result);
+  }
+
+  // DEBUG_PRINT("State: %d\n", state);
 
   switch(state) {
     case STATE_IDLE:
@@ -288,7 +295,7 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
       } else {
         if (goToInitialPositionWhenReady >= 0.0f) {
-          float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
+          float delayMs = goToInitialPositionWhenReady *  2000.0f;
           timeWhenToGoToInitialPosition = now + delayMs;
           trajectoryStartTime = now + delayMs;
           goToInitialPositionWhenReady = -1.0f;
@@ -307,18 +314,28 @@ static void appTimer(xTimerHandle timer) {
       flightTime += delta;
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
+      // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
-        crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
+        start_trajectory_result = crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
+      
         remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
       }
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
+      // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
+      if (terminateTrajectoryAndLand){
+        crtpCommanderHighLevelStop();
+        terminateTrajectoryAndLand = false;
+        DEBUG_PRINT("Terminating trajectory, going to pad...\n");
+        float timeToPadPosition = 2.0;
+        crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
+        currentProgressInTrajectory = NO_PROGRESS;
+        state = STATE_GOING_TO_PAD;
+      }
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
