@@ -37,6 +37,9 @@ from cflib.crazyflie.mem import Poly4D
 
 import zmq
 
+#CONSTANTS
+TRAJECTORY_SEGMENT_SIZE_BYTES = 132
+
 figure8 = [
     [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
     [0.710000, 0.396058, 0.918033, 0.128965, -0.773546, 0.339704, 0.034310, -0.026417, -0.030049, -0.445604, -0.684403, 0.888433, 1.493630, -1.361618, -0.139316, 0.158875, 0.095799, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
@@ -62,6 +65,14 @@ generated = [
 [0.828262,0.923440,0.156260,0.019688,-0.145150,-0.182312,0.155285,0.259346,-0.198118,0.743930,0.450113,0.283868,-0.596685,-0.793230,0.562075,1.121753,-0.812234,1.063450,-0.115136,-0.058880,0.148996,0.170966,-0.128837,-0.259732,0.189417,0.000000,0.000000,0.000000,0.000000,-0.000000,-0.000000,0.000000,-0.000000],
 
 ]
+
+class TrajectoryUploadConfig():
+    def __init__(self) -> None:
+        self.trajectory_id = None
+        self.trajectory_memory_offset = None
+        self.pol_segment_count = None
+        self.defined=False
+        self.should_upload=False
 
 class TrafficController:
     CS_DISCONNECTED = 0
@@ -96,25 +107,41 @@ class TrafficController:
         self.connection_thread.start()
         
         self._traj_upload_done = False
+        self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
     def upload_trajectory(self, trajectory:np.array,trajectory_id):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
         trajectory_mem:TrajectoryMemory
+
         self.trajectory_mem=trajectory_mem
 
+        segments_in_memory=len(trajectory_mem.trajectory)
+        
+        id=trajectory_id-1
         self.latest_trajectory_id=trajectory_id
 
+        self._traj_upload_configs[id].trajectory_id=id
+        self._traj_upload_configs[id].pol_segment_count=len(trajectory)
+        self._traj_upload_configs[id].defined=False
+        self._traj_upload_configs[id].should_upload=True
+        self._traj_upload_configs[id].trajectory_memory_offset= 0 if id == 1 else 15
+
         total_duration = 0
-        for row in trajectory:
+        for i,row in enumerate(trajectory):
             duration = row[0]
             x = Poly4D.Poly(row[1:9])
             y = Poly4D.Poly(row[9:17])
             z = Poly4D.Poly(row[17:25])
             yaw = Poly4D.Poly(row[25:33])
-            trajectory_mem.trajectory.append(Poly4D(duration, x, y, z, yaw))
-            total_duration += duration
 
-        print('Uploading trajectory ...')
+            pol=Poly4D(duration, x, y, z, yaw)
+            
+            index=self._traj_upload_configs[id].trajectory_memory_offset + i
+            trajectory_mem.trajectory[index] = pol
+
+            total_duration += duration
+    
+        print('Uploading trajectory with id:{} in {}...'.format(trajectory_id,self.uri))
         trajectory_mem.write_data(self._upload_done,
                                   write_failed_cb=self._upload_failed)
     
@@ -126,8 +153,21 @@ class TrafficController:
         self._traj_upload_done = True
         self._traj_upload_success = True
 
-        print("Defining trajectory ...")
-        self._cf.high_level_commander.define_trajectory(self.latest_trajectory_id, 0, len(self.trajectory_mem.trajectory))
+        # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
+        # since each segment is 132 bytes long
+        for i,conf in enumerate(self._traj_upload_configs):
+            if conf.defined:
+                continue
+            
+
+            id=conf.trajectory_id+1
+            offset=conf.trajectory_memory_offset
+            pol_segment_count=conf.pol_segment_count
+            print("Defining trajectory with id: {}...".format(id))
+
+            self._cf.high_level_commander.define_trajectory(id, offset*TRAJECTORY_SEGMENT_SIZE_BYTES, pol_segment_count)
+
+            conf.defined=True
 
     def _upload_failed(self, mem, addr):
         print('Trajectory upload failed!')
@@ -218,7 +258,7 @@ class TrafficController:
         return self.vbat
 
     def is_charged_for_flight(self):
-        return self.vbat > 4.10
+        return self.vbat > 3.6
 
     def get_traj_cycles(self):
         return self.traj_cycles
@@ -242,6 +282,22 @@ class TrafficController:
         self.set_trajectory_count(2)
         self._setup_logging()
 
+        # append traj memory
+        trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
+        trajectory_mem:TrajectoryMemory
+        row=np.zeros(33)
+        for i in range(30):
+            duration = row[0]
+            x = Poly4D.Poly(row[1:9])
+            y = Poly4D.Poly(row[9:17])
+            z = Poly4D.Poly(row[17:25])
+            yaw = Poly4D.Poly(row[25:33])
+
+            pol=Poly4D(duration, x, y, z, yaw)
+            
+            trajectory_mem.trajectory.append(pol)
+
+        
     def _connection_failed(self, link_uri, msg):
         print('Connection to %s failed: %s' % (link_uri, msg))
         self._set_disconnected(5)
@@ -460,8 +516,10 @@ class Tower(TowerBase):
     def fly(self, wanted):
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
-        
+
         self.upload_trajectory_multiple(generated,1,cf_uris=-1)
+        self.upload_trajectory_multiple(figure8,2,cf_uris=-1)
+
         print("Waiting for trajectories to be uploaded..")
         #wait until cfs have received trajectory
         while not self.trajectories_uploaded():
@@ -691,15 +749,15 @@ class SyncTower(TowerBase):
 
 
 uris = [
-    'radio://0/10/2M/E7E7E7E701',
-    'radio://0/10/2M/E7E7E7E702',
-    'radio://0/10/2M/E7E7E7E703',
-    'radio://0/10/2M/E7E7E7E704',
-    'radio://0/10/2M/E7E7E7E705',
-    'radio://0/10/2M/E7E7E7E706',
-    'radio://0/10/2M/E7E7E7E707',
-    'radio://0/10/2M/E7E7E7E708',
-    'radio://0/10/2M/E7E7E7E709'
+    # 'radio://0/10/2M/E7E7E7E701',
+    # 'radio://0/10/2M/E7E7E7E702',
+    # 'radio://0/10/2M/E7E7E7E703',
+    'radio://0/40/2M/E7E7E7E704',
+    # 'radio://0/10/2M/E7E7E7E705',
+    # 'radio://0/10/2M/E7E7E7E706',
+    # 'radio://0/10/2M/E7E7E7E707',
+    # 'radio://0/10/2M/E7E7E7E708',
+    # 'radio://0/10/2M/E7E7E7E709'
 ]
 
 count = 1

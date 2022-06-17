@@ -250,7 +250,14 @@ static void appTimer(xTimerHandle timer) {
   }
 
   // DEBUG_PRINT("State: %d\n", state);
-
+  // for (int i=0;i<2;i++){
+  //   int id=i+1;
+  //   int res=crtpCommanderHighLevelIsTrajectoryDefined(id);
+  //   DEBUG_PRINT("Trajectory %d defined: %d \n",id,res);
+  // }
+  
+  
+  
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
@@ -318,7 +325,7 @@ static void appTimer(xTimerHandle timer) {
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
-        start_trajectory_result = crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
+        start_trajectory_result = crtpCommanderHighLevelStartTrajectory(2, SEQUENCE_SPEED, true, false);
       
         remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
@@ -348,7 +355,7 @@ static void appTimer(xTimerHandle timer) {
         } else {
           if (remainingTrajectories > 0) {
             DEBUG_PRINT("Trajectory finished, restarting...\n");
-            crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
+            crtpCommanderHighLevelStartTrajectory(1, SEQUENCE_SPEED, true, false);
           }
           remainingTrajectories--;
         }
