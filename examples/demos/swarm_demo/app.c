@@ -37,7 +37,7 @@ static void appTimer(xTimerHandle timer);
 #define TAKE_OFF_HEIGHT 0.2f
 #define LANDING_HEIGHT 0.12f
 #define SEQUENCE_SPEED 1.0f
-#define DURATION_TO_INITIAL_POSITION 2.0
+#define DURATION_TO_INITIAL_POSITION 4.0
 #define TRAJECTORY_SEGMENT_SIZE_BYTES 132
 
 static uint32_t lockWriteIndex;
@@ -74,7 +74,7 @@ static uint32_t flightTime = 0;
 
 static int start_trajectory_result = 0;
 // The nr of trajectories to fly
-static uint8_t trajectoryCount = 255;
+// static uint8_t trajectoryCount = 255;
 static uint8_t remainingTrajectories = 0;
 
 // The latest trajectory id
@@ -307,7 +307,7 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
       } else {
         if (goToInitialPositionWhenReady >= 0.0f) {
-          float delayMs = goToInitialPositionWhenReady *  2000.0f;
+          float delayMs = goToInitialPositionWhenReady *  3000.0f;
           timeWhenToGoToInitialPosition = now + delayMs;
           trajectoryStartTime = now + delayMs;
           goToInitialPositionWhenReady = -1.0f;
@@ -339,7 +339,6 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
         start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
-        remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
       }
       flightTime += delta;
@@ -366,10 +365,13 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
-            DEBUG_PRINT("Trajectory finished, restarting...\n");
-            crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+            // DEBUG_PRINT("Trajectory finished, restarting...\n");
+            // crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+            float delayMs=3000.0f;
+            timeWhenToGoToInitialPosition = now + delayMs;
+            state=STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+            remainingTrajectories--;
           }
-          remainingTrajectories--;
         }
       }
       flightTime += delta;
@@ -523,7 +525,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
   PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
-  PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
+  PARAM_ADD(PARAM_UINT8, trajcount, &remainingTrajectories)
   PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
 
 PARAM_GROUP_STOP(app)

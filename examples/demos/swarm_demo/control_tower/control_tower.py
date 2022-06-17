@@ -124,14 +124,14 @@ class TrafficController:
 
         segments_in_memory=len(trajectory_mem.trajectory)
         
-        id=trajectory_id-1
+        id=trajectory_id-1 #0-based indexing
         self.latest_trajectory_id=trajectory_id
 
         self._traj_upload_configs[id].trajectory_id=id
         self._traj_upload_configs[id].pol_segment_count=len(trajectory)
         self._traj_upload_configs[id].defined=False
         self._traj_upload_configs[id].should_upload=True
-        self._traj_upload_configs[id].trajectory_memory_offset= 0 if id == 1 else 15
+        self._traj_upload_configs[id].trajectory_memory_offset= 0 if self.latest_trajectory_id == 1 else 15
 
         total_duration = 0
         for i,row in enumerate(trajectory):
@@ -529,9 +529,9 @@ class Tower(TowerBase):
         
         # self.upload_trajectory_multiple(generated,1,cf_uris=-1)
         # self.upload_trajectory_multiple(figure8,2,cf_uris=-1)
-        
-        self.upload_trajectory_multiple(trajs[0],1,cf_uris=-1)
-        # self.upload_trajectory_multiple(trajs[1],2,cf_uris=-1)
+       
+        self.upload_trajectory_multiple(trajs[1],1,cf_uris=['radio://0/40/2M/E7E7E7E704'])
+        # self.upload_trajectory_multiple(trajs[1],2,cf_uris=['radio://0/40/2M/E7E7E7E701'])
 
         print("Waiting for trajectories to be uploaded..")
         #wait until cfs have received trajectory
@@ -762,10 +762,13 @@ class SyncTower(TowerBase):
 
 
 uris = [
+    # 'radio://0/40/2M/E7E7E7E701',
+    'radio://0/40/2M/E7E7E7E704',
+
     # 'radio://0/10/2M/E7E7E7E701',
     # 'radio://0/10/2M/E7E7E7E702',
     # 'radio://0/10/2M/E7E7E7E703',
-    'radio://0/40/2M/E7E7E7E704',
+    # 'radio://0/10/2M/E7E7E7E704',
     # 'radio://0/10/2M/E7E7E7E705',
     # 'radio://0/10/2M/E7E7E7E706',
     # 'radio://0/10/2M/E7E7E7E707',
