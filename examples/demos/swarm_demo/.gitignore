@@ -1,4 +1,4 @@
 bin/*
 cf2.*
-dynamic_trajectories/multi_mav_planning/my_optimizers/*
+control_tower/dynamic_trajectories/multi_mav_planning/my_optimizers/*
 cache
