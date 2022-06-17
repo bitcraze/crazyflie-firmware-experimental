@@ -38,6 +38,7 @@ static void appTimer(xTimerHandle timer);
 #define LANDING_HEIGHT 0.12f
 #define SEQUENCE_SPEED 1.0f
 #define DURATION_TO_INITIAL_POSITION 2.0
+#define TRAJECTORY_SEGMENT_SIZE_BYTES 132
 
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
@@ -73,6 +74,9 @@ static int start_trajectory_result = 0;
 // The nr of trajectories to fly
 static uint8_t trajectoryCount = 255;
 static uint8_t remainingTrajectories = 0;
+
+// The latest trajectory id
+static uint8_t latestTrajectoryId = 255;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -255,7 +259,25 @@ static void appTimer(xTimerHandle timer) {
   //   int res=crtpCommanderHighLevelIsTrajectoryDefined(id);
   //   DEBUG_PRINT("Trajectory %d defined: %d \n",id,res);
   // }
-  
+  if(latestTrajectoryId<255){
+    struct poly4d first_segment;
+    uint32_t offset;
+    if (latestTrajectoryId==1){
+      offset=0;
+    } else {
+      offset=15;
+    }
+
+    int res=crtpCommanderHighLevelReadTrajectory(15*TRAJECTORY_SEGMENT_SIZE_BYTES, sizeof(first_segment), (uint8_t*)&first_segment);
+    if (res){
+      float posx=first_segment.p[0][0];
+      float posy=first_segment.p[1][0];
+      float posz=first_segment.p[2][0];
+
+      DEBUG_PRINT("Trajectory %d first waypoint: %f %f %f\n",latestTrajectoryId,(double) posx, (double) posy, (double) posz);
+
+    }
+  }
   
   
   switch(state) {
@@ -314,9 +336,13 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
       if (now >= timeWhenToGoToInitialPosition) {
-        DEBUG_PRINT("Going to initial position\n");
-        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
-        state = STATE_GOING_TO_INITIAL_POSITION;
+         if (latestTrajectoryId<255){
+          // If there is no trajectory, wait until there is one
+          
+
+          crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
+          state = STATE_GOING_TO_INITIAL_POSITION;
+        }
       }
       flightTime += delta;
       break;
@@ -326,7 +352,6 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
         start_trajectory_result = crtpCommanderHighLevelStartTrajectory(2, SEQUENCE_SPEED, true, false);
-      
         remainingTrajectories = trajectoryCount - 1;
         state = STATE_RUNNING_TRAJECTORY;
       }
@@ -487,6 +512,8 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
   PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
   PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
+  PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
+
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)

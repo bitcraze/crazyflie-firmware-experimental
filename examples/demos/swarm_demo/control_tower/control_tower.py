@@ -171,6 +171,9 @@ class TrafficController:
             self._cf.high_level_commander.define_trajectory(id, offset*TRAJECTORY_SEGMENT_SIZE_BYTES, pol_segment_count)
 
             conf.defined=True
+            
+            self._cf.param.set_value('app.curr_traj_id', id)
+            
 
     def _upload_failed(self, mem, addr):
         print('Trajectory upload failed!')
@@ -330,7 +333,7 @@ class TrafficController:
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
         self._cf.param.all_updated.add_callback(self._all_updated)
-        # self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+        self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
 
         print("Connecting to " + self.uri)
         self._cf.open_link(self.uri)
