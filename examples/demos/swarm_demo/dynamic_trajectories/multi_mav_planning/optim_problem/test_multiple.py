@@ -92,7 +92,7 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
-def generate_trajectories(MAV_sequences):
+def generate_trajectories(MAV_sequences,total_time):
     """Generates the trajectories for the MAVs."""
     trajs=[]
     
@@ -106,7 +106,7 @@ def generate_trajectories(MAV_sequences):
         #insert column of zeros at the end
         waypoints=np.insert(waypoints,3,0,axis=1)
 
-        tr=min_snap_tg.min_snap_traj_generation(waypoints)
+        tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
         trajs.append( tr )
 
     fig=plt.figure()
@@ -137,7 +137,8 @@ x0s = [
        [ [0, 0, 1],[0, 1, 1] ],
        [ [0.5, 0, 1],[0.5, 1, 1] ], 
        [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
-       [ [0, 0, 1],[1, 0, 1] ],
+       [ [0 , 0, 1],[1, 0, 1] ],
+       [ [-1, -1 , 1] , [ 1, 1, 1] ],
    ]
 
 xrefs = [
@@ -145,8 +146,10 @@ xrefs = [
     [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
     [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
     [ [1, 1, 1.5],[0, 1, 1.5] ],
+    [ [1, 1, 1],[-1, -1, 1] ],
 ]
 
 if __name__ == "__main__":
-    for i in range(len(x0s)):
-        main_solver(i)
+    # for i in range(len(x0s)):
+        # main_solver(i)
+    main_solver(-1)

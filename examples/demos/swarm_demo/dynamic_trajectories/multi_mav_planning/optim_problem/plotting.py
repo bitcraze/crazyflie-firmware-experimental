@@ -1,7 +1,10 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from .constants import *
-
+try:
+    from constants import *
+except:
+    from .constants import *
+    
 from matplotlib.gridspec import GridSpec
 from matplotlib import animation
 
