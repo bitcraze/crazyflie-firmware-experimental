@@ -240,6 +240,9 @@ class Trajectory:
             ax = fig.add_subplot(111, projection='3d')
 
         ax.plot(x, y, z,label=label)
+        #plot start and end point
+        ax.scatter(x[0], y[0], z[0], color='green')
+        ax.scatter(x[-1], y[-1], z[-1], color='red')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')

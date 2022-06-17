@@ -116,6 +116,10 @@ class TrafficController:
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
         trajectory_mem:TrajectoryMemory
 
+        if len(trajectory) > 15:
+            print('Trajectory is too long!')
+            raise Exception('Trajectory is too long ({} segments)!'.format(len(trajectory)))
+
         self.trajectory_mem=trajectory_mem
 
         segments_in_memory=len(trajectory_mem.trajectory)
@@ -159,10 +163,9 @@ class TrafficController:
         # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
         # since each segment is 132 bytes long
         for i,conf in enumerate(self._traj_upload_configs):
-            if conf.defined:
+            if conf.defined or conf.trajectory_id==None:
                 continue
             
-
             id=conf.trajectory_id+1
             offset=conf.trajectory_memory_offset
             pol_segment_count=conf.pol_segment_count
@@ -523,8 +526,12 @@ class Tower(TowerBase):
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
 
-        self.upload_trajectory_multiple(generated,1,cf_uris=-1)
-        self.upload_trajectory_multiple(figure8,2,cf_uris=-1)
+        
+        # self.upload_trajectory_multiple(generated,1,cf_uris=-1)
+        # self.upload_trajectory_multiple(figure8,2,cf_uris=-1)
+        
+        self.upload_trajectory_multiple(trajs[0],1,cf_uris=-1)
+        # self.upload_trajectory_multiple(trajs[1],2,cf_uris=-1)
 
         print("Waiting for trajectories to be uploaded..")
         #wait until cfs have received trajectory
