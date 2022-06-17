@@ -1,9 +1,45 @@
-import trajectory_gen.marios_gen as min_snap_tg
-from trajectory_gen.uav_trajectory import Trajectory
+try:
+    from trajectory_gen.uav_trajectory import Trajectory
+    from optim_problem.test_multiple import * 
+    from trajectory_gen import marios_gen as min_snap_tg
+except:
+    from .trajectory_gen.uav_trajectory import Trajectory
+    from .optim_problem.test_multiple import *
+    from .trajectory_gen import marios_gen as min_snap_tg
+
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import List
-from optim_problem.test_multiple import * 
+
+def generate_trajectories(MAV_sequences,total_time):
+    """Generates the trajectories for the MAVs."""
+    trajs=[]
+    
+    for i in range(N_MAV):
+        waypoints=MAV_sequences[i]
+
+        #downsample the trajectory
+        downsample_step=6
+        waypoints=waypoints[::downsample_step,:]
+
+        #insert column of zeros at the end
+        waypoints=np.insert(waypoints,3,0,axis=1)
+
+        tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
+        trajs.append( tr )
+
+    fig=plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    for i in range(N_MAV):
+        trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title('Generated Trajectories')
+    ax.legend()
+    
+    return trajs
 
 x0s = [
        [ [0, 0, 1],[0, 1, 1] ],
@@ -51,7 +87,14 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
 
     MAV_sequences = getMAVPaths(us,x0s)
     
+    # plotGridSpec(MAV_sequences)
+
+
     trajs:List[Trajectory]=generate_trajectories(MAV_sequences,total_time=4)
+
+    # for i in range(N_MAV):
+    #     trajs[i].plot(timestep=0.1,ax=ax)
+    plt.show()
 
     traj_matrices=[]
     for i in range(len(trajs)):

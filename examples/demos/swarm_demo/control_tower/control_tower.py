@@ -37,6 +37,9 @@ from cflib.crazyflie.mem import Poly4D
 
 import zmq
 
+from multi_mav_planning import main as multi_MAV
+
+
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
@@ -759,6 +762,28 @@ uris = [
     # 'radio://0/10/2M/E7E7E7E708',
     # 'radio://0/10/2M/E7E7E7E709'
 ]
+
+x0s = [
+       [ [0, 0, 1],[0, 1, 1] ],
+       [ [0.5, 0, 1],[0.5, 1, 1] ], 
+       [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
+       [ [0, 0, 1],[1, 0, 1] ],
+       [ [-1, -1 , 1] , [ 1, 1, 1] ],
+
+   ]
+
+xrefs = [
+    [ [1, 1, 1],[1, 0, 1] ],
+    [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
+    [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
+    [ [1, 1, 1.5],[0, 1, 1.5] ],
+    [ [1, 1, 1],[-1, -1, 1] ],
+]
+
+
+trajs=multi_MAV.solve_problem(x0s[-1],xrefs=xrefs[-1])
+print(trajs)
+input("Press enter to start")
 
 count = 1
 mode = 'normal'

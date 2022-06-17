@@ -9,7 +9,7 @@ except:
     from .constants import *
     from .plotting import *
 
-import trajectory_gen.marios_gen as min_snap_tg
+
 
 def dynamics_ct(_x, _u):
     """
@@ -92,30 +92,7 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
-def generate_trajectories(MAV_sequences,total_time):
-    """Generates the trajectories for the MAVs."""
-    trajs=[]
-    
-    for i in range(N_MAV):
-        waypoints=MAV_sequences[i]
 
-        #downsample the trajectory
-        downsample_step=6
-        waypoints=waypoints[::downsample_step,:]
-
-        #insert column of zeros at the end
-        waypoints=np.insert(waypoints,3,0,axis=1)
-
-        tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
-        trajs.append( tr )
-
-    fig=plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    for i in range(N_MAV):
-        trajs[i].plot(timestep=0.1,ax=ax)
-    
-    return trajs
 
 
 def main_solver(case=2):

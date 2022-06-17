@@ -222,7 +222,7 @@ class Trajectory:
             data[i, 25:33] = p.pyaw.p
         return data
 
-    def plot(self, timestep: float,ax=None):
+    def plot(self, timestep: float,ax=None,label=None):
         size = int(self.duration / timestep+0.5)
         print("size:", size)
         x = np.zeros(size)
@@ -239,7 +239,7 @@ class Trajectory:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
 
-        ax.plot(x, y, z)
+        ax.plot(x, y, z,label=label)
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
