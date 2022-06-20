@@ -169,7 +169,7 @@ class Trajectory:
         self.polynomials = [Polynomial4D(
             row[0], row[1:9], row[9:17], row[17:25], row[25:33]) for row in matrix]
         
-        print("matrix[:, 0].shape: ", matrix[:, 0].shape)
+        # print("matrix[:, 0].shape: ", matrix[:, 0].shape)
         self.duration = np.sum(matrix[:, 0])
 
     def load_from_pol_segments(self, pols_coeffs):

@@ -21,6 +21,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import random
+from typing import List
 import time
 import cflib.crtp  # noqa
 from cflib.crazyflie import Crazyflie
@@ -29,6 +31,7 @@ import statistics
 import sys
 import threading
 import math
+from cupshelpers import Printer
 
 import numpy as np
 from cflib.crazyflie.mem.trajectory_memory import TrajectoryMemory
@@ -38,7 +41,8 @@ from cflib.crazyflie.mem import Poly4D
 import zmq
 
 from multi_mav_planning import main as multi_MAV
-
+import simpleaudio
+from colorama import Fore, Back, Style
 
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
@@ -68,6 +72,12 @@ generated = [
 [0.828262,0.923440,0.156260,0.019688,-0.145150,-0.182312,0.155285,0.259346,-0.198118,0.743930,0.450113,0.283868,-0.596685,-0.793230,0.562075,1.121753,-0.812234,1.063450,-0.115136,-0.058880,0.148996,0.170966,-0.128837,-0.259732,0.189417,0.000000,0.000000,0.000000,0.000000,-0.000000,-0.000000,0.000000,-0.000000],
 
 ]
+
+def beep():
+    wave_obj = simpleaudio.WaveObject.from_wave_file("/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/beep.wav")
+    play_obj = wave_obj.play()
+    play_obj.wait_done()
+
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -112,7 +122,17 @@ class TrafficController:
         self._traj_upload_done = False
         self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
-    def upload_trajectory(self, trajectory:np.array,trajectory_id):
+        self.waiting_for_trajectory=False
+        self.latest_trajectory_id=None
+
+        self.trajs_uploaded=0
+        self.trajs_uploaded_success=0
+
+    def is_waiting_for_trajectory(self):
+        pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
+        return self.copter_state==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION and pending_trajs==0
+
+    def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
         trajectory_mem:TrajectoryMemory
 
@@ -124,8 +144,8 @@ class TrafficController:
 
         segments_in_memory=len(trajectory_mem.trajectory)
         
-        id=trajectory_id-1 #0-based indexing
-        self.latest_trajectory_id=trajectory_id
+        self.latest_trajectory_id = 2 if self.latest_trajectory_id==1 else 1
+        id = self.latest_trajectory_id-1 #0-based indexing
 
         self._traj_upload_configs[id].trajectory_id=id
         self._traj_upload_configs[id].pol_segment_count=len(trajectory)
@@ -148,17 +168,17 @@ class TrafficController:
 
             total_duration += duration
     
-        print('Uploading trajectory with id:{} in {}...'.format(trajectory_id,self.uri))
+        print('Uploading trajectory with id:{} in {}...'.format(self.latest_trajectory_id,self.uri))
+        self.trajs_uploaded+=1
+
         trajectory_mem.write_data(self._upload_done,
                                   write_failed_cb=self._upload_failed)
     
     def is_trajectory_uploaded(self):
-        return self._traj_upload_done
+        return self._traj_upload_done and self._traj_upload_success
 
     def _upload_done(self, mem, addr):
-        print('Trajectory upload succesfull in address!',addr)
-        self._traj_upload_done = True
-        self._traj_upload_success = True
+        print(Fore.GREEN+'Trajectory upload succesfull!'+Style.RESET_ALL)
 
         # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
         # since each segment is 132 bytes long
@@ -176,10 +196,22 @@ class TrafficController:
             conf.defined=True
             
             self._cf.param.set_value('app.curr_traj_id', id)
-            
+            print("CF:{} Current trajectory id: {}".format(self.uri[-2:],id))
+        
+        self._traj_upload_done = True
+        self._traj_upload_success = True
+        
+        self.trajs_uploaded_success+=1
+        if(self.trajs_uploaded_success!=self.trajs_uploaded):
+            print(Fore.RED+"Trajectories difference: {}".format(self.trajs_uploaded-self.trajs_uploaded_success))
+            print(Style.RESET_ALL)
+
+
 
     def _upload_failed(self, mem, addr):
-        print('Trajectory upload failed!')
+        print(Fore.RED+'Trajectory upload FAILED!')
+        print(Style.RESET_ALL)
+        
         self._traj_upload_done = True
         self._traj_upload_success = False
 
@@ -342,24 +374,29 @@ class TrafficController:
         self._cf.open_link(self.uri)
 
     def _console_incoming(self, console_text):
-        print("CF {} DEBUG:".format( self.uri[-2:] ),console_text, end='')
+        print(Fore.YELLOW+"CF {} DEBUG:".format( self.uri[-2:] ),console_text, end='')
+        print(Style.RESET_ALL)
 
     def _setup_logging(self):
         # print("Setting up logging")
         self._log_conf = LogConfig(name='Tower', period_in_ms=100)
         self._log_conf.add_variable('app.state', 'uint8_t')
-        self._log_conf.add_variable('app.prgr', 'float')
+        # self._log_conf.add_variable('app.prgr', 'float')
         self._log_conf.add_variable('app.uptime', 'uint32_t')
         self._log_conf.add_variable('app.flighttime', 'uint32_t')
         self._log_conf.add_variable('pm.vbat', 'float')
         self._log_conf.add_variable('stateEstimate.x', 'float')
         self._log_conf.add_variable('stateEstimate.y', 'float')
+        self._log_conf.add_variable('stateEstimate.z', 'float')
 
         self._cf.log.add_config(self._log_conf)
         self._log_conf.data_received_cb.add_callback(self._log_data)
         self._log_conf.start()
 
     def _log_data(self, timestamp, data, logconf):
+        if(data['app.state'] !=self.copter_state):
+            print("Copter state changed to {}".format(data['app.state']))
+
         self.copter_state = data['app.state']
 
         if self.copter_state != self.STATE_WAIT_FOR_TAKE_OFF:
@@ -367,18 +404,21 @@ class TrafficController:
 
         if self.copter_state != self.STATE_HOVERING:
             self._pre_state_going_to_initial_position_end_time = 0
+        
 
         self.vbat = data['pm.vbat']
 
         self.up_time_ms = data['app.uptime']
         self.flight_time_ms = data['app.flighttime']
 
-        self.traj_cycles = data['app.prgr']
-        if self.traj_cycles <= self.NO_PROGRESS:
-            self.traj_cycles = None
+        # self.traj_cycles = data['app.prgr']
+        # if self.traj_cycles <= self.NO_PROGRESS:
+        #     self.traj_cycles = None
+        self.traj_cycles=None
 
         self.est_x = data['stateEstimate.x']
         self.est_y = data['stateEstimate.y']
+        self.est_z = data['stateEstimate.z']
 
     def dump(self):
         print("***", self.uri)
@@ -396,7 +436,7 @@ class TrafficController:
 
 class TowerBase:
     def __init__(self, uris, report_socket=None):
-        self.controllers:list[TrafficController] = []
+        self.controllers:List[TrafficController] = []
         self._uris = uris
         for uri in uris:
             self.controllers.append(TrafficController(uri))
@@ -452,6 +492,14 @@ class TowerBase:
         for controller in self.controllers:
             controller.dump()
             controller.terminate()
+    
+    def get_flying_controllers(self)->List[TrafficController]:
+        flying_controllers = []
+        for controller in self.controllers:
+            if controller.is_flying():
+                flying_controllers.append(controller)
+        
+        return flying_controllers
 
     def send_report(self):
         if self.report_socket is None:
@@ -486,10 +534,9 @@ class TowerBase:
             except Exception:
                 pass
     
-    def upload_trajectory_multiple(self, trajectory:np.array,trajectory_id:int,cf_uris=None)->list:
+    def upload_trajectory_multiple(self, trajectory:np.array,cf_uris=None)->list:
         """Uploads a trajectory to the crazyflies with the ids.
             @param trajectory: The trajectory to upload.
-            @param trajectory_id: The id of the trajectory.
             @param cf_uris: The uris of the crazyflies to upload the trajectory to.
             
             @return: The uris of the crazyflies that failed to upload the trajectory.
@@ -498,12 +545,12 @@ class TowerBase:
         if cf_uris ==-1:# if no crazyflies are specified, upload to all
             cf_uris = self._uris
 
-        print("Uploading trajectory",trajectory_id,"to",cf_uris)
+        print("Uploading trajectory to",cf_uris)
         
         for uri in cf_uris:
             id=self.get_controller_id(uri)
             if id is not None:
-                self.controllers[id].upload_trajectory(trajectory,trajectory_id)
+                self.controllers[id].upload_trajectory(trajectory)
             else:
                 print("Could not find controller for",uri)
                 
@@ -514,34 +561,41 @@ class TowerBase:
         return None
 
     def trajectories_uploaded(self):
-        for controller in self.controllers:
+        for controller in self.get_flying_controllers():
             if not controller.is_trajectory_uploaded():
                 return False
         return True
 class Tower(TowerBase):
     def __init__(self, uris, report_socket=None):
         TowerBase.__init__(self, uris, report_socket)
+        
+        self.predefined_xrefs=[
+            [-1,-1,1],
+            [+1,-1,1],
+            [-1,+1,1],
+            [+1,+1,1],            
+        ]
+
+        self.pending_trajs_to_upload = 0
 
     def fly(self, wanted):
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
 
         
-        # self.upload_trajectory_multiple(generated,1,cf_uris=-1)
-        # self.upload_trajectory_multiple(figure8,2,cf_uris=-1)
-       
-        self.upload_trajectory_multiple(trajs[1],1,cf_uris=['radio://0/40/2M/E7E7E7E704'])
+        # self.upload_trajectory_multiple(generated ,cf_uris=-1)
+        # time.sleep(10)
+        # self.upload_trajectory_multiple(figure8   ,cf_uris=-1)
+        # time.sleep(10)
+        # self.upload_trajectory_multiple(figure8   ,cf_uris=-1)
+
+        # self.upload_trajectory_multiple(trajs[1],1,cf_uris=['radio://0/40/2M/E7E7E7E704'])
         # self.upload_trajectory_multiple(trajs[1],2,cf_uris=['radio://0/40/2M/E7E7E7E701'])
 
-        print("Waiting for trajectories to be uploaded..")
-        #wait until cfs have received trajectory
-        while not self.trajectories_uploaded():
-            time.sleep( 0.5)
-
-        print("All trajectories uploaded")
 
         while True:
-            # print()
+            
+
             if wanted:
                 currently_flying = self.flying_count()
                 missing = wanted - currently_flying
@@ -552,9 +606,70 @@ class Tower(TowerBase):
             else:
                 self.land_all()
 
+            if self.pending_trajs_to_upload>0:
+                if self.trajectories_uploaded():
+                    self.pending_trajs_to_upload-=1
+                    print("All trajectories uploaded")
+
+            # Check if new trajectories need to be calculated
+            time.sleep(3)
+            if self.all_flying_copters_waiting_for_trajectories() and self.pending_trajs_to_upload==0:
+                print("All copters are waiting for trajectories")
+                self.solve_multiple_MAV()
+            
+            
             self.send_report()
 
             time.sleep(0.2)
+
+    def solve_multiple_MAV(self):
+        flying_controllers = self.get_flying_controllers()
+        
+        x0s=[ [cf.est_x,cf.est_y,cf.est_z] for cf in flying_controllers]
+        
+        #Assign randomly xrefs to each copter
+        while True:
+            random.shuffle(self.predefined_xrefs)
+            xrefs=[self.predefined_xrefs[i] for i in range(len(flying_controllers))]
+            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>0.1:
+                break
+            print("x0s and xrefs are the same,trying again...")
+        
+        points_to_pad=2-len(x0s) # 2 is hard coded for now
+        for i in range(points_to_pad):
+            x0s.append([0,0,0])
+            xrefs.append([0,0,0])
+        
+        print("Trying to solve problem with:")
+        print("x0s:",x0s)
+        print("xrefs:",xrefs)
+        print("")
+        # input("Press enter to continue")
+        trajs=multi_MAV.solve_problem(x0s,xrefs)
+        
+        for i,cf in enumerate(flying_controllers):
+            cf.upload_trajectory(trajs[i])
+
+        print("Waiting for trajectories to be uploaded..")
+        #wait until cfs have received trajectory
+        self.pending_trajs_to_upload +=1
+       
+
+        print("All copters moved to next stage")
+        
+        # time.sleep(2)
+        print("Slept for some time ")
+
+    def all_flying_copters_waiting_for_trajectories(self):
+        flying_controllers = self.get_flying_controllers()
+        if len(flying_controllers) == 0:
+            return False
+
+        for controller in flying_controllers:
+            if not controller.is_waiting_for_trajectory() :
+                return False
+
+        return True
 
     def prepare_copters(self, count):
         prepared_count = 0
@@ -794,13 +909,12 @@ xrefs = [
 ]
 
 
-trajs=multi_MAV.solve_problem(x0s[-1],xrefs=xrefs[-1])
-print(trajs)
-input("Press enter to start")
+# trajs=multi_MAV.solve_problem(x0s[-1],xrefs=xrefs[-1])
+# print(trajs)
+# input("Press enter to start")
 
 count = 1
 mode = 'normal'
-
 if len(sys.argv) > 1:
     if sys.argv[1] == 'd':
         mode = 'dump'

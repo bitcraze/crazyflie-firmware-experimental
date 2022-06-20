@@ -79,6 +79,9 @@ static uint8_t remainingTrajectories = 0;
 
 // The latest trajectory id
 static uint8_t latestTrajectoryId = 255;
+static uint8_t prevTrajectoryId = 255;
+
+static uint8_t start_trajectory=0;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -262,7 +265,7 @@ static void appTimer(xTimerHandle timer) {
   //   DEBUG_PRINT("Trajectory %d defined: %d \n",id,res);
   // }
   
-  
+
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
@@ -318,12 +321,19 @@ static void appTimer(xTimerHandle timer) {
       flightTime += delta;
       break;
     case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
+      // latest trajectory id will be updated as soon as the trajectory is defined
+      if (prevTrajectoryId==latestTrajectoryId) {
+        // DEBUG_PRINT("Previous Traj id same with latest: %d\n", prevTrajectoryId);
+        flightTime += delta;
+        break;
+      }
+
       if (now >= timeWhenToGoToInitialPosition) {
-        
         float wp[4];
         bool result=getFirstWaypointofTraj(latestTrajectoryId,wp);
         if (result){
           DEBUG_PRINT("Going to initial position: %f %f %f\n",(double)wp[0],(double)wp[1],(double)wp[2]);
+          prevTrajectoryId=latestTrajectoryId;
           crtpCommanderHighLevelGoTo(wp[0] + trajecory_center_offset_x, wp[1] + trajecory_center_offset_y, wp[2] + trajecory_center_offset_z, wp[3], DURATION_TO_INITIAL_POSITION, false);
           state = STATE_GOING_TO_INITIAL_POSITION;
         }else{
@@ -339,6 +349,7 @@ static void appTimer(xTimerHandle timer) {
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("At initial position, starting trajectory...\n");
         start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+        // start_trajectory = 0;
         state = STATE_RUNNING_TRAJECTORY;
       }
       flightTime += delta;
@@ -527,6 +538,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
   PARAM_ADD(PARAM_UINT8, trajcount, &remainingTrajectories)
   PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
+  PARAM_ADD(PARAM_UINT8, start_traj, &start_trajectory)
 
 PARAM_GROUP_STOP(app)
 

@@ -28,16 +28,16 @@ def generate_trajectories(MAV_sequences,total_time):
         tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
         trajs.append( tr )
 
-    fig=plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    # fig=plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
 
-    for i in range(N_MAV):
-        trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.set_title('Generated Trajectories')
-    ax.legend()
+    # for i in range(N_MAV):
+    #     trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # ax.set_title('Generated Trajectories')
+    # ax.legend()
     
     return trajs
 
@@ -94,7 +94,7 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
 
     # for i in range(N_MAV):
     #     trajs[i].plot(timestep=0.1,ax=ax)
-    plt.show()
+    # plt.show()
 
     traj_matrices=[]
     for i in range(len(trajs)):

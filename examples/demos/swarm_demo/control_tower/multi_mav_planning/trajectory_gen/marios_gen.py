@@ -141,7 +141,7 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
 
     polynomials_coefficients = np.linalg.solve(a=A, b=b)
 
-    print("polynomials_coefficients.shape:", polynomials_coefficients.shape)
+    # print("polynomials_coefficients.shape:", polynomials_coefficients.shape)
 
     piece_pols = []  # piecewise polynomials
     for i in range(n):
@@ -252,7 +252,7 @@ def allocateTime(waypoints: np.array, max_vel: float, max_acc: float):
 
     waypoints = waypoints[:, :-1]
 
-    print("waypoints.shape:", waypoints.shape)
+    # print("waypoints.shape:", waypoints.shape)
 
     N = len(waypoints)-1
     durations = np.zeros(N)
@@ -295,9 +295,9 @@ def allocateTimeProportional(waypoints: np.array, total_time):
 
     waypoints = waypoints[:, :-1]
     
-    print("waypoints.shape:", waypoints.shape)
-    for wp in waypoints:
-        print(wp)
+    # print("waypoints.shape:", waypoints.shape)
+    # for wp in waypoints:
+    #     print(wp)
 
     N = len(waypoints)-1
     durations = np.zeros(N)
@@ -325,7 +325,7 @@ def generate_traj(waypoints: np.array,total_time):
     # time_allocation = allocateTime(waypoints,MAX_VEL,MAX_ACC)
 
     time_allocation = allocateTimeProportional(waypoints,total_time)
-    print("time_allocation:", time_allocation)
+    # print("time_allocation:", time_allocation)
 
     for i, point in enumerate(waypoints):
         # time allocation
@@ -354,7 +354,7 @@ def create_traj(pols_coeffs, pc_pols):
         matrix[i, 25:33] = pols_coeffs[3][i].p.T
 
     matrix = np.array(matrix)
-    print("matrix.shape: ", matrix.shape)
+    # print("matrix.shape: ", matrix.shape)
 
     tr = Trajectory()
     tr.load_from_matrix(matrix)
