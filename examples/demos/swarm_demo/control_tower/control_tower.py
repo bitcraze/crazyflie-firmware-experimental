@@ -120,6 +120,8 @@ class TrafficController:
         self.connection_thread.start()
         
         self._traj_upload_done = False
+        self._traj_upload_success = False
+
         self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
         self.waiting_for_trajectory=False
@@ -171,9 +173,11 @@ class TrafficController:
         print('Uploading trajectory with id:{} in {}...'.format(self.latest_trajectory_id,self.uri))
         self.trajs_uploaded+=1
 
-        trajectory_mem.write_data(self._upload_done,
-                                  write_failed_cb=self._upload_failed)
-    
+        trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
+
+        self._traj_upload_done = False
+        self._traj_upload_success = False
+
     def is_trajectory_uploaded(self):
         return self._traj_upload_done and self._traj_upload_success
 
@@ -610,12 +614,12 @@ class Tower(TowerBase):
                 if self.trajectories_uploaded():
                     self.pending_trajs_to_upload-=1
                     print("All trajectories uploaded")
-
-            # Check if new trajectories need to be calculated
-            time.sleep(3)
-            if self.all_flying_copters_waiting_for_trajectories() and self.pending_trajs_to_upload==0:
-                print("All copters are waiting for trajectories")
-                self.solve_multiple_MAV()
+            else:
+                # Check if new trajectories need to be calculated
+                # time.sleep(3)
+                if self.all_flying_copters_waiting_for_trajectories() and self.pending_trajs_to_upload==0:
+                    print("All copters are waiting for trajectories")
+                    self.solve_multiple_MAV()
             
             
             self.send_report()

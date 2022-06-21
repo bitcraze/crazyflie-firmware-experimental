@@ -37,7 +37,7 @@ static void appTimer(xTimerHandle timer);
 #define TAKE_OFF_HEIGHT 0.2f
 #define LANDING_HEIGHT 0.12f
 #define SEQUENCE_SPEED 1.0f
-#define DURATION_TO_INITIAL_POSITION 4.0
+#define DURATION_TO_INITIAL_POSITION 1.5
 #define TRAJECTORY_SEGMENT_SIZE_BYTES 132
 
 static uint32_t lockWriteIndex;
@@ -45,7 +45,7 @@ static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
 static bool hasLock();
 
-static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]);
+// static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]);
 
 static bool takeOffWhenReady = false;
 static float goToInitialPositionWhenReady = -1.0f;
@@ -328,30 +328,36 @@ static void appTimer(xTimerHandle timer) {
         break;
       }
 
-      if (now >= timeWhenToGoToInitialPosition) {
-        float wp[4];
-        bool result=getFirstWaypointofTraj(latestTrajectoryId,wp);
-        if (result){
-          DEBUG_PRINT("Going to initial position: %f %f %f\n",(double)wp[0],(double)wp[1],(double)wp[2]);
-          prevTrajectoryId=latestTrajectoryId;
-          crtpCommanderHighLevelGoTo(wp[0] + trajecory_center_offset_x, wp[1] + trajecory_center_offset_y, wp[2] + trajecory_center_offset_z, wp[3], DURATION_TO_INITIAL_POSITION, false);
-          state = STATE_GOING_TO_INITIAL_POSITION;
-        }else{
-          DEBUG_PRINT("No initial position found\n");
-        }
+      prevTrajectoryId=latestTrajectoryId;
+      state = STATE_GOING_TO_INITIAL_POSITION;
 
-      }
+      // if (now >= timeWhenToGoToInitialPosition) {
+      //   float wp[4];
+      //   bool result=getFirstWaypointofTraj(latestTrajectoryId,wp);
+      //   if (result){
+      //     DEBUG_PRINT("Going to initial position: %f %f %f\n",(double)wp[0],(double)wp[1],(double)wp[2]);
+      //     prevTrajectoryId=latestTrajectoryId;
+      //     crtpCommanderHighLevelGoTo(wp[0] + trajecory_center_offset_x, wp[1] + trajecory_center_offset_y, wp[2] + trajecory_center_offset_z, wp[3], DURATION_TO_INITIAL_POSITION, false);
+      //     state = STATE_GOING_TO_INITIAL_POSITION;
+      //   }else{
+      //     DEBUG_PRINT("No initial position found\n");
+      //   }
+      // }
+
       flightTime += delta;
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
       // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
-      if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("At initial position, starting trajectory...\n");
-        start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
-        // start_trajectory = 0;
-        state = STATE_RUNNING_TRAJECTORY;
-      }
+      start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+      state = STATE_RUNNING_TRAJECTORY;
+      
+      // if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+      //   DEBUG_PRINT("At initial position, starting trajectory...\n");
+      //   start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+      //   // start_trajectory = 0;
+      //   state = STATE_RUNNING_TRAJECTORY;
+      // }
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
@@ -504,30 +510,30 @@ static void resetLockData() {
     }
 }
 
-static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]){
-  if(traj_id<255){
-    struct poly4d first_segment;
-    uint32_t offset;
-    if (traj_id==1){
-      offset=0;
-    } else {
-      offset=15;
-    }
+// static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]){
+//   if(traj_id<255){
+//     struct poly4d first_segment;
+//     uint32_t offset;
+//     if (traj_id==1){
+//       offset=0;
+//     } else {
+//       offset=15;
+//     }
 
-    int res=crtpCommanderHighLevelReadTrajectory(offset*TRAJECTORY_SEGMENT_SIZE_BYTES, sizeof(first_segment), (uint8_t*)&first_segment);
-    if (res){
-      wp[0]=first_segment.p[0][0];
-      wp[1]=first_segment.p[1][0];
-      wp[2]=first_segment.p[2][0];
-      wp[3]=first_segment.p[3][0];
+//     int res=crtpCommanderHighLevelReadTrajectory(offset*TRAJECTORY_SEGMENT_SIZE_BYTES, sizeof(first_segment), (uint8_t*)&first_segment);
+//     if (res){
+//       wp[0]=first_segment.p[0][0];
+//       wp[1]=first_segment.p[1][0];
+//       wp[2]=first_segment.p[2][0];
+//       wp[3]=first_segment.p[3][0];
 
-      DEBUG_PRINT("Trajectory %d first waypoint: %f %f %f\n",latestTrajectoryId,(double) wp[0],(double) wp[1],(double) wp[2]);
-      return true;
-    }
-    return false;
-  }
-  return false;
-}
+//       DEBUG_PRINT("Trajectory %d first waypoint: %f %f %f\n",latestTrajectoryId,(double) wp[0],(double) wp[1],(double) wp[2]);
+//       return true;
+//     }
+//     return false;
+//   }
+//   return false;
+// }
 
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
