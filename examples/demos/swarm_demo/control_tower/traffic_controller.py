@@ -74,6 +74,14 @@ class TrafficController:
 
         self.trajs_uploaded=0
         self.trajs_uploaded_success=0
+        
+        self._waiting_to_start_traj=False
+
+    def waiting_to_start_trajectory(self):
+        return self._waiting_to_start_traj
+    
+    def set_start_trajectory_param(self):
+        self._cf.param.set_value("app.start_traj",1)
 
     def is_waiting_for_trajectory(self):
         pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
@@ -343,11 +351,18 @@ class TrafficController:
         self._log_conf.start()
 
     def _log_data(self, timestamp, data, logconf):
-        if(data['app.state'] !=self.copter_state):
+        if(data['app.state'] !=self.copter_state): 
+            #copter state has changed            
             print("Copter state changed to {}".format(data['app.state']))
+            
             if data['app.state']==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
                 # can_upload_trajectory is set only when copter enters for first time the state 
                 self.can_upload_trajectory = True
+            
+            if  data['app.state']==self.STATE_GOING_TO_INITIAL_POSITION:
+                self._waiting_to_start_traj = True
+            else :
+                self._waiting_to_start_traj = False
 
         self.copter_state = data['app.state']
 

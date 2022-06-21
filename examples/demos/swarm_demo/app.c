@@ -331,33 +331,21 @@ static void appTimer(xTimerHandle timer) {
       prevTrajectoryId=latestTrajectoryId;
       state = STATE_GOING_TO_INITIAL_POSITION;
 
-      // if (now >= timeWhenToGoToInitialPosition) {
-      //   float wp[4];
-      //   bool result=getFirstWaypointofTraj(latestTrajectoryId,wp);
-      //   if (result){
-      //     DEBUG_PRINT("Going to initial position: %f %f %f\n",(double)wp[0],(double)wp[1],(double)wp[2]);
-      //     prevTrajectoryId=latestTrajectoryId;
-      //     crtpCommanderHighLevelGoTo(wp[0] + trajecory_center_offset_x, wp[1] + trajecory_center_offset_y, wp[2] + trajecory_center_offset_z, wp[3], DURATION_TO_INITIAL_POSITION, false);
-      //     state = STATE_GOING_TO_INITIAL_POSITION;
-      //   }else{
-      //     DEBUG_PRINT("No initial position found\n");
-      //   }
-      // }
-
       flightTime += delta;
       break;
     case STATE_GOING_TO_INITIAL_POSITION:
       // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
+      if (start_trajectory==0) {// wait until receive start_trajectory signal
+        flightTime += delta;
+        break;
+      }
+
+      start_trajectory=0;
+      
       start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
       state = STATE_RUNNING_TRAJECTORY;
       
-      // if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-      //   DEBUG_PRINT("At initial position, starting trajectory...\n");
-      //   start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
-      //   // start_trajectory = 0;
-      //   state = STATE_RUNNING_TRAJECTORY;
-      // }
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:

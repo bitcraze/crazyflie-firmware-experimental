@@ -71,10 +71,29 @@ class Tower(TowerBase):
                 print("All copters are waiting for trajectories")
                 self.solve_multiple_MAV()
             
+            if self.all_flying_copters_waiting_to_start_trajectories():
+                print("All copters are waiting to start trajectories")
+                self.all_flying_copters_start_trajectory()
             
             self.send_report()
 
             time.sleep(0.2)
+
+    def all_flying_copters_start_trajectory(self):         
+        for controller in self.get_flying_controllers():
+            controller.set_start_trajectory_param()
+        
+    def all_flying_copters_waiting_to_start_trajectories(self):
+        flying_controllers = self.get_flying_controllers()
+        if len(flying_controllers) == 0:
+            return False
+
+        for controller in flying_controllers:
+            if not controller.waiting_to_start_trajectory() :
+                return False
+
+        return True
+
 
     def solve_multiple_MAV(self):
         flying_controllers = self.get_flying_controllers()
