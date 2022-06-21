@@ -69,7 +69,7 @@ class TrafficController:
 
         self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
-        self.waiting_for_trajectory=False
+        self.can_upload_trajectory=False # can upload trajectory if copter is in state STATE_WAITING_TO_GO_TO_INITIAL_POSITION (5) 
         self.latest_trajectory_id=None
 
         self.trajs_uploaded=0
@@ -77,7 +77,7 @@ class TrafficController:
 
     def is_waiting_for_trajectory(self):
         pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
-        return self.copter_state==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION and pending_trajs==0
+        return self.copter_state==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION and pending_trajs==0 and self.can_upload_trajectory
 
     def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
@@ -123,6 +123,8 @@ class TrafficController:
         self._traj_upload_done = False
         self._traj_upload_success = False
 
+        self.can_upload_trajectory=False
+
     def is_trajectory_uploaded(self):
         return self._traj_upload_done and self._traj_upload_success
 
@@ -154,8 +156,6 @@ class TrafficController:
         if(self.trajs_uploaded_success!=self.trajs_uploaded):
             print(Fore.RED+"Trajectories difference: {}".format(self.trajs_uploaded-self.trajs_uploaded_success))
             print(Style.RESET_ALL)
-
-
 
     def _upload_failed(self, mem, addr):
         print(Fore.RED+'Trajectory upload FAILED!')
@@ -345,6 +345,9 @@ class TrafficController:
     def _log_data(self, timestamp, data, logconf):
         if(data['app.state'] !=self.copter_state):
             print("Copter state changed to {}".format(data['app.state']))
+            if data['app.state']==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
+                # can_upload_trajectory is set only when copter enters for first time the state 
+                self.can_upload_trajectory = True
 
         self.copter_state = data['app.state']
 

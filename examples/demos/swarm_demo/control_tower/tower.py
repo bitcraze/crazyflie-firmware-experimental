@@ -63,16 +63,13 @@ class Tower(TowerBase):
             else:
                 self.land_all()
 
-            if self.pending_trajs_to_upload>0:
-                if self.trajectories_uploaded():
-                    self.pending_trajs_to_upload-=1
-                    print("All trajectories uploaded")
-            else:
-                # Check if new trajectories need to be calculated
-                # time.sleep(3)
-                if self.all_flying_copters_waiting_for_trajectories() and self.pending_trajs_to_upload==0:
-                    print("All copters are waiting for trajectories")
-                    self.solve_multiple_MAV()
+
+            
+            # Check if new trajectories need to be calculated
+            # time.sleep(3)
+            if self.all_flying_copters_waiting_for_trajectories():
+                print("All copters are waiting for trajectories")
+                self.solve_multiple_MAV()
             
             
             self.send_report()
@@ -88,7 +85,7 @@ class Tower(TowerBase):
         while True:
             random.shuffle(self.predefined_xrefs)
             xrefs=[self.predefined_xrefs[i] for i in range(len(flying_controllers))]
-            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>0.1:
+            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>0.4:
                 break
             print("x0s and xrefs are the same,trying again...")
         
@@ -107,15 +104,6 @@ class Tower(TowerBase):
         for i,cf in enumerate(flying_controllers):
             cf.upload_trajectory(trajs[i])
 
-        print("Waiting for trajectories to be uploaded..")
-        #wait until cfs have received trajectory
-        self.pending_trajs_to_upload +=1
-       
-
-        print("All copters moved to next stage")
-        
-        # time.sleep(2)
-        print("Slept for some time ")
 
     def all_flying_copters_waiting_for_trajectories(self):
         flying_controllers = self.get_flying_controllers()
