@@ -232,6 +232,13 @@ class Trajectory:
         for i, t in enumerate(np.arange(0, self.duration, timestep)):
             out = self.eval(t)
             out: TrajectoryOutput
+            if i==len(x):
+                #delete last element
+                x = x[:-1]
+                y = y[:-1]
+                z = z[:-1]
+                continue
+            
             x[i], y[i], z[i] = out.pos[0], out.pos[1], out.pos[2]
             # print(x[i], y[i], z[i])
         

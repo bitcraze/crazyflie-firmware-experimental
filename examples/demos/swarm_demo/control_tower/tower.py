@@ -72,7 +72,7 @@ class Tower(TowerBase):
                 self.solve_multiple_MAV()
             
             if self.all_flying_copters_waiting_to_start_trajectories():
-                print("All copters are waiting to start trajectories")
+                print("All flying copters are waiting to start trajectories")
                 self.all_flying_copters_start_trajectory()
             
             self.send_report()
@@ -104,7 +104,7 @@ class Tower(TowerBase):
         while True:
             random.shuffle(self.predefined_xrefs)
             xrefs=[self.predefined_xrefs[i] for i in range(len(flying_controllers))]
-            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>0.4:
+            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>1.9:
                 break
             print("x0s and xrefs are the same,trying again...")
         

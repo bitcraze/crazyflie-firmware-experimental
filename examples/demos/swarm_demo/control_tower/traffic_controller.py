@@ -76,6 +76,8 @@ class TrafficController:
         self.trajs_uploaded_success=0
         
         self._waiting_to_start_traj=False
+        
+        self._console_buffer = ""
 
     def waiting_to_start_trajectory(self):
         return self._waiting_to_start_traj
@@ -137,7 +139,7 @@ class TrafficController:
         return self._traj_upload_done and self._traj_upload_success
 
     def _upload_done(self, mem, addr):
-        print(Fore.GREEN+'Trajectory upload succesfull!'+Style.RESET_ALL)
+        print(Fore.GREEN+'Trajectory upload succesfull to {}!'.format(self.uri[-2:])+Style.RESET_ALL)
 
         # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
         # since each segment is 132 bytes long
@@ -331,8 +333,16 @@ class TrafficController:
         self._cf.open_link(self.uri)
 
     def _console_incoming(self, console_text):
-        print(Fore.YELLOW+"CF {} DEBUG:".format( self.uri[-2:] ),console_text, end='')
-        print(Style.RESET_ALL)
+        # print each message in one line 
+        if console_text[-1] != '\n':
+            self._console_buffer += console_text
+        else:
+            self._console_buffer += console_text
+
+            print(Fore.YELLOW+"CF {} DEBUG:".format( self.uri[-2:] ),self._console_buffer, end='')
+            print(Style.RESET_ALL)
+
+            self._console_buffer = ""
 
     def _setup_logging(self):
         # print("Setting up logging")
@@ -353,15 +363,18 @@ class TrafficController:
     def _log_data(self, timestamp, data, logconf):
         if(data['app.state'] !=self.copter_state): 
             #copter state has changed            
-            print("Copter state changed to {}".format(data['app.state']))
+            print("Copter {} state changed to {}".format(self.uri[-2:],data['app.state']))
             
+            if data['app.state']==self.STATE_LANDING:
+                 self.set_trajectory_count(2)
+
             if data['app.state']==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
                 # can_upload_trajectory is set only when copter enters for first time the state 
                 self.can_upload_trajectory = True
             
             if  data['app.state']==self.STATE_GOING_TO_INITIAL_POSITION:
                 self._waiting_to_start_traj = True
-            else :
+            else:
                 self._waiting_to_start_traj = False
 
         self.copter_state = data['app.state']

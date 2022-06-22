@@ -99,8 +99,19 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
     traj_matrices=[]
     for i in range(len(trajs)):
         traj_matrices.append(trajs[i].get_matrix())
+    
+    np.save('/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/traj_matrices_{}.npy'.format(solve_problem.counter),traj_matrices)
+    solve_problem.counter += 1
 
     return traj_matrices
+
+solve_problem.counter = 0
+# #get date for saving the files
+# import datetime
+# now = datetime.datetime.now()
+# date = now.strftime("%Y-%m-%d-%H-%M-%S")
+# print(date)
+
 
 if __name__ == "__main__":
     # trajs=main(1)
