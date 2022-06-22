@@ -34,9 +34,10 @@ class Tower(TowerBase):
             [+1,+1,1],            
         ]
 
-        self.pending_trajs_to_upload = 0
+        self.wanted :int = None
 
     def fly(self, wanted):
+        self.wanted=wanted
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
 
@@ -86,7 +87,7 @@ class Tower(TowerBase):
         
     def all_flying_copters_waiting_to_start_trajectories(self):
         flying_controllers = self.get_flying_controllers()
-        if len(flying_controllers) == 0:
+        if len(flying_controllers) == 0 :
             return False
 
         for controller in flying_controllers:
@@ -165,6 +166,10 @@ class Tower(TowerBase):
 
         if len(flying_controllers) == 0:
             return False
+        
+        if len(flying_controllers) != self.wanted:
+            print("Some flying copters are flying but not as many as wanted to start trajectories")
+            return False
 
         for controller in flying_controllers:
             if not controller.is_waiting_for_trajectory() :
@@ -183,6 +188,8 @@ class Tower(TowerBase):
         if missing > 0:
             print("Trying to prepare", missing, "copter(s)")
             best_controllers = self.find_best_controllers()
+            print("Best controllers:", [controller.uri for controller in best_controllers])
+
             for best_controller in best_controllers[:missing]:
                 if best_controller:
                     print("Preparing " + best_controller.uri)
@@ -191,23 +198,11 @@ class Tower(TowerBase):
             print("Prepared", new_prepared_count, "copter(s)")
 
     def start_copters(self, count, total):
-        unused_slot_times = self.find_unused_slot_times(total)
-        # print("Unused slot times:", unused_slot_times)
-
-        slot_index = 0
         for controller in self.controllers:
             if controller.is_ready_for_flight():
-                if slot_index < count and slot_index < len(unused_slot_times):
-                    trajectory_delay = 1.0 - unused_slot_times[slot_index]
-                    if trajectory_delay == 1.0:
-                        trajectory_delay = 0.0
-                    print("Starting prepared copter", controller.uri,
-                          'with a delay of', trajectory_delay)
-                    controller.start_trajectory(trajectory_delay, offset_z=0.25)
-                    slot_index += 1
-                else:
-                    return
-
+                print("Starting " + controller.uri)
+                controller.start_trajectory(0.15, offset_z=0.25)
+                   
     def find_unused_slot_times(self, total_slots):
         # Times are measured in trajectory cycles
         start_times = []

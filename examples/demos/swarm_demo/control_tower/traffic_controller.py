@@ -59,6 +59,7 @@ class TrafficController:
 
     def __init__(self, uri):
         self.uri = uri
+        self.short_uri= self.get_short_uri()
         self.stay_alive = True
         self.reset_internal()
         self.connection_thread = threading.Thread(target=self.process)
@@ -104,8 +105,9 @@ class TrafficController:
         self.trajectory_mem=trajectory_mem
 
         segments_in_memory=len(trajectory_mem.trajectory)
-        
-        self.latest_trajectory_id = 2 if self.latest_trajectory_id==1 else 1
+        print(self.short_uri + "Previous latest_trajectory_id:",self.latest_trajectory_id)
+
+        self.latest_trajectory_id = 2 if int(self.latest_trajectory_id)==1 else 1
         id = self.latest_trajectory_id-1 #0-based indexing
 
         self._traj_upload_configs[id].trajectory_id=id
@@ -213,6 +215,7 @@ class TrafficController:
         return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off()
 
     def is_ready_for_flight(self):
+        print(self.short_uri + "is_ready_for_flight:",self.copter_state, (not self._pre_state_going_to_initial_position()) )
         return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position()
 
     def is_flying(self):
@@ -286,11 +289,17 @@ class TrafficController:
         self.connection_state = self.CS_CONNECTED
         print('Connected to %s' % link_uri)
 
+    def get_short_uri(self):
+        return "CF:{} ".format(self.uri[-2:])
+
     def _all_updated(self):
         """Callback that is called when all parameters have been updated"""
 
         self.set_trajectory_count(2)
         self._setup_logging()
+        
+        self.latest_trajectory_id = self._cf.param.get_value('app.curr_traj_id')
+        print(self.short_uri+'Latest trajectory id: {}'.format(self.latest_trajectory_id))
 
         # append traj memory
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
