@@ -79,6 +79,10 @@ class TrafficController:
         
         self._console_buffer = ""
 
+        self.charging_pad_position = None
+
+        self._trajcount = 255
+
     def waiting_to_start_trajectory(self):
         return self._waiting_to_start_traj
     
@@ -253,7 +257,13 @@ class TrafficController:
     def set_trajectory_count(self, count):
         if self.connection_state == self.CS_CONNECTED:
             self._cf.param.set_value('app.trajcount', count)
-
+    
+    def get_trajectory_count(self):
+        # return self._trajcount
+        if self.connection_state == self.CS_CONNECTED:
+            self._cf.param.request_param_update('app.trajcount')
+            return self._cf.param.get_value('app.trajcount')
+            
     def get_charge_level(self):
         return self.vbat
 
@@ -385,6 +395,10 @@ class TrafficController:
         if self.copter_state != self.STATE_HOVERING:
             self._pre_state_going_to_initial_position_end_time = 0
         
+        #charging pad position set
+        if self.charging_pad_position== None:
+            self.charging_pad_position = (data['stateEstimate.x'], data['stateEstimate.y'], data['stateEstimate.z'])
+            print("Charging pad position set to {}".format(self.charging_pad_position))
 
         self.vbat = data['pm.vbat']
 

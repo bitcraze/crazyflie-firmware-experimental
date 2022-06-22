@@ -21,6 +21,7 @@ import simpleaudio
 from colorama import Fore, Back, Style
 from traffic_controller import TrafficController
 from tower_base import TowerBase
+import copy
 
 class Tower(TowerBase):
     def __init__(self, uris, report_socket=None):
@@ -94,20 +95,53 @@ class Tower(TowerBase):
 
         return True
 
+    def copters_landing_after_traj(self,flying_controllers=None)->List[int]:
+        """Returns a list of copter ids that need to go on the charger after the trajectory is done"""
+        if flying_controllers is None:
+            flying_controllers = self.get_flying_controllers()
+        
+        copters_ids_to_go_on_chargers=[]
+        for i,controller in enumerate(flying_controllers):
+            traj_count=controller.get_trajectory_count()
+            print("controller",controller.uri[-2:], "traj count:",traj_count, type(traj_count))
+            if int(traj_count)==1:
+                copters_ids_to_go_on_chargers.append(i)
+        
+        return copters_ids_to_go_on_chargers
+                
 
     def solve_multiple_MAV(self):
         flying_controllers = self.get_flying_controllers()
         
         x0s=[ [cf.est_x,cf.est_y,cf.est_z] for cf in flying_controllers]
-        
-        #Assign randomly xrefs to each copter
-        while True:
-            random.shuffle(self.predefined_xrefs)
-            xrefs=[self.predefined_xrefs[i] for i in range(len(flying_controllers))]
-            if np.linalg.norm(np.array(xrefs)-np.array(x0s))>1.9:
-                break
-            print("x0s and xrefs are the same,trying again...")
-        
+
+        #xrefs
+        xrefs=[]
+        copters_ids_to_go_on_chargers=self.copters_landing_after_traj(flying_controllers)
+        print("copters_ids_to_go_on_chargers: ",[flying_controllers[i].uri[-2:] for i in copters_ids_to_go_on_chargers])
+
+        predef_xrefs=copy.deepcopy(self.predefined_xrefs)
+        random.shuffle(predef_xrefs)# shuffle so that we don't always go to the same one
+
+        for i,controller in enumerate(flying_controllers):
+            if i in copters_ids_to_go_on_chargers:
+                # if id is in copters_ids_to_go_on_chargers, we want to go on charger
+                height_above_charger=0.4
+                pos=[controller.charging_pad_position[0],controller.charging_pad_position[1],height_above_charger]
+            else:
+                # otherwise, it needs to go on one of thr predefined xref that is not 
+                # the same as the one it is currently on
+                
+                for j in range(len(predef_xrefs)):
+                    dx=np.linalg.norm( np.array(predef_xrefs[j]) - np.array(x0s[i]) )
+                    if dx >0.5:
+                        pos=predef_xrefs[j]
+                        #delete the used xref
+                        del predef_xrefs[j]
+                        break
+                
+            xrefs.append(pos)
+
         points_to_pad=2-len(x0s) # 2 is hard coded for now
         for i in range(points_to_pad):
             x0s.append([0,0,0])
@@ -125,7 +159,10 @@ class Tower(TowerBase):
 
 
     def all_flying_copters_waiting_for_trajectories(self):
-        flying_controllers = self.get_flying_controllers()
+        flying_controllers:List[TrafficController] = self.get_flying_controllers()
+        # print("All flying copters:", [cf.copter_state for cf in flying_controllers])
+        # print("All flying copters waiting for trajectories:", [cf.uri for cf in flying_controllers if cf.is_waiting_for_trajectory()])
+
         if len(flying_controllers) == 0:
             return False
 
