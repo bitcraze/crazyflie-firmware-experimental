@@ -116,8 +116,8 @@ enum State {
   STATE_WAIT_FOR_TAKE_OFF, // Charging
   STATE_TAKING_OFF,
   STATE_HOVERING,
-  STATE_WAITING_TO_GO_TO_INITIAL_POSITION,
-  STATE_GOING_TO_INITIAL_POSITION,
+  STATE_WAITING_TO_RECEIVE_TRAJECTORY,
+  STATE_WAITING_TO_START_TRAJECTORY,
   STATE_RUNNING_TRAJECTORY,
   STATE_GOING_TO_PAD,
   STATE_WAITING_AT_PAD,
@@ -296,12 +296,12 @@ static void appTimer(xTimerHandle timer) {
           trajectoryStartTime = now + delayMs;
           goToInitialPositionWhenReady = -1.0f;
           DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
-          state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+          state = STATE_WAITING_TO_RECEIVE_TRAJECTORY;
         }
       }
       flightTime += delta;
       break;
-    case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
+    case STATE_WAITING_TO_RECEIVE_TRAJECTORY:
       // latest trajectory id will be updated as soon as the trajectory is defined
       if (prevTrajectoryId==latestTrajectoryId) {
         // DEBUG_PRINT("Previous Traj id same with latest: %d\n", prevTrajectoryId);
@@ -310,13 +310,11 @@ static void appTimer(xTimerHandle timer) {
       }
 
       prevTrajectoryId=latestTrajectoryId;
-      state = STATE_GOING_TO_INITIAL_POSITION;
+      state = STATE_WAITING_TO_START_TRAJECTORY;
 
       flightTime += delta;
       break;
-    case STATE_GOING_TO_INITIAL_POSITION:
-      // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
-
+    case STATE_WAITING_TO_START_TRAJECTORY:
       if (start_trajectory==0) {// wait until receive start_trajectory signal
         flightTime += delta;
         break;
@@ -330,7 +328,6 @@ static void appTimer(xTimerHandle timer) {
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
-      // currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
       if (terminateTrajectoryAndLand){
         crtpCommanderHighLevelStop();
         terminateTrajectoryAndLand = false;
@@ -351,17 +348,12 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
         } else {
           if (remainingTrajectories > 0) {
-            // DEBUG_PRINT("Trajectory finished, restarting...\n");
-            // crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
             float delayMs=3000.0f;
             timeWhenToGoToInitialPosition = now + delayMs;
-            state=STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+            state=STATE_WAITING_TO_RECEIVE_TRAJECTORY;
             
             int temp= remainingTrajectories-1;
             paramSet(paramIdTrajcount.index,  &temp);
-            
-            // paramSet(paramIdTrajcount.index,  (remainingTrajectories-1) );
-            // remainingTrajectories--;
           }
         }
       }

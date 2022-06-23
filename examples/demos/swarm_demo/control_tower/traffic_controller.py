@@ -44,8 +44,8 @@ class TrafficController:
     STATE_WAIT_FOR_TAKE_OFF = 2  # Charging
     STATE_TAKING_OFF = 3
     STATE_HOVERING = 4
-    STATE_WAITING_TO_GO_TO_INITIAL_POSITION = 5
-    STATE_GOING_TO_INITIAL_POSITION = 6
+    STATE_WAITING_TO_RECEIVE_TRAJECTORY = 5
+    STATE_WAITING_TO_START_TRAJECTORY = 6
     STATE_RUNNING_TRAJECTORY = 7
     STATE_GOING_TO_PAD = 8
     STATE_WAITING_AT_PAD = 9
@@ -73,7 +73,7 @@ class TrafficController:
 
         self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
-        self.can_upload_trajectory=False # can upload trajectory if copter is in state STATE_WAITING_TO_GO_TO_INITIAL_POSITION (5) 
+        self.can_upload_trajectory=False # can upload trajectory if copter is in state STATE_WAITING_TO_RECEIVE_TRAJECTORY (5) 
         self.latest_trajectory_id=None
 
         self.trajs_uploaded=0
@@ -103,7 +103,7 @@ class TrafficController:
 
     def is_waiting_for_trajectory(self):
         pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
-        return self.copter_state==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION and pending_trajs==0 and self.can_upload_trajectory
+        return self.copter_state==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY and pending_trajs==0 and self.can_upload_trajectory
 
     def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
@@ -231,8 +231,8 @@ class TrafficController:
 
     def is_flying(self):
         return self.copter_state == self.STATE_RUNNING_TRAJECTORY or \
-               self.copter_state == self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION or \
-               self.copter_state == self.STATE_GOING_TO_INITIAL_POSITION or \
+               self.copter_state == self.STATE_WAITING_TO_RECEIVE_TRAJECTORY or \
+               self.copter_state == self.STATE_WAITING_TO_START_TRAJECTORY or \
                self._pre_state_going_to_initial_position()
 
     def is_landing(self):
@@ -398,11 +398,11 @@ class TrafficController:
             if data['app.state']==self.STATE_LANDING:
                  self.set_trajectory_count(TRAJECTORY_COUNT)
 
-            if data['app.state']==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
+            if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY:
                 # can_upload_trajectory is set only when copter enters for first time the state 
                 self.can_upload_trajectory = True
             
-            if  data['app.state']==self.STATE_GOING_TO_INITIAL_POSITION:
+            if  data['app.state']==self.STATE_WAITING_TO_START_TRAJECTORY:
                 self._waiting_to_start_traj = True
             else:
                 self._waiting_to_start_traj = False
