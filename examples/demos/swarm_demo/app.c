@@ -40,6 +40,9 @@ static void appTimer(xTimerHandle timer);
 #define DURATION_TO_INITIAL_POSITION 1.5
 #define TRAJECTORY_SEGMENT_SIZE_BYTES 132
 
+#define SAFETY_LAND_HEIGHT 0.05f
+#define SAFETY_LAND_DURATION 3.0 // in seconds
+
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
@@ -82,6 +85,8 @@ static uint8_t latestTrajectoryId = 255;
 static uint8_t prevTrajectoryId = 255;
 
 static uint8_t start_trajectory=0;
+static uint8_t safety_land_flag=0;
+static uint8_t is_safety_landing=0;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -223,12 +228,23 @@ static void appTimer(xTimerHandle timer) {
           DEBUG_PRINT("Error starting trajectory: %d\n", start_trajectory_result);
   }
 
-  // DEBUG_PRINT("State: %d\n", state);
-  // for (int i=0;i<2;i++){
-  //   int id=i+1;
-  //   int res=crtpCommanderHighLevelIsTrajectoryDefined(id);
-  //   DEBUG_PRINT("Trajectory %d defined: %d \n",id,res);
-  // }
+  if (safety_land_flag==1){
+    if (is_safety_landing==0){
+      crtpCommanderHighLevelLand(0,SAFETY_LAND_DURATION);
+      is_safety_landing=1;
+    }else{
+      // it is already landing
+      if (crtpCommanderHighLevelIsTrajectoryFinished()){
+        crtpCommanderHighLevelStop();
+        state = STATE_IDLE;
+
+        safety_land_flag=0;
+        is_safety_landing=0;
+      }
+    }
+
+    return;
+  }
   
   
   switch(state) {
@@ -503,6 +519,7 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, trajcount, &remainingTrajectories)
   PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
   PARAM_ADD(PARAM_UINT8, start_traj, &start_trajectory)
+  PARAM_ADD(PARAM_UINT8, safety_land, &safety_land_flag)
 
 PARAM_GROUP_STOP(app)
 

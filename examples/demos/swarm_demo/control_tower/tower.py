@@ -54,6 +54,7 @@ class Tower(TowerBase):
 
         while True:
             
+            self.safety_check()
 
             if wanted:
                 currently_flying = self.flying_count()
@@ -80,6 +81,12 @@ class Tower(TowerBase):
             self.send_report()
 
             time.sleep(0.2)
+
+    def safety_check(self):
+        for controller in self.controllers:
+            if controller.pos_out_of_bounds():
+                print("Out of bounds: " + controller.uri)
+                controller.safety_land()
 
     def all_flying_copters_start_trajectory(self):         
         for controller in self.get_flying_controllers():

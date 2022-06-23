@@ -23,6 +23,7 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
+TRAJECTORY_COUNT=4
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -57,6 +58,8 @@ class TrafficController:
 
     PRE_STATE_TIMEOUT = 3
 
+    OUT_OF_BOUNDS_CUBE =(1.4,1.4,1.8)
+
     def __init__(self, uri):
         self.uri = uri
         self.short_uri= self.get_short_uri()
@@ -84,6 +87,14 @@ class TrafficController:
 
         self._trajcount = 255
 
+    def pos_out_of_bounds(self):
+        return self.est_x>self.OUT_OF_BOUNDS_CUBE[0]\
+            or self.est_y<-self.OUT_OF_BOUNDS_CUBE[1]\
+            or self.est_z>self.OUT_OF_BOUNDS_CUBE[2]\
+
+    def safety_land(self):
+        self._cf.param.set_value('app.safety_land', 1)
+    
     def waiting_to_start_trajectory(self):
         return self._waiting_to_start_traj
     
@@ -295,7 +306,7 @@ class TrafficController:
     def _all_updated(self):
         """Callback that is called when all parameters have been updated"""
 
-        self.set_trajectory_count(2)
+        self.set_trajectory_count(TRAJECTORY_COUNT)
         self._setup_logging()
         
         self.latest_trajectory_id = self._cf.param.get_value('app.curr_traj_id')
@@ -385,7 +396,7 @@ class TrafficController:
             print("Copter {} state changed to {}".format(self.uri[-2:],data['app.state']))
             
             if data['app.state']==self.STATE_LANDING:
-                 self.set_trajectory_count(2)
+                 self.set_trajectory_count(TRAJECTORY_COUNT)
 
             if data['app.state']==self.STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
                 # can_upload_trajectory is set only when copter enters for first time the state 
