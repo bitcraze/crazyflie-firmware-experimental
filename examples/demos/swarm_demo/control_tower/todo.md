@@ -4,8 +4,9 @@
 
 - [X] Safety land script
 - [ ] Safety land interface
-- [x] Return to pad with trajectory
-- [ ] Return to closest pad 
+- [X] Return to pad with trajectory
+- [ ] Return to closest pad(blocked) 
 - [ ] Keep solver alive while executing
-- [x] Fix re-taking off bug
+- [X] Fix re-taking off bug
 - [ ] Reset crash state manually
+- [X] Make uploading faster

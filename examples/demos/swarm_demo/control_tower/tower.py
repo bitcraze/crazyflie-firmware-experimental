@@ -177,19 +177,26 @@ class Tower(TowerBase):
                 # if id is in copters_ids_to_go_on_chargers, we want to go on charger
                 height_above_charger=0.4
                 pos=[controller.charging_pad_position[0],controller.charging_pad_position[1],height_above_charger]
+                xrefs.append(pos)
+
             else:
                 # otherwise, it needs to go on one of thr predefined xref that is not 
                 # the same as the one it is currently on
                 
                 for j in range(len(predef_xrefs)):
                     dx=np.linalg.norm( np.array(predef_xrefs[j]) - np.array(x0s[i]) )
-                    if dx >0.8:
+                    if dx >0.9:
                         pos=predef_xrefs[j]
+                        xrefs.append(pos)
+
                         #delete the used xref
                         del predef_xrefs[j]
                         break
-                
-            xrefs.append(pos)
+                    elif j==len(predef_xrefs)-1:
+                        print("final xref is the same as the final x0 left")
+                        xrefs.append(xrefs[0])
+                        xrefs[0]=predef_xrefs[j] #TODO: this is a "hack" to make sure we don't use the same xref twice 
+
 
         points_to_pad=multi_MAV.N_MAV-len(x0s)
         for i in range(points_to_pad):
