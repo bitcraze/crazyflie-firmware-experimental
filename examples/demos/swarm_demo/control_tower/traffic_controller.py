@@ -153,7 +153,8 @@ class TrafficController:
         self.final_position=self.get_final_position(trajectory).pos
         print(self.short_uri+"Final position:",self.final_position)
         self.traj_start_time = time.time()
-        trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
+        # trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
+        trajectory_mem.write_data_marios(self._upload_done,write_failed_cb=self._upload_failed,tr_id=self.latest_trajectory_id)
 
         self._traj_upload_done = False
         self._traj_upload_success = False
