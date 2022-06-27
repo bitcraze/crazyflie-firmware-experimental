@@ -250,6 +250,7 @@ static void appTimer(xTimerHandle timer) {
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+      prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retakinf off
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
@@ -297,6 +298,7 @@ static void appTimer(xTimerHandle timer) {
           goToInitialPositionWhenReady = -1.0f;
           DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
           state = STATE_WAITING_TO_RECEIVE_TRAJECTORY;
+          prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retakinf off
         }
       }
       flightTime += delta;

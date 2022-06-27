@@ -23,7 +23,7 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
-TRAJECTORY_COUNT=4
+TRAJECTORY_COUNT=2
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -73,7 +73,7 @@ class TrafficController:
 
         self._traj_upload_configs: list[TrajectoryUploadConfig] =[TrajectoryUploadConfig() for i in range(2)]
 
-        self.can_upload_trajectory=False # can upload trajectory if copter is in state STATE_WAITING_TO_RECEIVE_TRAJECTORY (5) 
+        self.can_upload_trajectory=False # can upload trajectory if copter is in state STATE_WAITING_TO_RECEIVE_TRAJECTORY (5) or while executing trajectory (7)
         self.latest_trajectory_id=None
 
         self.trajs_uploaded=0
@@ -86,6 +86,7 @@ class TrafficController:
         self.charging_pad_position = None
 
         self._trajcount = 255
+        self.final_position=None
 
     def pos_out_of_bounds(self):
         return self.est_x>self.OUT_OF_BOUNDS_CUBE[0]\
@@ -103,7 +104,10 @@ class TrafficController:
 
     def is_waiting_for_trajectory(self):
         pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
-        return self.copter_state==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY and pending_trajs==0 and self.can_upload_trajectory
+        expected_states=[self.STATE_WAITING_TO_RECEIVE_TRAJECTORY,self.STATE_RUNNING_TRAJECTORY]
+        is_in_valid_state= self.copter_state == expected_states[0] or self.copter_state == expected_states[1]
+        
+        return  is_in_valid_state and pending_trajs==0 and self.can_upload_trajectory
 
     def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
@@ -141,16 +145,31 @@ class TrafficController:
             trajectory_mem.trajectory[index] = pol
 
             total_duration += duration
-    
+
         print('Uploading trajectory with id:{} in {}...'.format(self.latest_trajectory_id,self.uri))
         self.trajs_uploaded+=1
-
+        
+        #get the final position of the trajectory
+        self.final_position=self.get_final_position(trajectory).pos
+        print(self.short_uri+"Final position:",self.final_position)
         trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
 
         self._traj_upload_done = False
         self._traj_upload_success = False
 
         self.can_upload_trajectory=False
+
+    def get_final_position(self,trajectory:List[List[float]]):
+        trajectory=np.array(trajectory)
+
+        matrix=trajectory[-1,:] # last row
+        matrix=[matrix]
+
+        tr=multi_MAV.Trajectory()
+        tr.load_from_matrix(matrix)
+        pos=tr.eval(tr.duration)
+        
+        return pos
 
     def is_trajectory_uploaded(self):
         return self._traj_upload_done and self._traj_upload_success
@@ -226,7 +245,7 @@ class TrafficController:
         return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off()
 
     def is_ready_for_flight(self):
-        print(self.short_uri + "is_ready_for_flight:",self.copter_state, (not self._pre_state_going_to_initial_position()) )
+        # print(self.short_uri + "is_ready_for_flight:",self.copter_state, (not self._pre_state_going_to_initial_position()) )
         return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position()
 
     def is_flying(self):
@@ -393,13 +412,15 @@ class TrafficController:
     def _log_data(self, timestamp, data, logconf):
         if(data['app.state'] !=self.copter_state): 
             #copter state has changed            
-            print("Copter {} state changed to {}".format(self.uri[-2:],data['app.state']))
+            print(Fore.BLUE+"Copter {} state changed to {} {} ".format(self.uri[-2:],data['app.state'] , type(data['app.state'])))
+            print(Style.RESET_ALL,end="")
             
             if data['app.state']==self.STATE_LANDING:
                  self.set_trajectory_count(TRAJECTORY_COUNT)
 
-            if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY:
+            if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY or data['app.state']==self.STATE_RUNNING_TRAJECTORY :
                 # can_upload_trajectory is set only when copter enters for first time the state 
+                print("Copter {} can upload trajectory".format(self.uri[-2:]))
                 self.can_upload_trajectory = True
             
             if  data['app.state']==self.STATE_WAITING_TO_START_TRAJECTORY:
