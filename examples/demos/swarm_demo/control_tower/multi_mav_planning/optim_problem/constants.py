@@ -1,6 +1,6 @@
 ts = 0.05
 N = 50
-N_MAV = 2
+N_MAV = 4
 (nu, nx) = (3, 3)  # control and state dimensions
 # Costs Constants
 (qX, qU, qN) = (500, 0.1, 89000)

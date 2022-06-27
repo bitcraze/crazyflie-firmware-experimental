@@ -23,7 +23,7 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
-TRAJECTORY_COUNT=2
+TRAJECTORY_COUNT=4
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -152,6 +152,7 @@ class TrafficController:
         #get the final position of the trajectory
         self.final_position=self.get_final_position(trajectory).pos
         print(self.short_uri+"Final position:",self.final_position)
+        self.traj_start_time = time.time()
         trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
 
         self._traj_upload_done = False
@@ -175,7 +176,8 @@ class TrafficController:
         return self._traj_upload_done and self._traj_upload_success
 
     def _upload_done(self, mem, addr):
-        print(Fore.GREEN+'Trajectory upload succesfull to {}!'.format(self.uri[-2:])+Style.RESET_ALL)
+        dt=time.time()-self.traj_start_time
+        print(Fore.GREEN+'Trajectory upload succesfull to {} after {:0.3f} sec!'.format(self.uri[-2:],dt)+Style.RESET_ALL)
 
         # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
         # since each segment is 132 bytes long

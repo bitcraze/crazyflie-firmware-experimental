@@ -1,8 +1,11 @@
+from enum import unique
 import opengen as og
 import casadi.casadi as cs
 import matplotlib.pyplot as plt
 import numpy as np
 from constants import *
+import itertools as it
+
 # Build parametric optimizer
 # ------------------------------------
 
@@ -55,11 +58,12 @@ for t in range(0, N):  # for each time step in the horizon
         #  (x0s[0][1]-x0s[1][1])**2 +
         #  (x0s[0][2]-x0s[1][2])**2)
 
-   
+    swarm_combinations = it.combinations(range(N_MAV), 2)
     epsilon=0.0000001
-    h = 0.3 - cs.sqrt((x0s[0][2]-x0s[1][2]+epsilon)**2 + (x0s[0][0]-x0s[1][0]+epsilon)**2 + (x0s[0][1]-x0s[1][1]+epsilon)**2)
+    for i,j in swarm_combinations:
+        h = 0.3 - cs.sqrt((x0s[i][2]-x0s[j][2]+epsilon)**2 + (x0s[i][0]-x0s[j][0]+epsilon)**2 + (x0s[i][1]-x0s[j][1]+epsilon)**2)
+        cost += 10000*cs.fmax(0, h)
 
-    cost += 10000*cs.fmax(0, h)
     # print("cost:", cost)
 
 for i in range(N_MAV):
@@ -97,5 +101,5 @@ builder = og.builder.OpEnOptimizerBuilder(problem,
                                           solver_config)
 builder.build()
 
-from test_multiple import main 
-main()
+from test_multiple import  main_solver 
+main_solver()

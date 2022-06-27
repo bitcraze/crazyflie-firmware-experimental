@@ -174,7 +174,7 @@ class Tower(TowerBase):
                 
                 for j in range(len(predef_xrefs)):
                     dx=np.linalg.norm( np.array(predef_xrefs[j]) - np.array(x0s[i]) )
-                    if dx >0.5:
+                    if dx >0.8:
                         pos=predef_xrefs[j]
                         #delete the used xref
                         del predef_xrefs[j]
@@ -182,7 +182,7 @@ class Tower(TowerBase):
                 
             xrefs.append(pos)
 
-        points_to_pad=2-len(x0s) # 2 is hard coded for now
+        points_to_pad=multi_MAV.N_MAV-len(x0s)
         for i in range(points_to_pad):
             x0s.append([0,0,0])
             xrefs.append([0,0,0])

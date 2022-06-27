@@ -130,8 +130,8 @@ def animate3D(MAV_sequences,ax=None,fig=None):
 
     plot_start_and_goal(MAV_sequences, ax)
 
-    ax.set_xlim(-0.1,1.1)
-    ax.set_ylim(-0.1,1.1)
+    ax.set_xlim(-1.1,1.1)
+    ax.set_ylim(-1.1,1.1)
     ax.set_zlim(0.5,1.5)
     
     def update(num, MAV_sequences, lines):

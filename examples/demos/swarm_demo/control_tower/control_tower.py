@@ -54,6 +54,9 @@ def beep():
 
 uris = [
     # 'radio://0/20/2M/E7E7E7E701',
+    'radio://0/20/2M/E7E7E7E702',
+    'radio://0/20/2M/E7E7E7E706',
+
     'radio://0/20/2M/E7E7E7E704',
     'radio://0/20/2M/E7E7E7E707',
 
@@ -90,7 +93,7 @@ xrefs = [
 # print(trajs)
 # input("Press enter to start")
 
-count = 2
+count = 4
 mode = 'normal'
 if len(sys.argv) > 1:
     if sys.argv[1] == 'd':
