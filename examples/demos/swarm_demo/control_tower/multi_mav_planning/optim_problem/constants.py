@@ -8,6 +8,6 @@ N_MAV = 4
 
 # Obsatcles Constants
 (cyl_x, cyl_y, cyl_z, cyl_r, cyl_h) = (0.5, 0.5, 0.5, 0.2, 1.0)
-
+SWARM_COLLISION_DISTANCE = 0.4
 # Disatnce between MAVs
 (dMAV2D, dMAVZ) = (0.5, 0.2)
