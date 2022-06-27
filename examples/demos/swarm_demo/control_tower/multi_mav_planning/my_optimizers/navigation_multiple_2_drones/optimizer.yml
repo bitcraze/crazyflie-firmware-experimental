@@ -1,0 +1,29 @@
+_comment: auto-generated file; do not modify
+build:
+  build_dir: my_optimizers
+  build_mode: debug
+  cost_function_name: phi_mHrdbubhEzyNeRnkPSLu
+  grad_function_name: grad_phi_mHrdbubhEzyNeRnkPSLu
+  id: mHrdbubhEzyNeRnkPSLu
+  mapping_f1: mapping_f1_mHrdbubhEzyNeRnkPSLu
+  mapping_f2: mapping_f2_mHrdbubhEzyNeRnkPSLu
+  open_version: null
+  opengen_version: 0.6.11
+  target_system: null
+meta:
+  authors:
+  - John Smith
+  licence: MIT
+  optimizer_name: navigation_multiple
+  version: 0.0.0
+solver:
+  constraints_tolerance: 0.0001
+  lbfgs_memory: 10
+  max_duration_micros: 5000000
+  max_inner_iterations: 500
+  max_outer_iterations: 10
+  penalty_weight_update_factor: 5.0
+  tolerance: 1.0e-05
+tcp:
+  ip: 127.0.0.1
+  port: 8333
