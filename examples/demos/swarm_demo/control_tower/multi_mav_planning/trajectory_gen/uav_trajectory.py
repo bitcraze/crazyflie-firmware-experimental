@@ -223,24 +223,7 @@ class Trajectory:
         return data
 
     def plot(self, timestep: float,ax=None,label=None):
-        size = int(self.duration / timestep+0.5)
-        print("size:", size)
-        x = np.zeros(size)
-        y = np.zeros(size)
-        z = np.zeros(size)
-
-        for i, t in enumerate(np.arange(0, self.duration, timestep)):
-            out = self.eval(t)
-            out: TrajectoryOutput
-            if i==len(x):
-                #delete last element
-                x = x[:-1]
-                y = y[:-1]
-                z = z[:-1]
-                continue
-            
-            x[i], y[i], z[i] = out.pos[0], out.pos[1], out.pos[2]
-            # print(x[i], y[i], z[i])
+        x,y,z= self.get_path(timestep)
         
         if ax==None:
             fig = plt.figure()
@@ -260,6 +243,26 @@ class Trajectory:
 
         if ax==None:
             plt.show()
+
+    def get_path(self,timestep: float):
+        size = int(self.duration / timestep+0.5)
+        x = np.zeros(size)
+        y = np.zeros(size)
+        z = np.zeros(size)
+
+        for i, t in enumerate(np.arange(0, self.duration, timestep)):
+            out = self.eval(t)
+            out: TrajectoryOutput
+            if i==len(x):
+                #delete last element
+                x = x[:-1]
+                y = y[:-1]
+                z = z[:-1]
+                continue
+            
+            x[i], y[i], z[i] = out.pos[0], out.pos[1], out.pos[2]
+        
+        return x, y, z
 
 class Waypoint():
     def __init__(self, x, y, z, yaw):
