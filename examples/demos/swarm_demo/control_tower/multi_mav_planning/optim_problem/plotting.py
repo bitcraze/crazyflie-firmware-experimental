@@ -126,6 +126,7 @@ def animate3D(MAV_sequences,ax=None,fig=None):
     lines=[]
     for i in range(len(MAV_sequences)):
         line, = ax.plot(MAV_sequences[i,0:1,0], MAV_sequences[i,0:1,1], MAV_sequences[i,0:1,2])
+        ax.text(MAV_sequences[i,0,0], MAV_sequences[i,0,1], MAV_sequences[i,0,2], str(i),fontsize=30)
         lines.append(line)
 
     plot_start_and_goal(MAV_sequences, ax)
@@ -133,6 +134,11 @@ def animate3D(MAV_sequences,ax=None,fig=None):
     ax.set_xlim(-1.1,1.1)
     ax.set_ylim(-1.1,1.1)
     ax.set_zlim(0.5,1.5)
+
+    #set axis labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
     
     def update(num, MAV_sequences, lines):
         if num<2:

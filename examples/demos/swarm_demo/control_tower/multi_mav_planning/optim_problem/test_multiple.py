@@ -10,7 +10,6 @@ except:
     from .plotting import *
 
 
-
 def dynamics_ct(_x, _u):
     """
     Returns the dx dynamics of the system given the current state x and the
@@ -36,7 +35,7 @@ def concatenate_xs(x0s, xrefs):
     return np.concatenate(z)
 
 
-def getMAVPaths(us,x0s):
+def getMAVPaths(us, x0s):
     MAV_sequences = []
     for i in range(N_MAV):  # for each mav
         state_sequence = []
@@ -57,7 +56,6 @@ def getMAVPaths(us,x0s):
         MAV_sequences.append(state_sequence)
 
     MAV_sequences = np.array(MAV_sequences)
-
     return MAV_sequences
 
 
@@ -68,8 +66,8 @@ def solve_multiple_MAV_problem(x0s, xrefs):
         mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
     except:
         print("Could not create a TCP connection manager with short path")
-        path="/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
-        
+        path = "/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
+
         mng = og.tcp.OptimizerTcpManager(path)
 
     # Start the TCP server
@@ -80,7 +78,7 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     # call the solver with the initial and reference states
     solver_status = mng.call(z)
-    
+
     print("solver_status:", solver_status["exit_status"])
     # print("solver_status:", solver_status["max_constraint_violation"])
     us = solver_status['solution']
@@ -93,15 +91,34 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
+def find_shortest_distance(MAV_sequences):
+    """Finds the shortest distance between MAVs
+        MAV_sequences: list of MAV paths 
+           dimensions: [N_MAV, N_timesteps, 3]    
+    """
 
+    print("MAV_sequences.shape:", MAV_sequences.shape)
+    dist=np.ones((len(MAV_sequences),len(MAV_sequences),MAV_sequences.shape[1]))
+    
+    for i in range(len(MAV_sequences)):
+        for j in range(len(MAV_sequences)):
+            if i==j:
+                continue
+            for k in range(MAV_sequences.shape[1]):
+                dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
+    
+    print("min distance:", min(dist.flatten()))
 
 
 def main_solver(case=-1):
     # Run simulations
     us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
 
-    MAV_sequences = getMAVPaths(us,x0s[case])
+    MAV_sequences = getMAVPaths(us, x0s[case])
     
+    dist=find_shortest_distance(MAV_sequences)
+    print("Shortest distance:", dist)
+
     # generate_trajectories(MAV_sequences)
     # plotting(MAV_sequences)
 
@@ -111,23 +128,45 @@ def main_solver(case=-1):
 
     plt.show()
 
+
 x0s = [
-       [ [0, 0, 1],[0, 1, 1] ],
-       [ [0.5, 0, 1],[0.5, 1, 1] ], 
-       [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
-       [ [0 , 0, 1],[1, 0, 1] ],
-       [ [-1, -1 , 1] , [ -1, 1, 1] ,[ 1, -1, 1],[ 1, 1, 1]],
-   ]
+    [[0, 0, 1], [0, 1, 1]],
+    [[0.5, 0, 1], [0.5, 1, 1]],
+    [[0.5, 0.5, 0.5], [0.5, 0.5, 1.5]],
+    [[0, 0, 1], [1, 0, 1]],
+    [[-1, -1, 1], [-1, 1, 1], [1, -1, 1], [1, 1, 1]],
+    [[1, -1, 1], [-1, -1, 1], [1, 1, 1], [-1, 1, 1]],
+]
 
 xrefs = [
-    [ [1, 1, 1],[1, 0, 1] ],
-    [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
-    [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
-    [ [1, 1, 1.5],[0, 1, 1.5] ],
-    [ [1, 1, 1],[ 1, -1, 1] ,[ -1, 1, 1],[-1, -1, 1] ],
+    [[1, 1, 1], [1, 0, 1]],
+    [[0.5, 1, 1.5], [0.5, 0, 1.5]],
+    [[0.5, 0.5, 1.5], [0.5, 0.5, 0.5]],
+    [[1, 1, 1.5], [0, 1, 1.5]],
+    [[1, 1, 1], [1, -1, 1], [-1, 1, 1], [-1, -1, 1]],
+    [[-1, 1, 1], [1, -1, 1], [-1, -1, 1], [1, 1, 1]],
+]
+
+x0s = [
+    [
+        [0.91, -0.95, 1.00],
+        [-0.96, -0.97, 1.00],
+        [0.97, 0.92, 1.00],
+        [-0.92, 1.00, 1.00], ]
+
+]
+
+xrefs = [
+    [
+        [-0.99, 0.96, 1.00],
+        [0.96, -1.01, 1.00],
+        [-0.95, -0.95, 1.00],
+        [0.96, 1.00, 1.00],
+    ]
+
 ]
 
 if __name__ == "__main__":
     # for i in range(len(x0s)):
-        # main_solver(i)
+    # main_solver(i)
     main_solver(-1)
