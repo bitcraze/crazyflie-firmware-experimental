@@ -91,10 +91,16 @@ def solve_multiple_MAV_problem(x0s, xrefs):
 
     return us
 
-def find_shortest_distance(MAV_sequences):
+
+def calculate_distances(MAV_sequences):
     """Finds the shortest distance between MAVs
         MAV_sequences: list of MAV paths 
            dimensions: [N_MAV, N_timesteps, 3]    
+        
+        returns: array of distances between MAVs 
+              dimensions: [N_MAV, N_MAV,N_timesteps]
+        
+        e.g: (i,j,k) = distance between MAV i and MAV j at "time" k
     """
 
     print("MAV_sequences.shape:", MAV_sequences.shape)
@@ -109,22 +115,39 @@ def find_shortest_distance(MAV_sequences):
     
     print("min distance:", min(dist.flatten()))
 
+    return dist
+
+def plot_distance_in_MAV_pairs(dists,MAV_pairs):
+    plt.figure()
+
+    plt.title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))
+    plt.xlabel("ticks")
+    plt.ylabel("distance")
+    plt.plot(dists[MAV_pairs[0],MAV_pairs[1],:])
+
+    plt.grid()
+    plt.show()
 
 def main_solver(case=-1):
     # Run simulations
     us = solve_multiple_MAV_problem(x0s[case], xrefs[case])
+    print("x0s:", x0s[case])
+    print("xrefs:", xrefs[case])
 
     MAV_sequences = getMAVPaths(us, x0s[case])
+
+    dists =calculate_distances(MAV_sequences)
+    print("Shortest distance:", min(dists.flatten()))
     
-    dist=find_shortest_distance(MAV_sequences)
-    print("Shortest distance:", dist)
+    MAV_dist_pairs=[1,3]
+    plot_distance_in_MAV_pairs(dists,MAV_dist_pairs)
 
     # generate_trajectories(MAV_sequences)
     # plotting(MAV_sequences)
 
-    # plotGridSpec(MAV_sequences)
+    plotGridSpec(MAV_sequences)
 
-    animate3D(MAV_sequences)
+    # animate3D(MAV_sequences)
 
     plt.show()
 
@@ -165,6 +188,21 @@ xrefs = [
     ]
 
 ]
+
+x0s = [[
+    [0.96, 0.97, 1.00],
+    [-1.00, -0.96, 1.00],
+    [-0.96, 0.95, 1.00],
+    [1.00, -0.96, 1.00],
+
+]]
+
+xrefs = [[
+    [0.86, -0.96, 0.40],
+    [0.98, 1.21,  0.40],
+    [-1.03, -0.99, 0.40],
+    [-0.78, 1.17,  0.40],
+]]
 
 if __name__ == "__main__":
     # for i in range(len(x0s)):

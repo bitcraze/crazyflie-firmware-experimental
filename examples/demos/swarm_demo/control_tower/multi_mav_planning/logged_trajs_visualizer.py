@@ -2,8 +2,12 @@ from typing import List
 from colorama import Fore
 import numpy as np 
 import matplotlib.pyplot as plt
-from trajectory_gen import uav_trajectory
-from optim_problem import plotting
+try:
+    from trajectory_gen import uav_trajectory
+    from optim_problem import plotting
+except:
+    from .trajectory_gen import uav_trajectory
+    from .optim_problem import plotting
 
 
 def get_sequences(trajs):
@@ -40,10 +44,15 @@ def load_trajs_from_matrix(trajs_mat)->List[uav_trajectory.Trajectory]:
         trajs.append(traj)
     return trajs
 
-def find_shortest_distance(MAV_sequences):
+def calculate_distances(MAV_sequences):
     """Finds the shortest distance between MAVs
         MAV_sequences: list of MAV paths 
            dimensions: [N_MAV, N_timesteps, 3]    
+        
+        returns: array of distances between MAVs 
+              dimensions: [N_MAV, N_MAV,N_timesteps]
+        
+        e.g: (i,j,k) = distance between MAV i and MAV j at "time" k
     """
 
     print("MAV_sequences.shape:", MAV_sequences.shape)
@@ -53,10 +62,12 @@ def find_shortest_distance(MAV_sequences):
         for j in range(len(MAV_sequences)):
             if i==j:
                 continue
-            for k in range(MAV_sequences.shape[2]):
+            for k in range(MAV_sequences.shape[1]):
                 dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
     
     print("min distance:", min(dist.flatten()))
+
+    return dist
 
 def get_xos_xrefs_from_sequences(MAV_sequences):
     """Returns x0s and xrefs of MAVs"""
@@ -67,12 +78,21 @@ def get_xos_xrefs_from_sequences(MAV_sequences):
 
 def plot_trajs_from_file(filename="traj_matrices_0.npy"):
     path="/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/"
-    trajs_mat=np.load(path+filename)
-    
+    trajs_mat=np.load(path+filename, allow_pickle = True)
+    plot_trajs_from_matrix(trajs_mat)
+
+def plot_trajs_from_matrix(trajs_mat):
     x0s,xrefs=None,None
 
+    if type(trajs_mat)!=np.array:
+        trajs_mat= np.array(trajs_mat) 
+
     print("trajs_mat.shape:", trajs_mat.shape)
-    if trajs_mat.shape[2]!=33: # if x0s and xrefs have been logged (normally it should be 33 because of pol coefficients)
+    print("trajs_mat[0].shape:", np.array(trajs_mat[0]).shape)
+
+    print("len(trajs_mat[0])",len(trajs_mat[0]))
+
+    if len(trajs_mat[0])!=33 and  len(trajs_mat[0][0])!=33: # if x0s and xrefs have been logged (normally it should be 33 because of pol coefficients)
         print("x0s and xrefs have been logged")
         x0s=trajs_mat[0]
         xrefs=trajs_mat[1]
@@ -99,7 +119,11 @@ def plot_trajs_from_file(filename="traj_matrices_0.npy"):
 
 
     #check shortest distance between MAVs
-    find_shortest_distance(MAV_sequence)
+    dists=calculate_distances(MAV_sequence)
+    
+    #plot distance between MAVs
+    MAV_pairs=[0,1]
+    plot_distance_in_MAV_pairs(dists,MAV_pairs)
 
     #Plotting
     fig = plt.figure()
@@ -107,12 +131,24 @@ def plot_trajs_from_file(filename="traj_matrices_0.npy"):
 
     plotting.animate3D(MAV_sequence,ax=ax,fig=fig)
 
+    # plotting.plotGridSpec(MAV_sequences=MAV_sequence)
+    plt.show()
+
+def plot_distance_in_MAV_pairs(dists,MAV_pairs):
+    plt.figure()
+
+    plt.title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))
+    plt.xlabel("ticks")
+    plt.ylabel("distance")
+    plt.plot(dists[MAV_pairs[0],MAV_pairs[1],:])
+
+    plt.grid()
     plt.show()
 
 
 if __name__=="__main__":
     traj_numbers=range(6)
-    traj_numbers=[1,2]
+    traj_numbers=[12]
     # filename="traj_matrices_0.npy"
     for i in traj_numbers:
         filename="traj_matrices_{}.npy".format(i)

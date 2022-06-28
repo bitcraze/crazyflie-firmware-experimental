@@ -6,8 +6,8 @@ N_MAV = 4
 (qX, qU, qN) = (500, 0.1, 89000)
 (qObs, qBet) = (200, 1000000)
 
-# Obsatcles Constants
+# Obstacles Constants
 (cyl_x, cyl_y, cyl_z, cyl_r, cyl_h) = (0.5, 0.5, 0.5, 0.2, 1.0)
-SWARM_COLLISION_DISTANCE = 0.4
-# Disatnce between MAVs
-(dMAV2D, dMAVZ) = (0.5, 0.2)
+SWARM_COLLISION_DISTANCE = 0.6
+# Distance between MAVs
+# (dMAV2D, dMAVZ) = (0.5, 0.2) (not used for now)
