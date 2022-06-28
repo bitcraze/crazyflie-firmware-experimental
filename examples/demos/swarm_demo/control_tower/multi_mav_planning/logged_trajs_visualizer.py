@@ -1,4 +1,5 @@
 from typing import List
+from colorama import Fore
 import numpy as np 
 import matplotlib.pyplot as plt
 from trajectory_gen import uav_trajectory
@@ -7,7 +8,16 @@ from optim_problem import plotting
 def plot_trajs_from_file(filename="traj_matrices_0.npy"):
     path="/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/"
     trajs_mat=np.load(path+filename)
-    print(trajs_mat.shape)
+    
+    print("trajs_mat.shape:", trajs_mat.shape)
+    if trajs_mat.shape[2]!=33: # if x0s and xrefs have been logged (normally it should be 33 because of pol coefficients)
+        print("x0s and xrefs have been logged")
+        x0s=trajs_mat[0]
+        xrefs=trajs_mat[1]
+        print(Fore.GREEN+"x0s :", x0s, Fore.RESET)
+        print(Fore.GREEN+"xrefs :", xrefs, Fore.RESET)
+        trajs_mat=trajs_mat[2:]
+
     
     trajs:List[uav_trajectory.Trajectory]=[]
     
@@ -38,9 +48,31 @@ def plot_trajs_from_file(filename="traj_matrices_0.npy"):
     for i in range(len(MAV_sequence)):
         MAV_sequence[i]=MAV_sequence[i][:min_len]
     MAV_sequence=np.array(MAV_sequence)
-    plotting.animate3D(MAV_sequence)
+
+    #check shortest distance between MAVs
+    find_shortest_distance(MAV_sequence)
+
+    plotting.animate3D(MAV_sequence,ax=ax,fig=fig)
 
     plt.show()
+
+def find_shortest_distance(MAV_sequences):
+    """Finds the shortest distance between MAVs
+        MAV_sequences: list of MAV paths 
+           dimensions: [N_MAV, N_timesteps, 3]    
+    """
+
+    print("MAV_sequences.shape:", MAV_sequences.shape)
+    dist=np.ones((len(MAV_sequences),len(MAV_sequences),MAV_sequences.shape[1]))
+    
+    for i in range(len(MAV_sequences)):
+        for j in range(len(MAV_sequences)):
+            if i==j:
+                continue
+            for k in range(MAV_sequences.shape[2]):
+                dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
+    
+    print("min distance:", min(dist.flatten()))
 
 if __name__=="__main__":
     traj_numbers=range(6)
