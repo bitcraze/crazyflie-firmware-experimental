@@ -28,7 +28,6 @@ TRAJECTORY_COUNT=4
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
         self.trajectory_id = None
-        self.trajectory_memory_offset = None
         self.pol_segment_count = None
         self.defined=False
         self.should_upload=False
@@ -119,18 +118,8 @@ class TrafficController:
 
         self.trajectory_mem=trajectory_mem
 
-        segments_in_memory=len(trajectory_mem.trajectory)
-        print(self.short_uri + "Previous latest_trajectory_id:",self.latest_trajectory_id)
-
-        self.latest_trajectory_id = 2 if int(self.latest_trajectory_id)==1 else 1
-        id = self.latest_trajectory_id-1 #0-based indexing
-
-        self._traj_upload_configs[id].trajectory_id=id
-        self._traj_upload_configs[id].pol_segment_count=len(trajectory)
-        self._traj_upload_configs[id].defined=False
-        self._traj_upload_configs[id].should_upload=True
-        self._traj_upload_configs[id].trajectory_memory_offset= 0 if self.latest_trajectory_id == 1 else 15
-
+        #fill trajectory memory with new trajectory
+        trajectory_mem.trajectory=[]
         total_duration = 0
         for i,row in enumerate(trajectory):
             duration = row[0]
@@ -141,11 +130,22 @@ class TrafficController:
 
             pol=Poly4D(duration, x, y, z, yaw)
             
-            index=self._traj_upload_configs[id].trajectory_memory_offset + i
-            trajectory_mem.trajectory[index] = pol
+            trajectory_mem.trajectory.append(pol)
 
             total_duration += duration
+        
+        #setting upload config and mechanisms
+        print(self.short_uri + "Previous latest_trajectory_id:",self.latest_trajectory_id)
 
+        self.latest_trajectory_id = 2 if int(self.latest_trajectory_id)==1 else 1
+        id = self.latest_trajectory_id-1 #0-based indexing
+
+
+        self._traj_upload_configs[id].trajectory_id=id
+        self._traj_upload_configs[id].defined=False
+        self._traj_upload_configs[id].should_upload=True
+        self._traj_upload_configs[id].pol_segment_count=len(trajectory)
+        
         print('Uploading trajectory with id:{} in {}...'.format(self.latest_trajectory_id,self.uri))
         self.trajs_uploaded+=1
         
@@ -153,13 +153,22 @@ class TrafficController:
         self.final_position=self.get_final_position(trajectory).pos
         print(self.short_uri+"Final position:",self.final_position)
         self.traj_start_time = time.time()
-        # trajectory_mem.write_data(self._upload_done,write_failed_cb=self._upload_failed)
-        trajectory_mem.write_data_marios(self._upload_done,write_failed_cb=self._upload_failed,tr_id=self.latest_trajectory_id)
+        # trajectory_mem.write_data_marios(self._upload_done,write_failed_cb=self._upload_failed,tr_id=self.latest_trajectory_id)
+        
+        self.upload_trajectory_to_memory(trajectory_mem,self._upload_done,self._upload_failed,self.latest_trajectory_id)
 
         self._traj_upload_done = False
         self._traj_upload_success = False
 
         self.can_upload_trajectory=False
+
+    def upload_trajectory_to_memory(self,traj_mem:TrajectoryMemory,upload_done_callback,upload_failed_callback,tr_id):
+        if tr_id==1:
+            start_addr=0x00
+        else:
+            start_addr=15*TRAJECTORY_SEGMENT_SIZE_BYTES
+            
+        traj_mem.write_data(upload_done_callback,write_failed_cb=upload_failed_callback,start_addr=start_addr)
 
     def get_final_position(self,trajectory:List[List[float]]):
         trajectory=np.array(trajectory)
@@ -187,10 +196,10 @@ class TrafficController:
                 continue
             
             id=conf.trajectory_id+1
-            offset=conf.trajectory_memory_offset
             pol_segment_count=conf.pol_segment_count
             print("Defining trajectory with id: {}...".format(id))
-
+            
+            offset=0 if id==1 else 15
             self._cf.high_level_commander.define_trajectory(id, offset*TRAJECTORY_SEGMENT_SIZE_BYTES, pol_segment_count)
 
             conf.defined=True
@@ -325,7 +334,7 @@ class TrafficController:
     def get_short_uri(self):
         return "CF:{} ".format(self.uri[-2:])
 
-    def _all_updated(self):
+    def _all_updated(self,link_uri):
         """Callback that is called when all parameters have been updated"""
 
         self.set_trajectory_count(TRAJECTORY_COUNT)
@@ -378,7 +387,7 @@ class TrafficController:
         self._cf.disconnected.add_callback(self._disconnected)
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
-        self._cf.param.all_updated.add_callback(self._all_updated)
+        self._cf.fully_connected.add_callback(self._all_updated)
         self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
 
         print("Connecting to " + self.uri)
