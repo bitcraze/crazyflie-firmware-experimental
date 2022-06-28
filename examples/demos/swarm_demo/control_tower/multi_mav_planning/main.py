@@ -7,6 +7,7 @@ except:
     from .optim_problem.test_multiple import *
     from .trajectory_gen import marios_gen as min_snap_tg
 
+import copy
 import matplotlib.pyplot as plt
 import numpy as np
 from typing import List
@@ -74,6 +75,19 @@ def main(case=2)->List[Trajectory]:
 
     return trajs
 
+def log_trajectories(traj_matrices:list,x0s,xrefs):
+    """Logs the trajectories to a file."""
+    #deep copy the trajectories
+    traj_matrices_copy=copy.deepcopy(traj_matrices)
+    #insert first xrefs and then x0s so that at the endit going to be like this:
+    #[x0s,xrefs,traj_matrices_copy]
+    traj_matrices_copy.insert(0,xrefs) 
+    traj_matrices_copy.insert(0,x0s)   
+    np.save('/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/traj_matrices_{}.npy'.format(log_trajectories.counter),traj_matrices_copy)
+    log_trajectories.counter += 1
+
+log_trajectories.counter=0
+
 def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.array] :
     """Solves the multiple MAV problem.
     Args:
@@ -100,12 +114,10 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
     for i in range(len(trajs)):
         traj_matrices.append(trajs[i].get_matrix())
     
-    np.save('/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/traj_matrices_{}.npy'.format(solve_problem.counter),traj_matrices)
-    solve_problem.counter += 1
+    log_trajectories(traj_matrices,x0s,xrefs)
+
 
     return traj_matrices
-
-solve_problem.counter = 0
 # #get date for saving the files
 # import datetime
 # now = datetime.datetime.now()
