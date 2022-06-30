@@ -10,18 +10,19 @@ except:
     from .optim_problem import plotting
 
 
-def get_sequences(trajs):
+def get_sequences_from_trajs(trajs:List[uav_trajectory.Trajectory])->List[List[np.array]]:
+    """Returns MAV sequences from list of Trajectory objects"""
     MAV_sequence=[]
     
     for i in range(len(trajs)):
         # trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
         x,y,z=trajs[i].get_path(timestep=0.1)
-        traj=[]
+        seq=[]
         for j in range(len(x)):
-            traj.append([x[j],y[j],z[j]])
-        traj=np.array(traj)
-        print(traj.shape)
-        MAV_sequence.append(traj)
+            seq.append([x[j],y[j],z[j]])
+        seq=np.array(seq)
+        print(seq.shape)
+        MAV_sequence.append(seq)
     return MAV_sequence
 
 def align_sequences(MAV_sequence):
@@ -36,6 +37,7 @@ def align_sequences(MAV_sequence):
     return MAV_sequence
 
 def load_trajs_from_matrix(trajs_mat)->List[uav_trajectory.Trajectory]:
+    """Loads trajs from matrix into list of Trajectory objects"""
     trajs:List[uav_trajectory.Trajectory]=[]
     
     for i in range(len(trajs_mat)):
@@ -76,12 +78,12 @@ def get_xos_xrefs_from_sequences(MAV_sequences):
     
     return x0s, xrefs
 
-def plot_trajs_from_file(filename="traj_matrices_0.npy"):
+def handle_trajs_from_file(filename="traj_matrices_0.npy"):
     path="/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/"
     trajs_mat=np.load(path+filename, allow_pickle = True)
-    plot_trajs_from_matrix(trajs_mat)
+    handle_trajs_from_matrix(trajs_mat)
 
-def plot_trajs_from_matrix(trajs_mat):
+def handle_trajs_from_matrix(trajs_mat):
     x0s,xrefs=None,None
 
     if type(trajs_mat)!=np.array:
@@ -101,7 +103,7 @@ def plot_trajs_from_matrix(trajs_mat):
     
     trajs = load_trajs_from_matrix(trajs_mat)
 
-    MAV_sequence = get_sequences(trajs)
+    MAV_sequence = get_sequences_from_trajs(trajs)
     
     if x0s is None:
         x0s,xrefs=get_xos_xrefs_from_sequences(MAV_sequence)
@@ -135,6 +137,8 @@ def plot_trajs_from_matrix(trajs_mat):
     plt.show()
 
 def plot_distance_in_MAV_pairs(dists,MAV_pairs):
+    """Plots distance between MAVs in MAV_pairs"""
+    
     plt.figure()
 
     plt.title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))
@@ -148,11 +152,11 @@ def plot_distance_in_MAV_pairs(dists,MAV_pairs):
 
 if __name__=="__main__":
     traj_numbers=range(6)
-    traj_numbers=[12]
+    traj_numbers=[17]
     # filename="traj_matrices_0.npy"
     for i in traj_numbers:
         filename="traj_matrices_{}.npy".format(i)
-        plot_trajs_from_file(filename)
+        handle_trajs_from_file(filename)
 
     
 
