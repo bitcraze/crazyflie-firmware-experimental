@@ -102,31 +102,48 @@ def calculate_distances(MAV_sequences):
         
         e.g: (i,j,k) = distance between MAV i and MAV j at "time" k
     """
+    if type(MAV_sequences) is not np.ndarray:
+        MAV_sequences = np.array(MAV_sequences)
 
     print("MAV_sequences.shape:", MAV_sequences.shape)
-    dist=np.ones((len(MAV_sequences),len(MAV_sequences),MAV_sequences.shape[1]))
+    try:
+        ticks=MAV_sequences.shape[1]
+    except:
+        ticks=len(MAV_sequences[0])
+
+    dist=np.ones((len(MAV_sequences),len(MAV_sequences),ticks))
     
     for i in range(len(MAV_sequences)):
         for j in range(len(MAV_sequences)):
             if i==j:
                 continue
-            for k in range(MAV_sequences.shape[1]):
+            for k in range(ticks):
+                if k>=len(MAV_sequences[i]) or k>=len(MAV_sequences[j]):
+                    continue
                 dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
     
     print("min distance:", min(dist.flatten()))
 
     return dist
 
-def plot_distance_in_MAV_pairs(dists,MAV_pairs):
-    plt.figure()
+def plot_distance_in_MAV_pairs(dists,MAV_pairs,ax=None,downsample_step=1,label=None):
+    should_show_plot = True if ax==None else False
+    print("should_show_plot:", should_show_plot)
+    if ax==None:
+        fig=plt.figure()
+        ax=fig.add_subplot(111)
+        ax.set_title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))
+    
+    ax.set_xlabel("ticks")
+    ax.set_ylabel("distance")
+    ticks=np.arange(len(dists[0][0]))*  N/len(dists[0][0])
 
-    plt.title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))
-    plt.xlabel("ticks")
-    plt.ylabel("distance")
-    plt.plot(dists[MAV_pairs[0],MAV_pairs[1],:])
+    ax.plot(ticks,dists[MAV_pairs[0],MAV_pairs[1],:],label=label)
 
-    plt.grid()
-    plt.show()
+    ax.grid()
+
+    if should_show_plot:
+        plt.show()
 
 def main_solver(case=-1):
     # Run simulations

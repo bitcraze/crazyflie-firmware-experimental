@@ -16,7 +16,8 @@ def get_sequences_from_trajs(trajs:List[uav_trajectory.Trajectory])->List[List[n
     
     for i in range(len(trajs)):
         # trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
-        x,y,z=trajs[i].get_path(timestep=0.1)
+        positions,traj_time = trajs[i].get_path(timestep=0.1)
+        x,y,z=positions[0],positions[1],positions[2]
         seq=[]
         for j in range(len(x)):
             seq.append([x[j],y[j],z[j]])
@@ -105,6 +106,9 @@ def handle_trajs_from_matrix(trajs_mat):
 
     MAV_sequence = get_sequences_from_trajs(trajs)
     
+    analyze_MAV_sequences(x0s,xrefs, MAV_sequence)
+
+def analyze_MAV_sequences(x0s,xrefs, MAV_sequence):
     if x0s is None:
         x0s,xrefs=get_xos_xrefs_from_sequences(MAV_sequence)
 
@@ -119,12 +123,11 @@ def handle_trajs_from_matrix(trajs_mat):
 
     MAV_sequence = align_sequences(MAV_sequence)
 
-
     #check shortest distance between MAVs
     dists=calculate_distances(MAV_sequence)
     
     #plot distance between MAVs
-    MAV_pairs=[0,1]
+    MAV_pairs=[1,3]
     plot_distance_in_MAV_pairs(dists,MAV_pairs)
 
     #Plotting
@@ -138,7 +141,7 @@ def handle_trajs_from_matrix(trajs_mat):
 
 def plot_distance_in_MAV_pairs(dists,MAV_pairs):
     """Plots distance between MAVs in MAV_pairs"""
-    
+
     plt.figure()
 
     plt.title("Distance between MAVs {} and {}".format(MAV_pairs[0],MAV_pairs[1]))

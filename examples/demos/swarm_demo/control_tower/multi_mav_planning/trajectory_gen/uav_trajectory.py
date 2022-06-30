@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from typing import Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -223,8 +224,9 @@ class Trajectory:
         return data
 
     def plot(self, timestep: float,ax=None,label=None):
-        x,y,z= self.get_path(timestep)
-        
+        pos,traj_time = self.get_path(timestep)
+        x,y,z = pos[0],pos[1],pos[2]
+
         if ax==None:
             fig = plt.figure()
             ax = fig.add_subplot(111, projection='3d')
@@ -244,13 +246,22 @@ class Trajectory:
         if ax==None:
             plt.show()
 
-    def get_path(self,timestep: float):
+    def get_path(self,timestep: float)->Tuple[np.ndarray,np.ndarray]:
+        """
+        @param timestep: time step in seconds  
+        @return: tuple (positions,time)
+                positions: 2D array of shape (n_points,3)
+                time: 1D array of shape (n_points)
+        """
         size = int(self.duration / timestep+0.5)
         x = np.zeros(size)
         y = np.zeros(size)
         z = np.zeros(size)
+        
+        time=np.arange(0, self.duration, timestep)
+        for i, t in enumerate(time):
+            print("pos({})={}".format(t, self.eval(t).pos))
 
-        for i, t in enumerate(np.arange(0, self.duration, timestep)):
             out = self.eval(t)
             out: TrajectoryOutput
             if i==len(x):
@@ -262,7 +273,9 @@ class Trajectory:
             
             x[i], y[i], z[i] = out.pos[0], out.pos[1], out.pos[2]
         
-        return x, y, z
+        positions = np.array([x,y,z])
+
+        return positions,time
 
 class Waypoint():
     def __init__(self, x, y, z, yaw):
@@ -289,7 +302,8 @@ class Waypoint():
         else:
             print("Sorry, invalid type")
 
-
+    def get_pos(self):
+        return self.x, self.y, self.z
 class Point_time():
     # Class that combines waypoint and desired time for trajectory generation
     def __init__(self, wp: Waypoint, t: float):

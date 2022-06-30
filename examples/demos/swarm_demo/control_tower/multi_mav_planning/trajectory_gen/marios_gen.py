@@ -1,5 +1,6 @@
 # Useful link :https://realpython.com/linear-programming-python/
 import time
+from typing import List
 import numpy as np
 from numpy.core.function_base import linspace
 import matplotlib.pyplot as plt
@@ -26,15 +27,30 @@ i-th waypoint conditions:
     x_i-1(4)(ti) =  x_i(4)(ti)
     x_i-1(5)(ti) =  x_i(5)(ti)
     x_i-1(6)(ti) =  x_i(6)(ti)
+    (in each block the position constraints are at the end 2 rows of the block
+        Block Format(per row):
+        x_i-1'(ti)   -  x_i'(ti)    = 0
+        x_i-1''(ti)  -  x_i''(ti)   = 0
+        x_i-1'''(ti) -  x_i'''(ti)  = 0
+        x_i-1(4)(ti) -  x_i(4)(ti)  = 0
+        x_i-1(5)(ti) -  x_i(5)(ti)  = 0
+        x_i-1(6)(ti) -  x_i(6)(ti)  = 0
+        x_i-1(ti)                   =  waypoint(i) 
+        x_i(ti)                     =  waypoint(i) 
+    )
 
 Last wp(waipont) conditions:
     x(-1) = waypoint(-1)
     x'(-1) = x''(-1)=x'''(-1)= 0 
+
+Each polynomial is expressed in the matrix with the following format:
+    c0*t^0 + c1*t^1 + c2*t^2 + c3*t^3 + c4*t^4 + c5*t^5 + c6*t^6 + c7*t^
+    where c0 is the constant term, c1 is the first term, c2 is the second term, etc.
 """
 ##############################################################################################
 
 
-def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
+def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X):
     """
     waypoints: list of Point_Time
 
@@ -50,14 +66,17 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
     m = len(waypoints)
     n = m - 1
     # print("m:", m, "n:", n)
-    A = np.zeros((8*n, 8*n))
-    b = np.zeros((8*n, 1))
+    A = np.zeros((8*n, 8*n),dtype=np.float64)
+    b = np.zeros((8*n, 1),dtype=np.float64)
     # print("A.shape:", A.shape)
     # print("b.shape:", b.shape)
 
     time_points = []
     prev_t = 0
     for i, traj_point in enumerate(waypoints):
+        if (wp_type == Waypoint.WP_TYPE_X):
+            print("i:", i, "waypoint:", traj_point.wp.get_pos(),traj_point.t)
+
         traj_point: Point_time
 
         wp = traj_point.wp.getType(wp_type)
@@ -135,15 +154,16 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
         # copy the time
         prev_t = traj_point.t
 
-    # print("det(A):", np.linalg.det(A))
-    # np.savetxt("A.csv", A, delimiter=",")
-    # np.savetxt("b.csv", b, delimiter=",")
+    # if (wp_type == Waypoint.WP_TYPE_X):
+        # print("det(A):", np.linalg.det(A))
+        # np.savetxt("A.csv", A, delimiter=",")
+        # np.savetxt("b.csv", b, delimiter=",")
 
     polynomials_coefficients = np.linalg.solve(a=A, b=b)
 
     # print("polynomials_coefficients.shape:", polynomials_coefficients.shape)
 
-    piece_pols = []  # piecewise polynomials
+    piece_pols:List[Polynomial] = []  # piecewise polynomials
     for i in range(n):
         p = polynomials_coefficients[8*i:8*(i+1)]
         piece_pols.append(Polynomial(p))
@@ -169,16 +189,16 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
                 t = waypoints[i+1].t
                 print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
                 print(
-                    f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(t)}")
+                    f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(0)}")
 
                 print(
                     f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
                 print(
-                    f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(t)}")
+                    f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(0)}")
                 print(
                     f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
                 print(
-                    f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(t)}")
+                    f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(0)}")
 
             else:
                 t = waypoints[i+1].t
@@ -194,6 +214,9 @@ def calculate_trajectory1D(waypoints, wp_type=Waypoint.WP_TYPE_X):
                     f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
                 print(
                     f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(t)}")
+
+    # if wp_type == Waypoint.WP_TYPE_X:
+        # print("time points:", [wp.t for wp in waypoints])
 
     total_pol = PiecewisePolynomial(piece_pols, time_points)
     # t_final = sum(total_pol.time_durations)
@@ -285,7 +308,7 @@ def allocateTime(waypoints: np.array, max_vel: float, max_acc: float):
 
 
 def allocateTimeProportional(waypoints: np.array, total_time):
-    # waypoints:list of Waypoint instances
+    # waypoints:list of waypoints
     # returns: list of time points
 
     # exclude last (yaw) column from the waypoints
@@ -362,7 +385,7 @@ def create_traj(pols_coeffs, pc_pols):
     # tr.plot(timestep=0.2)
     return tr
 
-def min_snap_traj_generation(waypoints,total_time):
+def min_snap_traj_generation(waypoints,total_time)->Trajectory:
     pols_coeffs, pc_pols = generate_traj(waypoints,total_time)
     tr = create_traj(pols_coeffs, pc_pols)
     
@@ -387,6 +410,80 @@ def min_snap_traj_generation(waypoints,total_time):
 #     [0.0, 0.0, height, yaw_ref],
 # ]
     
+def debug_traj_generation(waypoints:List[List[float]], tr:Trajectory):
+    """
+    This function is used to debug the trajectory generation.
+    It plots the generated trajectory and the waypoints.
+    
+    @param waypoints: list of waypoints in shape (waypoints_number, 3)
+    @param tr: trajectory to be debugged
+    """
+
+    timestep=0.01
+    pos,traj_time=tr.get_path(timestep=timestep)
+    x,y,z = pos[0],pos[1],pos[2]
+    t_traj=traj_time
+
+    x_wps,y_wps,z_wps= waypoints[:,0],waypoints[:,1],waypoints[:,2]
+
+    dur_wps=[ pol.duration for pol in tr.polynomials]
+
+    t_wps=[0]
+    for i in range(len(dur_wps)):
+        t_wps.append(t_wps[-1]+dur_wps[i])
+    
+
+    if len(t_traj)!=len(x):
+        t_traj=t_traj[:-1]
+    
+    if len(t_wps)!=len(x_wps):
+        t_wps=t_wps[:-1]
+
+    #plotting 
+    fig=plt.figure()
+
+    plt.subplot(1,3,1)
+    plt.scatter(t_traj,x,color="orange",label="generated")
+    for ii in range(len(t_wps)):
+        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],x_wps[ii]))
+
+    plt.scatter(t_wps,x_wps,color="r",label="waypoints")
+
+    plt.title('x')
+    plt.grid()
+    plt.legend()
+    plt.subplot(1,3,2)
+    plt.scatter(t_traj,y,color="orange",label="generated")
+    for ii in range(len(t_wps)):
+        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],y_wps[ii]))
+
+    plt.scatter(t_wps,y_wps,color="r",label="waypoints")
+
+    plt.title('y')
+    plt.grid()
+    plt.legend()
+    plt.subplot(1,3,3)
+    plt.scatter(t_traj,z,color="orange",label="generated")
+    for ii in range(len(t_wps)):
+        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],z_wps[ii]))
+    
+    plt.scatter(t_wps,z_wps,color="r",label="waypoints")
+
+    plt.title('z')
+    plt.grid()
+    plt.legend()
+    
+    fig=plt.figure()
+    ax=fig.add_subplot(111,projection='3d')
+    ax.plot(x,y,z)
+    ax.scatter(x_wps,y_wps,z_wps,color='r')
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.grid()
+
+    plt.show()
+
 if __name__ == "__main__":
     yaw_ref = 0
     height = 1
@@ -407,9 +504,129 @@ if __name__ == "__main__":
         [0.0, 0.5, height, yaw_ref],
         [0.0, 0.0, height, yaw_ref],
     ]
-
+    
+    waypoints = [
+        [ 0.983 , -0.945 , 0.993 ,0],
+        [ 0.949 , -0.916 , 0.981 ,0],
+        [ 0.915 , -0.887 , 0.969 ,0],
+        [ 0.881 , -0.857 , 0.957 ,0],
+        [ 0.847 , -0.828 , 0.945 ,0],
+        [ 0.813 , -0.799 , 0.933 ,0 ],
+        [ 0.779 , -0.770 , 0.921 ,0],
+        [ 0.745 , -0.741 , 0.909 ,0],
+        [ 0.711 , -0.712 , 0.897 ,0],
+        [ 0.677 , -0.683  , 0.885 ,0],
+        [ 0.643 , -0.653 , 0.873 ,0],
+        [ 0.609 , -0.624 , 0.861 ,0],
+        [ 0.575 , -0.595 , 0.849 ,0],
+        [ 0.541 , -0.566 , 0.837 ,0 ],
+        [ 0.507 , -0.537 , 0.825 ,0],
+        [ 0.473 , -0.508 , 0.813 ,0],
+        [ 0.440 , -0.479 , 0.801 ,0],
+        [ 0.406 , -0.449 , 0.789 ,0],
+        [ 0.372 , -0.418 , 0.777 ,0],
+        [ 0.339 , -0.386 , 0.765 ,0],
+        [ 0.307 , -0.353 , 0.753 ,0],
+        [ 0.275 , -0.320 , 0.741 ,0],
+        [ 0.245 , -0.285 , 0.729 ,0],
+        [ 0.216 , -0.250 , 0.717 ,0],
+        [ 0.188 , -0.214 , 0.705 ,0],
+        [ 0.162 , -0.179 , 0.693 ,0],
+        [ 0.136 , -0.145 , 0.681 ,0],
+        [ 0.112 , -0.112 , 0.669 ,0],
+        [ 0.089 , -0.079 , 0.657 ,0],
+        [ 0.065 , -0.047 , 0.645 ,0],
+        [ 0.043 , -0.016 , 0.633 ,0],
+        [ 0.020 ,  0.014 , 0.621 ,0],
+        [-0.002 ,  0.045 , 0.609 ,0],
+        [-0.025 ,  0.077 , 0.597 ,0 ],
+        [-0.050 ,  0.111  , 0.585 ,0 ],
+        [-0.078 ,  0.149 , 0.573 ,0],
+        [-0.108 ,  0.192 , 0.561 ,0  ],
+        [-0.141 ,  0.240  , 0.549 ,0 ],
+        [-0.177 ,  0.294  , 0.537 ,0],
+        [-0.215 ,  0.354 , 0.525 ,0],
+        [-0.256 ,  0.419 , 0.513 ,0],
+        [-0.300 ,  0.489 , 0.501 ,0],
+        [-0.346 ,  0.564 , 0.490 ,0],
+        [-0.395 ,  0.643 , 0.478 ,0],
+        [-0.447 ,  0.722 , 0.466 ,0],
+        [-0.501 ,  0.802 , 0.454 ,0],
+        [-0.558 ,  0.882 , 0.442 ,0 ],
+        [-0.618 ,  0.963 , 0.430 ,0],
+        [-0.680 ,  1.045 , 0.418 ,0],
+        [-0.746 ,  1.128 , 0.406 ,0],
+        [-0.779 ,  1.169 , 0.400 ,0 ],
+    ]
     # MAX_VEL = 3
     # MAX_ACC = 3
-    
+
+    waypoints=[
+     [ 0.98303212 ,-0.94542514 , 0.99399998,0],
+     [ 0.94909636 ,-0.91627543 , 0.98199994,0],
+     [ 0.9151606  ,-0.88712571 , 0.96999991,0],
+     [ 0.88122484 ,-0.85797599 , 0.95799987,0],
+     [ 0.84728908 ,-0.82882628 , 0.94599983,0],
+     [ 0.81335332 ,-0.79967656 , 0.9339998 ,0],
+     [ 0.77941756 ,-0.77052685 , 0.92199976,0],
+     [ 0.7454818  ,-0.74137713 , 0.90999972,0],
+     [ 0.71154603 ,-0.71222742 , 0.89799968,0],
+     [ 0.67761027 ,-0.6830777  , 0.88599965,0],
+     [ 0.64367451 ,-0.65392798 , 0.87399961,0],
+     [ 0.60973875 ,-0.62477827 , 0.86199957,0],
+     [ 0.57580299 ,-0.59562855 , 0.84999953,0],
+     [ 0.54186723 ,-0.56647884 , 0.8379995 ,0],
+     [ 0.50793147 ,-0.53732912 , 0.82599946,0],
+     [ 0.47399571 ,-0.50817941 , 0.81399942,0],
+     [ 0.44005995 ,-0.47902969 , 0.80199939,0],
+     [ 0.4062736  ,-0.44922623 , 0.78999935,0],
+     [ 0.37272632 ,-0.41856135 , 0.77799931,0],
+     [ 0.33970393 ,-0.38679147 , 0.76599928,0],
+     [ 0.30740045 ,-0.35389865 , 0.75399924,0],
+     [ 0.27597276 ,-0.32000234 , 0.74199921,0],
+     [ 0.24560811 ,-0.28529865 , 0.72999918,0],
+     [ 0.21649164 ,-0.25010282 , 0.71799915,0],
+     [ 0.18871876 ,-0.21483843 , 0.70599912,0],
+     [ 0.1622432  ,-0.17991379 , 0.69399909,0],
+     [ 0.13694193 ,-0.14562244 , 0.68199906,0],
+     [ 0.11268735 ,-0.11215223 , 0.66999904,0],
+     [ 0.08907383 ,-0.07944733 , 0.65799901,0],
+     [ 0.06593392 ,-0.04750054 , 0.64599899,0],
+     [ 0.04313557 ,-0.01628442 , 0.63399897,0],
+     [ 0.02033101 , 0.01481188 , 0.62199895,0],
+     [-0.00257602 , 0.04599376 , 0.60999892,0],
+     [-0.02558012 , 0.07726728 , 0.5979989 ,0],
+     [-0.05066033 , 0.1114889  , 0.5859989 ,0],
+     [-0.07837222 , 0.14977682 , 0.57399894,0],
+     [-0.10877433 , 0.19236745 , 0.561999  ,0],
+     [-0.1419815  , 0.2405046  , 0.5499991 ,0],
+     [-0.17772321 , 0.2947204  , 0.53799925,0],
+     [-0.21547425 , 0.35478366 , 0.52599943,0],
+     [-0.25624065 , 0.41970496 , 0.51399966,0],
+     [-0.30018103 , 0.48957904 , 0.50199991,0],
+     [-0.34686339 , 0.56446155 , 0.49000021,0],
+     [-0.39595945 , 0.64322563 , 0.47800053,0],
+     [-0.44762108 , 0.72244451 , 0.46600085,0],
+     [-0.50179798 , 0.80217095 , 0.45400117,0],
+     [-0.55841301 , 0.88247215 , 0.4420015 ,0],
+     [-0.61800849 , 0.96356163 , 0.43000184,0],
+     [-0.68067019 , 1.04548637 , 0.41800218,0],
+     [-0.74620039 , 1.12827261 , 0.40600252,0],
+     [-0.77999194 , 1.16998877 , 0.4000027 ,0],
+     ]
+
+
+    total_time = 4
     waypoints = np.array(waypoints)
-    min_snap_traj_generation(waypoints)
+    print(waypoints.shape)
+    waypoints=waypoints[::5,:]
+
+    tr=min_snap_traj_generation(waypoints,total_time= total_time)    
+
+    tt=2.80
+    x=tr.eval(t=tt ).pos[0]
+
+    print("x({})={}".format(tt,x))
+
+
+    debug_traj_generation(waypoints, tr)

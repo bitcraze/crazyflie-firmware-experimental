@@ -2,12 +2,12 @@ try:
     from trajectory_gen.uav_trajectory import Trajectory
     from optim_problem.test_multiple import * 
     from trajectory_gen import marios_gen as min_snap_tg
-    from logged_trajs_visualizer import plot_trajs_from_matrix
+    from logged_trajs_visualizer import handle_trajs_from_matrix,analyze_MAV_sequences,get_sequences_from_trajs
 except:
     from .trajectory_gen.uav_trajectory import Trajectory
     from .optim_problem.test_multiple import *
     from .trajectory_gen import marios_gen as min_snap_tg
-    from .logged_trajs_visualizer import plot_trajs_from_matrix
+    from .logged_trajs_visualizer import handle_trajs_from_matrix,analyze_MAV_sequences,get_sequences_from_trajs
 
 import copy
 from colorama import Fore
@@ -15,16 +15,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import List
 
-def generate_trajectories(MAV_sequences,total_time):
-    """Generates the trajectories for the MAVs."""
+def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float,downsample_step=6)->List[Trajectory]:
+    """Generates the trajectories for the MAVs.
+    Args: 
+        MAV_sequences: List of waypoints of each MAV dimensions (N_MAV,HORIZON_N,XYZ).
+        total_time: Total time of the trajectory execution.
+        downsample_step: Step of the downsampling.
+    Returns:
+        trajectories: List of trajectories for each drone.
+    """
     trajs=[]
     
     for i in range(N_MAV):
         waypoints=MAV_sequences[i]
 
-        #downsample the trajectory
-        downsample_step=6
+        #downsample the trajectory but always include the first and last waypoint
+        final=waypoints[-1,:]
         waypoints=waypoints[::downsample_step,:]
+        if not np.equal(waypoints[-1],final).all():
+            # waypoints=np.append(waypoints,final,axis=1)
+            waypoints=np.vstack((waypoints,final))
+
+        print("After: {}".format(waypoints.shape))
+
         print(Fore.RED,waypoints.shape,Fore.RESET)
 
         #insert column of zeros at the end(yaw)
@@ -32,18 +45,7 @@ def generate_trajectories(MAV_sequences,total_time):
 
         tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
         trajs.append( tr )
-
-    # fig=plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-
-    # for i in range(N_MAV):
-    #     trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
-    # ax.set_xlabel('X')
-    # ax.set_ylabel('Y')
-    # ax.set_zlabel('Z')
-    # ax.set_title('Generated Trajectories')
-    # ax.legend()
-    
+        
     return trajs
 
 x0s = [
@@ -66,16 +68,15 @@ xrefs = [
 x0s = [[
     [0.96, 0.97, 1.00],
     [-1.00, -0.96, 1.00],
-    [-0.96, 0.95, 1.00],
     [1.00, -0.96, 1.00],
-
+    [-0.96, 0.95, 1.00],
 ]]
 
 xrefs = [[
     [0.86, -0.96, 0.40],
     [0.98, 1.21,  0.40],
-    [-1.03, -0.99, 0.40],
     [-0.78, 1.17,  0.40],
+    [-1.03, -0.99, 0.40],
 ]]
 
 def main(case=2)->List[Trajectory]:
@@ -94,11 +95,13 @@ def main(case=2)->List[Trajectory]:
 
     return trajs
 
-def log_trajectories(traj_matrices:list,x0s,xrefs):
+def log_trajectories(trajs:List[Trajectory],x0s:List[List[float]],xrefs:List[List[float]]):
     """Logs the trajectories to a file."""
+    traj_matrices = [trajs[i].get_matrix() for i in range(len(trajs))]
+
     #deep copy the trajectories
     traj_matrices_copy=copy.deepcopy(traj_matrices)
-    #insert first xrefs and then x0s so that at the endit going to be like this:
+    #insert first xrefs and then x0s so that at the end it is going to be like this:
     #[x0s,xrefs,traj_matrices_copy]
     traj_matrices_copy.insert(0,xrefs) 
     traj_matrices_copy.insert(0,x0s)   
@@ -106,6 +109,14 @@ def log_trajectories(traj_matrices:list,x0s,xrefs):
     log_trajectories.counter += 1
 
 log_trajectories.counter=0
+
+def compare_planned_with_generated(MAV_sequences:List[List[List[float]]], trajs:List[Trajectory],downsample_step:int):
+    """Plots the generated trajectories and the waypoints of the planning in order to compare and debug."""
+    for i,tr in enumerate(trajs):
+        waypoints=MAV_sequences[i]
+        min_snap_tg.debug_traj_generation(waypoints,tr)
+
+    
 
 def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.array] :
     """Solves the multiple MAV problem.
@@ -120,24 +131,13 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
 
     MAV_sequences = getMAVPaths(us,x0s)
     
-    if __name__ == '__main__':
-        #check shortest distance between MAVs
-        dists=calculate_distances(MAV_sequences)
+    downsample_step=6
+    trajs = generate_trajectories(MAV_sequences,total_time=4,downsample_step=downsample_step)
 
-        #plot distance between MAVs
-        MAV_pairs=[1,3]
-        plot_distance_in_MAV_pairs(dists,MAV_pairs)
+    log_trajectories(trajs,x0s,xrefs)
 
-        plotGridSpec(MAV_sequences)
-
-
-    trajs:List[Trajectory]=generate_trajectories(MAV_sequences,total_time=4)
-
-    traj_matrices=[]
-    for i in range(len(trajs)):
-        traj_matrices.append(trajs[i].get_matrix())
-    
-    log_trajectories(traj_matrices,x0s,xrefs)
+    if __name__ == '__main__':     
+        compare_planned_with_generated(MAV_sequences[:,::downsample_step,:],trajs,downsample_step)
 
 
     return traj_matrices
@@ -147,4 +147,4 @@ if __name__ == "__main__":
     # trajs=main(1)
 
     traj_matrices=solve_problem(x0s[-1], xrefs[-1])
-    plot_trajs_from_matrix(traj_matrices)
+    # handle_trajs_from_matrix(traj_matrices)
