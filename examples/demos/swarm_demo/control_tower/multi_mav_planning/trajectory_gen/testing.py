@@ -4,16 +4,16 @@ from matplotlib import pyplot as plt
 try:
     from bezier_trajectory import *
     import uav_trajectory
-    from generate_trajectory import generate_trajectory
-    import marios_gen
+    from wolfgang_generate_trajectory import generate_trajectory
+    import min_snap_traj_gen
     from uav_trajectory import Trajectory
 
 except:
     print("Could not import bezier_trajectory")
     from .bezier_trajectory import *
     from . import uav_trajectory
-    from .generate_trajectory import generate_trajectory
-    from . import marios_gen
+    from .wolfgang_generate_trajectory import generate_trajectory
+    from . import min_snap_traj_gen
     from .uav_trajectory import Trajectory
 import time
 
@@ -25,7 +25,7 @@ def bezier(waypoints):
 
     segments = []
 
-    time_durations = marios_gen.allocateTimeProportional(waypoints,5)
+    time_durations = min_snap_traj_gen.allocateTimeProportional(waypoints,5)
 
     # # Nodes with one control point has not velocity, this is similar to calling
     # # goto in the High-level commander
@@ -88,7 +88,7 @@ def bezier(waypoints):
 
 
 def wolfgang(waypoints):
-    time_durations=marios_gen.allocateTimeProportional(waypoints,5)
+    time_durations=min_snap_traj_gen.allocateTimeProportional(waypoints,5)
     print("time_durations:",time_durations)
     #add empty column to waypoints
     waypoints=np.insert(waypoints,0,0,axis=1)
@@ -109,7 +109,7 @@ def wolfgang(waypoints):
 
 def marios(waypoints,total_time)->Trajectory:
     # remove fist column (time) of waypoints
-    return marios_gen.min_snap_traj_generation(waypoints,total_time)
+    return min_snap_traj_gen.min_snap_traj_generation(waypoints,total_time)
 
 test=[
  [0.02382189, 0.0156142,  1.00382214,0.0],

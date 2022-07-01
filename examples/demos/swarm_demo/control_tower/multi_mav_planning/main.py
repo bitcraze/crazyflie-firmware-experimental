@@ -1,13 +1,13 @@
 try:
     from trajectory_gen.uav_trajectory import Trajectory
     from optim_problem.test_multiple import * 
-    from trajectory_gen import marios_gen as min_snap_tg
-    from logged_trajs_visualizer import handle_trajs_from_matrix,analyze_MAV_sequences,get_sequences_from_trajs
+    from trajectory_gen import min_snap_traj_gen as min_snap_tg
+    from logged_trajs_visualizer import analyse_trajs_from_matrix
 except:
     from .trajectory_gen.uav_trajectory import Trajectory
     from .optim_problem.test_multiple import *
-    from .trajectory_gen import marios_gen as min_snap_tg
-    from .logged_trajs_visualizer import handle_trajs_from_matrix,analyze_MAV_sequences,get_sequences_from_trajs
+    from .trajectory_gen import min_snap_traj_gen as min_snap_tg
+    from .logged_trajs_visualizer import analyse_trajs_from_matrix
 
 import copy
 from colorama import Fore
@@ -152,5 +152,5 @@ if __name__ == "__main__":
     # trajs=main(1)
 
     traj_matrices=solve_problem(x0s[-1], xrefs[-1])
-    handle_trajs_from_matrix(traj_matrices)
+    analyse_trajs_from_matrix(traj_matrices)
     plt.show()

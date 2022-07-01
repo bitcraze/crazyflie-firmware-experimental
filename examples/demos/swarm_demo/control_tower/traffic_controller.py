@@ -163,6 +163,21 @@ class TrafficController:
         self.can_upload_trajectory=False
 
     def upload_trajectory_to_memory(self,traj_mem:TrajectoryMemory,upload_done_callback,upload_failed_callback,tr_id):
+        """
+        Uploads a trajectory to the memory of the copter.A simple mechanism is used to ensure that the trajectory is uploaded in the correct order.
+        The whole trajectory memory can handle 31 trajectory segments.So it is splitted in half and the maximum number of segments that can be uploaded at once is 15.
+        The trajectory ids used are 1 and 2 and each one have the following trajectory memory offsets:
+            1:  0x00
+            2:  15* TRAJECTORY_SEGMENT_SIZE_BYTES since the maximum number of segments is 15
+                where TRAJECTORY_SEGMENT_SIZE_BYTES is the size of a trajectory segment in bytes
+        
+        So the trajectory id 1 is uploaded in the first half of the memory and the trajectory id 2 is uploaded in the second half of the memory.
+        The first time it is demanded to upload a trajectory it is uploaded with the id 1 
+        and the second time it is demanded to upload a trajectory it is uploaded with the id 2 (while the previous one is being executed).
+
+        The copter will execute a trajectory as soon as it is in the state STATE_WAITING_TO_START_TRAJECTORY (6) and the trajectory_id parameter is changed.
+        """
+        
         if tr_id==1:
             start_addr=0x00
         else:
@@ -304,7 +319,6 @@ class TrafficController:
             self._cf.param.set_value('app.trajcount', count)
     
     def get_trajectory_count(self):
-        # return self._trajcount
         if self.connection_state == self.CS_CONNECTED:
             self._cf.param.request_param_update('app.trajcount')
             return self._cf.param.get_value('app.trajcount')

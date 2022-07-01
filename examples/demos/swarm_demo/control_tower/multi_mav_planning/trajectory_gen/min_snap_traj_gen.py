@@ -1,17 +1,18 @@
 # Useful link :https://realpython.com/linear-programming-python/
 import time
-from typing import List
+from typing import List,Tuple
 import numpy as np
 from numpy.core.function_base import linspace
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.gridspec import GridSpec
 from matplotlib import animation
 
 try:
     from uav_trajectory import *
+    from traj_utils import *
 except:
     from .uav_trajectory import *
+    from .traj_utils import *
 
 #################################POL GENERATOR OVERVIEW#######################################
 """
@@ -52,7 +53,7 @@ Each polynomial is expressed in the matrix with the following format:
 ##############################################################################################
 
 
-def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X):
+def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple(List[Polynomial],PiecewisePolynomial):
     """
     waypoints: list of Point_Time
 
@@ -163,8 +164,6 @@ def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_
 
     polynomials_coefficients = np.linalg.solve(a=A, b=b)
 
-    # print("polynomials_coefficients.shape:", polynomials_coefficients.shape)
-
     piece_pols:List[Polynomial] = []  # piecewise polynomials
     for i in range(n):
         p = polynomials_coefficients[8*i:8*(i+1)]
@@ -217,19 +216,24 @@ def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_
                 print(
                     f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(t)}")
 
-    # if wp_type == Waypoint.WP_TYPE_X:
-        # print("time points:", [wp.t for wp in waypoints])
 
     total_pol = PiecewisePolynomial(piece_pols, time_points)
-    # t_final = sum(total_pol.time_durations)
-    # print("t_final:", t_final)
-    # for t in linspace(0, t_final, 100):
-    # print(f"t={t} --> {total_pol.eval(t)}")
 
     return piece_pols, total_pol
 
 
-def calculate_trajectory4D(waypoints):
+def calculate_trajectory4D(waypoints:List[Point_time])->Tuple[List[np.array],List[PiecewisePolynomial]]:
+    """
+    Calculates a trajectory for the given waypoints.
+    @param waypoints: list of waypoints in shape (n,4) where :
+        --> n is the number of waypoints 
+        --> each waypoint is a tuple/array (x,y,z,t)
+
+    @return: polynomials_coefficients: list of polynomials coefficients in shape (n,8)
+        --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
+        --> each polynomial is a polynomial of degree 7
+    @return: pc_pols : list of PiecewisePolynomials
+    """
     # waypoints:list of Point_time instances
 
     polx, pc_polx = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_X)
@@ -240,44 +244,20 @@ def calculate_trajectory4D(waypoints):
     pols_coeffs = [polx, poly, polz, polyaw]
     pc_pols = [pc_polx, pc_poly, pc_polz, pc_polyaw]
 
-    # visualize_trajectory3D(pc_pols)
 
     return pols_coeffs, pc_pols
 
-
-def visualize_trajectory3D(pols):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    N = 100
-    time_frame = linspace(0, 10, N)
-    x = np.zeros(N)
-    y = np.zeros(N)
-    z = np.zeros(N)
-    yaw = np.zeros(N)
-
-    for i, t in enumerate(time_frame):
-        x[i] = pols[0].eval(t)
-        y[i] = pols[1].eval(t)
-        z[i] = pols[2].eval(t)
-
-    ax.scatter(x, y, z, c='r', marker='o')
-
-    plt.show()
-
-
-def allocateTime(waypoints: np.array, max_vel: float, max_acc: float):
-    # waypoints:list of Waypoint instances
-    # returns: list of time points
+def allocateTime(waypoints: np.array, max_vel: float, max_acc: float)->np.ndarray:
+    """
+    Allocates time to the waypoints based on the max_vel and max_acc parameters.
+    @param waypoints: numpy array of waypoints in shape (n,3).
+    @param max_vel: maximum velocity
+    @param max_acc: maximum acceleration
+    @return: numpy array of times in shape (n,1)
+    """
 
     # exclude last (yaw) column from the waypoints
-
     waypoints = waypoints[:, :-1]
-
-    # print("waypoints.shape:", waypoints.shape)
 
     N = len(waypoints)-1
     durations = np.zeros(N)
@@ -310,20 +290,22 @@ def allocateTime(waypoints: np.array, max_vel: float, max_acc: float):
 
 
 def allocateTimeProportional(waypoints: np.array, total_time):
-    # waypoints:list of waypoints
-    # returns: list of time points
+    """
+    Allocates portion of total time to the waypoints proportionally to their between distances.
+    
+    @param waypoints: numpy array of waypoints in shape (n,3).
+    @param total_time: total time in seconds
+
+    @return: numpy array of times in shape (n,1)
+    """
+
 
     # exclude last (yaw) column from the waypoints
+    waypoints = waypoints[:, :-1]
 
     # TODO: check if this time allocation leads to crazy trajectories and if so,
     #     increase the total time
-
-    waypoints = waypoints[:, :-1]
     
-    # print("waypoints.shape:", waypoints.shape)
-    # for wp in waypoints:
-    #     print(wp)
-
     N = len(waypoints)-1
     durations = np.zeros(N)
     distances = np.zeros(N)
@@ -365,7 +347,15 @@ def generate_traj(waypoints: np.array,total_time):
     return pols_coeffs, pc_pols
 
 
-def create_traj(pols_coeffs, pc_pols):
+def create_traj(pols_coeffs, pc_pols)->Trajectory:
+    """
+    Creates a Trajectory instance from the given polynomials coefficients and PiecewisePolynomials.
+    @param pols_coeffs: list of polynomials coefficients in shape (n,8)
+        --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
+        --> each polynomial is a polynomial of degree 7
+    @param pc_pols: list of PiecewisePolynomials
+    @return: Trajectory instance
+    """
     segments_number = len(pols_coeffs[0])
     matrix = np.zeros((segments_number, 4*8+1))
 
@@ -384,222 +374,40 @@ def create_traj(pols_coeffs, pc_pols):
     tr = Trajectory()
     tr.load_from_matrix(matrix)
 
-    # tr.plot(timestep=0.2)
     return tr
 
-def min_snap_traj_generation(waypoints,total_time)->Trajectory:
+def min_snap_traj_generation(waypoints:np.ndarray,total_time:float)->Trajectory:
+    """
+    Generates a trajectory from the given waypoints with a duration of the total_time.
+    @param waypoints: numpy array of waypoints in shape (n,3).
+    @param total_time: total time in seconds
+    @return: Trajectory instance
+    """
     pols_coeffs, pc_pols = generate_traj(waypoints,total_time)
     tr = create_traj(pols_coeffs, pc_pols)
     
     return tr
-
-# waypoints format: t,x,y,z,yaw
-# waypoints = [
-#     [0.0, 0.0, height, yaw_ref],
-# #
-#     [0.0, 1.0 - 0.1, height, yaw_ref],
-#     [0.0, 1.0, height, yaw_ref],
-#     [0.1, 1.0 + 0.1, height, yaw_ref],
-# #
-#     [1.0-0.1, 1.0, height, yaw_ref],
-#     [1.0, 1.0, height, yaw_ref],
-#     [1.0, 1.0-0.1, height, yaw_ref],
-# #
-#     [1.0, 0.0 + 0.1, height, yaw_ref],
-#     [1.0, 0.0, height, yaw_ref],
-#     [1.0 - 0.1, 0.0, height, yaw_ref],
-# #
-#     [0.0, 0.0, height, yaw_ref],
-# ]
     
-def debug_traj_generation(waypoints:np.ndarray, tr:Trajectory,downsample_step,plt_title=None):
-    """
-    This function is used to debug the trajectory generation.
-    It plots the generated trajectory and the waypoints.
-    
-    @param waypoints: list of waypoints in shape (waypoints_number, 3)
-    @param tr: trajectory to be debugged
-    """
-
-    if type(waypoints)!=type(np.array):
-        waypoints = np.array(waypoints)
-
-    waypoints_original = waypoints.copy()
-    waypoints = waypoints[::downsample_step,:]
-
-    timestep=0.01
-    pos,traj_time=tr.get_path(timestep=timestep)
-    x,y,z = pos[0],pos[1],pos[2]
-    t_traj=traj_time
-
-    x_wps,y_wps,z_wps= waypoints[:,0],waypoints[:,1],waypoints[:,2]
-
-    dur_wps=[ pol.duration for pol in tr.polynomials]
-
-    t_wps=[0]
-    for i in range(len(dur_wps)):
-        t_wps.append(t_wps[-1]+dur_wps[i])
-    
-
-    if len(t_traj)!=len(x):
-        delta=len(t_traj)-len(x)
-        t_traj=t_traj[:-delta]
-    
-    if len(t_wps)!=len(x_wps):
-        t_wps=t_wps[:-1]
-
-    #plotting 
-    t_wps_original = interpolate_time_setpoints(waypoints, waypoints_original, t_wps)    
-    
-    fig = plt.figure(constrained_layout=True)
-    if plt_title is not None:
-        fig.suptitle(plt_title)
-
-    USE_ONE_FIGURE=1
-    if USE_ONE_FIGURE:
-        grid_spec_plot(waypoints_original, x, y, z, t_traj, x_wps, y_wps, z_wps, t_wps,t_wps_original, fig)
-    else:
-        separate_plots(waypoints_original, x, y, z, t_traj, x_wps, y_wps, z_wps, t_wps, t_wps_original, fig)
-
-def interpolate_time_setpoints(waypoints, waypoints_original, t_wps):
-    original_shape = waypoints_original.shape
-    t_wps_original=[None] * original_shape[0]
-    for i in range(original_shape[0]):
-        for j in range(len(waypoints)):
-            if (waypoints_original[i,:]==waypoints[j,:]).all():
-                t_wps_original[i]=t_wps[j]
-    
-    min_i = 0
-    min_v = 0
-    for i, v in enumerate(t_wps_original):
-       if v is not None:
-           t_wps_original[min_i: i + 1] = list(np.linspace(min_v, v, i - min_i + 1))
-           min_i = i
-           min_v = v
-    
-    print(t_wps_original)
-
-    return t_wps_original
-
-def grid_spec_plot(waypoints_original, x, y, z, t_traj, x_wps, y_wps, z_wps, t_wps,t_wps_original, fig):
-    
-    WAYPOINTS_USED_FOR_GEN_MARKER_SIZE=100
-    
-    gs = GridSpec(2, 3)
-
-    axX = fig.add_subplot(gs[0, 0])
-    axY = fig.add_subplot(gs[0, 1])
-    axZ = fig.add_subplot(gs[0, 2])
-
-    ax3D = fig.add_subplot(gs[1,:], projection='3d')
-  
-    axX.plot(t_traj,x,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        axX.annotate("wp_{}".format(ii)  ,(t_wps[ii],x_wps[ii]))
-    
-    axX.scatter(t_wps,x_wps,color="r",label="waypoints",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    axX.scatter(t_wps_original,waypoints_original[:,0],color="g",label="waypoints_original",alpha=0.5)
-
-    axX.set_title('x')
-    axX.grid()
-    axX.legend()
-    
-    axY.plot(t_traj,y,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        axY.annotate("wp_{}".format(ii)  ,(t_wps[ii],y_wps[ii]))
-
-    axY.scatter(t_wps,y_wps,color="r",label="waypoints",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    axY.scatter(t_wps_original,waypoints_original[:,1],color="g",label="waypoints_original",alpha=0.5)
-
-    axY.set_title('y')
-    axY.grid()
-    axY.legend()
-
-    axZ.plot(t_traj,z,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        axZ.annotate("wp_{}".format(ii)  ,(t_wps[ii],z_wps[ii]))
-    
-    axZ.scatter(t_wps,z_wps,color="r",label="waypoints",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    axZ.scatter(t_wps_original,waypoints_original[:,2],color="g",label="waypoints_original",alpha=0.5)
-
-    axZ.set_title('z')
-    axZ.grid()
-    axZ.legend()
-    
-    
-    ax3D.plot(x,y,z)
-    ax3D.scatter(x_wps,y_wps,z_wps,color='r')
-    ax3D.scatter(waypoints_original[:,0],waypoints_original[:,1],waypoints_original[:,2],color='green',s=5)
-    
-    #set limits
-    ax3D.set_xlim3d(-1.2,1.2)
-    ax3D.set_ylim3d(-1.2,1.2)
-    ax3D.set_zlim3d(0.2,1.5)
-
-    ax3D.set_xlabel('x')
-    ax3D.set_ylabel('y')
-    ax3D.set_zlabel('z')
-    ax3D.grid()
-
-def separate_plots(waypoints_original, x, y, z, t_traj, x_wps, y_wps, z_wps, t_wps,t_wps_original, fig3d):
-
-    WAYPOINTS_USED_FOR_GEN_MARKER_SIZE=100
-
-    plt.figure()
-    plt.suptitle(fig3d.texts[0].get_text())
-    plt.subplot(1,3,1)
-    plt.plot(t_traj,x,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],x_wps[ii]))
-
-    plt.scatter(t_wps,x_wps,color="r",label="waypoints ",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    plt.scatter(t_wps_original,waypoints_original[:,0],color="g",label="waypoints_original",alpha=0.5)
-
-    plt.title('x')
-    plt.grid()
-    plt.legend()
-
-    plt.subplot(1,3,2)
-    plt.plot(t_traj,y,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],y_wps[ii]))
-
-    plt.scatter(t_wps,y_wps,color="r",label="waypoints",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    plt.scatter(t_wps_original,waypoints_original[:,1],color="g",label="waypoints_original",alpha=0.5)
-
-    plt.title('y')
-    plt.grid()
-    plt.legend()
-
-    plt.subplot(1,3,3)
-    plt.plot(t_traj,z,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],z_wps[ii]))
-    
-    plt.scatter(t_wps,z_wps,color="r",label="waypoints",s=WAYPOINTS_USED_FOR_GEN_MARKER_SIZE)
-    plt.scatter(t_wps_original,waypoints_original[:,2],color="g",label="waypoints_original",alpha=0.5)
-
-    plt.title('z')
-    plt.grid()
-    plt.legend()
-    
-    ax3d=fig3d.add_subplot(111,projection='3d')
-    ax3d.plot(x,y,z)
-    ax3d.scatter(x_wps,y_wps,z_wps,color='r')
-    ax3d.scatter(waypoints_original[:,0],waypoints_original[:,1],waypoints_original[:,2],color='green',s=5)
-    
-    #set limits
-    ax3d.set_xlim3d(-1.2,1.2)
-    ax3d.set_ylim3d(-1.2,1.2)
-    ax3d.set_zlim3d(0.2,1.5)
-
-    ax3d.set_xlabel('x')
-    ax3d.set_ylabel('y')
-    ax3d.set_zlabel('z')
-    ax3d.grid()
-
-
 if __name__ == "__main__":
+    # waypoints format: t,x,y,z,yaw
+    # waypoints = [
+    #     [0.0, 0.0, height, yaw_ref],
+    # #
+    #     [0.0, 1.0 - 0.1, height, yaw_ref],
+    #     [0.0, 1.0, height, yaw_ref],
+    #     [0.1, 1.0 + 0.1, height, yaw_ref],
+    # #
+    #     [1.0-0.1, 1.0, height, yaw_ref],
+    #     [1.0, 1.0, height, yaw_ref],
+    #     [1.0, 1.0-0.1, height, yaw_ref],
+    # #
+    #     [1.0, 0.0 + 0.1, height, yaw_ref],
+    #     [1.0, 0.0, height, yaw_ref],
+    #     [1.0 - 0.1, 0.0, height, yaw_ref],
+    # #
+    #     [0.0, 0.0, height, yaw_ref],
+    # ]
+
     yaw_ref = 0
     height = 1
     
