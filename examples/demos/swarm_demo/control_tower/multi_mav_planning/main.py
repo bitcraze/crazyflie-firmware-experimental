@@ -112,8 +112,11 @@ def compare_planned_with_generated(MAV_sequences:List[List[List[float]]], trajs:
     """Plots the generated trajectories and the waypoints of the planning in order to compare and debug."""
     
     for i,tr in enumerate(trajs):
-        waypoints=MAV_sequences[i]
-        min_snap_tg.debug_traj_generation(waypoints,tr,downsample_step,plt_title='Drone {}'.format(i))
+        
+        MAVs_to_plot=[0,1]
+        if i in MAVs_to_plot:
+            waypoints=MAV_sequences[i]
+            min_snap_tg.debug_traj_generation(waypoints,tr,downsample_step,plt_title='Drone {}'.format(i))
 
     
 

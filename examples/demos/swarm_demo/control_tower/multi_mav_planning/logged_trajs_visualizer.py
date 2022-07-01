@@ -127,7 +127,7 @@ def analyze_MAV_sequences(x0s,xrefs, MAV_sequence):
     dists=calculate_distances(MAV_sequence)
     
     #plot distance between MAVs
-    MAV_pairs=[1,3]
+    MAV_pairs=[1,0]
     plot_distance_in_MAV_pairs(dists,MAV_pairs)
 
     #Plotting
@@ -155,11 +155,9 @@ def plot_distance_in_MAV_pairs(dists,MAV_pairs):
 
 if __name__=="__main__":
     traj_numbers=range(6)
-    traj_numbers=[17]
+    # traj_numbers=[5]
     # filename="traj_matrices_0.npy"
     for i in traj_numbers:
         filename="traj_matrices_{}.npy".format(i)
         handle_trajs_from_file(filename)
-
     
-
