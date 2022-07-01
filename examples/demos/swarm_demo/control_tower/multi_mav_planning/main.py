@@ -110,9 +110,10 @@ log_trajectories.counter=0
 
 def compare_planned_with_generated(MAV_sequences:List[List[List[float]]], trajs:List[Trajectory],downsample_step:int):
     """Plots the generated trajectories and the waypoints of the planning in order to compare and debug."""
+    
     for i,tr in enumerate(trajs):
         waypoints=MAV_sequences[i]
-        min_snap_tg.debug_traj_generation(waypoints,tr)
+        min_snap_tg.debug_traj_generation(waypoints,tr,downsample_step,plt_title='Drone {}'.format(i))
 
     
 
@@ -130,12 +131,13 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
     MAV_sequences = getMAVPaths(us,x0s)
     
     downsample_step=5
-    trajs = generate_trajectories(MAV_sequences,total_time=5,downsample_step=downsample_step)
+    total_time=4.5
+    trajs = generate_trajectories(MAV_sequences,total_time=total_time,downsample_step=downsample_step)
 
     log_trajectories(trajs,x0s,xrefs)
 
     if __name__ == '__main__':
-        # compare_planned_with_generated(MAV_sequences[:,::downsample_step,:],trajs,downsample_step)
+        compare_planned_with_generated(MAV_sequences,trajs,downsample_step)
         pass
 
     traj_matrices = [trajs[i].get_matrix() for i in range(len(trajs))]
@@ -147,4 +149,5 @@ if __name__ == "__main__":
     # trajs=main(1)
 
     traj_matrices=solve_problem(x0s[-1], xrefs[-1])
-    # handle_trajs_from_matrix(traj_matrices)
+    handle_trajs_from_matrix(traj_matrices)
+    plt.show()
