@@ -125,9 +125,11 @@ def analyze_MAV_sequences(x0s,xrefs, MAV_sequence):
 
     #check shortest distance between MAVs
     dists=calculate_distances(MAV_sequence)
-    
+
+    #find index of shortest distance
+    min_dist_index=np.unravel_index(dists.argmin(), dists.shape)
+    MAV_pairs=[min_dist_index[0],min_dist_index[1]]
     #plot distance between MAVs
-    MAV_pairs=[1,0]
     plot_distance_in_MAV_pairs(dists,MAV_pairs)
 
     #Plotting
@@ -154,8 +156,8 @@ def plot_distance_in_MAV_pairs(dists,MAV_pairs):
 
 
 if __name__=="__main__":
-    traj_numbers=range(6)
-    # traj_numbers=[5]
+    # traj_numbers=range(6)
+    traj_numbers=[11]
     # filename="traj_matrices_0.npy"
     for i in traj_numbers:
         filename="traj_matrices_{}.npy".format(i)

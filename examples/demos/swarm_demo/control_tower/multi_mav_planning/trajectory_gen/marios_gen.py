@@ -783,13 +783,14 @@ if __name__ == "__main__":
     [-0.77982601,  0.95128473,  0.39997579,0],
     ]
 
-    total_time = 6
-    waypoints = np.array(waypoints)
-    print(waypoints.shape)
-    downsample_step = 4
+    total_times = [3.5]
+    for total_time in total_times:
+        waypoints = np.array(waypoints)
+        print(waypoints.shape)
+        downsample_step = 4
 
-    tr=min_snap_traj_generation(waypoints[::downsample_step,:],total_time= total_time)    
+        tr=min_snap_traj_generation(waypoints[::downsample_step,:],total_time= total_time)    
 
-    debug_traj_generation(waypoints, tr,downsample_step)
+        debug_traj_generation(waypoints, tr,downsample_step)
 
     plt.show()
