@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from typing import Tuple
+from typing import List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -141,7 +141,7 @@ class Polynomial4D:
 
 class Trajectory:
     def __init__(self):
-        self.polynomials = None
+        self.polynomials :List[Polynomial4D] = None
         self.duration = None
 
     def n_pieces(self):
@@ -260,8 +260,6 @@ class Trajectory:
         
         time=np.arange(0, self.duration, timestep)
         for i, t in enumerate(time):
-            print("pos({})={}".format(t, self.eval(t).pos))
-
             out = self.eval(t)
             out: TrajectoryOutput
             if i==len(x):

@@ -5,6 +5,8 @@ import numpy as np
 from numpy.core.function_base import linspace
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.gridspec import GridSpec
+from matplotlib import animation
 
 try:
     from uav_trajectory import *
@@ -74,8 +76,8 @@ def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_
     time_points = []
     prev_t = 0
     for i, traj_point in enumerate(waypoints):
-        if (wp_type == Waypoint.WP_TYPE_X):
-            print("i:", i, "waypoint:", traj_point.wp.get_pos(),traj_point.t)
+        # if (wp_type == Waypoint.WP_TYPE_X):
+            # print("i:", i, "waypoint:", traj_point.wp.get_pos(),traj_point.t)
 
         traj_point: Point_time
 
@@ -434,53 +436,63 @@ def debug_traj_generation(waypoints:List[List[float]], tr:Trajectory):
     
 
     if len(t_traj)!=len(x):
-        t_traj=t_traj[:-1]
+        delta=len(t_traj)-len(x)
+        t_traj=t_traj[:-delta]
     
     if len(t_wps)!=len(x_wps):
         t_wps=t_wps[:-1]
 
     #plotting 
-    fig=plt.figure()
 
-    plt.subplot(1,3,1)
-    plt.scatter(t_traj,x,color="orange",label="generated")
+    fig = plt.figure(constrained_layout=True)
+
+    gs = GridSpec(2, 3)
+
+    axX = fig.add_subplot(gs[0, 0])
+    axY = fig.add_subplot(gs[0, 1])
+    axZ = fig.add_subplot(gs[0, 2])
+
+    ax3D = fig.add_subplot(gs[1,:], projection='3d')
+
+
+
+  
+    axX.scatter(t_traj,x,color="orange",label="generated")
     for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],x_wps[ii]))
+        axX.annotate("wp_{}".format(ii)  ,(t_wps[ii],x_wps[ii]))
 
-    plt.scatter(t_wps,x_wps,color="r",label="waypoints")
+    axX.scatter(t_wps,x_wps,color="r",label="waypoints")
 
-    plt.title('x')
-    plt.grid()
-    plt.legend()
-    plt.subplot(1,3,2)
-    plt.scatter(t_traj,y,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],y_wps[ii]))
-
-    plt.scatter(t_wps,y_wps,color="r",label="waypoints")
-
-    plt.title('y')
-    plt.grid()
-    plt.legend()
-    plt.subplot(1,3,3)
-    plt.scatter(t_traj,z,color="orange",label="generated")
-    for ii in range(len(t_wps)):
-        plt.annotate("wp_{}".format(ii)  ,(t_wps[ii],z_wps[ii]))
+    axX.set_title('x')
+    axX.grid()
+    axX.legend()
     
-    plt.scatter(t_wps,z_wps,color="r",label="waypoints")
+    axY.scatter(t_traj,y,color="orange",label="generated")
+    for ii in range(len(t_wps)):
+        axY.annotate("wp_{}".format(ii)  ,(t_wps[ii],y_wps[ii]))
 
-    plt.title('z')
-    plt.grid()
-    plt.legend()
+    axY.scatter(t_wps,y_wps,color="r",label="waypoints")
+
+    axY.set_title('y')
+    axY.grid()
+    axY.legend()
+
+    axZ.scatter(t_traj,z,color="orange",label="generated")
+    for ii in range(len(t_wps)):
+        axZ.annotate("wp_{}".format(ii)  ,(t_wps[ii],z_wps[ii]))
     
-    fig=plt.figure()
-    ax=fig.add_subplot(111,projection='3d')
-    ax.plot(x,y,z)
-    ax.scatter(x_wps,y_wps,z_wps,color='r')
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    ax.grid()
+    axZ.scatter(t_wps,z_wps,color="r",label="waypoints")
+
+    axZ.set_title('z')
+    axZ.grid()
+    axZ.legend()
+    
+    ax3D.plot(x,y,z)
+    ax3D.scatter(x_wps,y_wps,z_wps,color='r')
+    ax3D.set_xlabel('x')
+    ax3D.set_ylabel('y')
+    ax3D.set_zlabel('z')
+    ax3D.grid()
 
     plt.show()
 

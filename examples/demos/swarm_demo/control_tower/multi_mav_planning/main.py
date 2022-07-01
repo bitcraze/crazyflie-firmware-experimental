@@ -36,8 +36,6 @@ def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float
             # waypoints=np.append(waypoints,final,axis=1)
             waypoints=np.vstack((waypoints,final))
 
-        print("After: {}".format(waypoints.shape))
-
         print(Fore.RED,waypoints.shape,Fore.RESET)
 
         #insert column of zeros at the end(yaw)
@@ -131,15 +129,17 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
 
     MAV_sequences = getMAVPaths(us,x0s)
     
-    downsample_step=6
-    trajs = generate_trajectories(MAV_sequences,total_time=4,downsample_step=downsample_step)
+    downsample_step=5
+    trajs = generate_trajectories(MAV_sequences,total_time=5,downsample_step=downsample_step)
 
     log_trajectories(trajs,x0s,xrefs)
 
-    if __name__ == '__main__':     
-        compare_planned_with_generated(MAV_sequences[:,::downsample_step,:],trajs,downsample_step)
+    if __name__ == '__main__':
+        # compare_planned_with_generated(MAV_sequences[:,::downsample_step,:],trajs,downsample_step)
+        pass
 
-
+    traj_matrices = [trajs[i].get_matrix() for i in range(len(trajs))]
+    
     return traj_matrices
 
 
