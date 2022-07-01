@@ -151,7 +151,7 @@ def calculate_distances(MAV_sequences)->np.ndarray:
 
     return dist
 
-def get_xos_xrefs_from_sequences(MAV_sequences)->Tuple(List[np.array],List[np.array]):
+def get_xos_xrefs_from_sequences(MAV_sequences)->Tuple[List[np.ndarray],List[np.ndarray]]:
     """Returns x0s and xrefs of MAVs"""
     x0s=[ i[0] for i in MAV_sequences]
     xrefs=[ i[-1] for i in MAV_sequences]

@@ -1,13 +1,13 @@
-try:
-    from trajectory_gen.uav_trajectory import Trajectory
-    from optim_problem.test_multiple import * 
-    from trajectory_gen import min_snap_traj_gen as min_snap_tg
-    from logged_trajs_visualizer import analyse_trajs_from_matrix
-except:
-    from .trajectory_gen.uav_trajectory import Trajectory
-    from .optim_problem.test_multiple import *
-    from .trajectory_gen import min_snap_traj_gen as min_snap_tg
-    from .logged_trajs_visualizer import analyse_trajs_from_matrix
+# try:
+from trajectory_gen.uav_trajectory import Trajectory
+from optim_problem.test_multiple import * 
+from trajectory_gen import min_snap_traj_gen as min_snap_tg
+from logged_trajs_visualizer import analyse_trajs_from_matrix
+# except:
+#     from .trajectory_gen.uav_trajectory import Trajectory
+#     from .optim_problem.test_multiple import *
+#     from .trajectory_gen import min_snap_traj_gen as min_snap_tg
+#     from .logged_trajs_visualizer import analyse_trajs_from_matrix
 
 import copy
 from colorama import Fore

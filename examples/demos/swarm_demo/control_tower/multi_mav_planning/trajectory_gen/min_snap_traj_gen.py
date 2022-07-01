@@ -53,7 +53,7 @@ Each polynomial is expressed in the matrix with the following format:
 ##############################################################################################
 
 
-def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple(List[Polynomial],PiecewisePolynomial):
+def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple[List[Polynomial],PiecewisePolynomial]:
     """
     waypoints: list of Point_Time
 
