@@ -4,10 +4,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 try:
-    from trajectory_gen import uav_trajectory
+    from trajectory_gen import uav_trajectory,traj_utils
     from optim_problem import plotting
 except:
-    from .trajectory_gen import uav_trajectory
+    from .trajectory_gen import uav_trajectory,traj_utils
     from .optim_problem import plotting
 
 
@@ -31,7 +31,7 @@ def analyse_trajs_from_matrix(trajs_mat):
     
     trajs = load_trajs_from_matrix(trajs_mat)
 
-    MAV_sequence = get_sequences_from_trajs(trajs)
+    MAV_sequence = get_sequences_from_trajs(trajs,timestep=0.1)# load sequence from traj
     
     analyze_MAV_sequences(x0s,xrefs, MAV_sequence)
 
@@ -89,13 +89,13 @@ def plot_distance_in_MAV_pairs(dists,MAV_pairs):
     plt.grid()
     plt.show()
 
-def get_sequences_from_trajs(trajs:List[uav_trajectory.Trajectory])->List[List[np.array]]:
+def get_sequences_from_trajs(trajs:List[uav_trajectory.Trajectory] , timestep:float = 0.1 )->List[List[np.array]]:
     """Returns MAV sequences from list of Trajectory objects"""
     MAV_sequence=[]
     
     for i in range(len(trajs)):
         # trajs[i].plot(timestep=0.1,ax=ax,label=str(i))
-        positions,traj_time = trajs[i].get_path(timestep=0.1)
+        positions,traj_time = trajs[i].get_path(timestep=timestep)
         x,y,z=positions[0],positions[1],positions[2]
         seq=[]
         for j in range(len(x)):
@@ -157,5 +157,3 @@ def get_xos_xrefs_from_sequences(MAV_sequences)->Tuple[List[np.ndarray],List[np.
     xrefs=[ i[-1] for i in MAV_sequences]
     
     return x0s, xrefs
-
-

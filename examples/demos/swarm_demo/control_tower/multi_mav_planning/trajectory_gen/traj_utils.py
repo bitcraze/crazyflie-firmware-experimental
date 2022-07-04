@@ -46,7 +46,8 @@ def debug_traj_generation(waypoints:np.ndarray, tr:Trajectory,downsample_step,pl
         t_traj=t_traj[:-delta]
     
     if len(t_wps)!=len(x_wps):
-        t_wps=t_wps[:-1]
+        delta=len(t_wps)-len(x_wps)
+        t_wps=t_wps[:-delta]
 
     #plotting 
     t_wps_original = interpolate_time_setpoints(waypoints, waypoints_original, t_wps)    
