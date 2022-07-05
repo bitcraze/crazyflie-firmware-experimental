@@ -52,342 +52,346 @@ Each polynomial is expressed in the matrix with the following format:
 """
 ##############################################################################################
 
+class TrajectoryGenerator:
+    @staticmethod
+    def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple[List[Polynomial],PiecewisePolynomial]:
+        """
+        waypoints: list of Point_Time
 
-def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple[List[Polynomial],PiecewisePolynomial]:
-    """
-    waypoints: list of Point_Time
+        wp_type: specifies the type of waypoint (x,y,z or yaw)
 
-    wp_type: specifies the type of waypoint (x,y,z or yaw)
+        returns: 
+            piece_pols: list (of Polynomial)
 
-    returns: 
-        piece_pols: list (of Polynomial)
+            total pol:  PiecewisePolynomial
 
-        total pol:  PiecewisePolynomial
+        """
+        # If m is the number of waypoints, n is the number of polynomials
+        m = len(waypoints)
+        n = m - 1
+        # print("m:", m, "n:", n)
+        A = np.zeros((8*n, 8*n),dtype=np.float64)
+        b = np.zeros((8*n, 1),dtype=np.float64)
+        # print("A.shape:", A.shape)
+        # print("b.shape:", b.shape)
 
-    """
-    # If m is the number of waypoints, n is the number of polynomials
-    m = len(waypoints)
-    n = m - 1
-    # print("m:", m, "n:", n)
-    A = np.zeros((8*n, 8*n),dtype=np.float64)
-    b = np.zeros((8*n, 1),dtype=np.float64)
-    # print("A.shape:", A.shape)
-    # print("b.shape:", b.shape)
+        time_points = []
+        prev_t = 0
+        for i, traj_point in enumerate(waypoints):
+            # if (wp_type == Waypoint.WP_TYPE_X):
+                # print("i:", i, "waypoint:", traj_point.wp.get_pos(),traj_point.t)
 
-    time_points = []
-    prev_t = 0
-    for i, traj_point in enumerate(waypoints):
-        # if (wp_type == Waypoint.WP_TYPE_X):
-            # print("i:", i, "waypoint:", traj_point.wp.get_pos(),traj_point.t)
+            traj_point: Point_time
 
-        traj_point: Point_time
+            wp = traj_point.wp.getType(wp_type)
+            t = traj_point.t-prev_t
+            if i != 0:
+                time_points.append(t)
 
-        wp = traj_point.wp.getType(wp_type)
-        t = traj_point.t-prev_t
-        if i != 0:
-            time_points.append(t)
-
-        pol = Polynomial([1, 1, 1, 1, 1, 1, 1, 1])
-
-        if (i == 0 or i == n):  # start/end constraints
-
-            for j in range(0, 4):
-                arr = np.array(pol.pol_coeffs_at_t(t))
-
-                # padding with zeros
-                arr = np.pad(arr, (8-len(arr), 0), 'constant')
-                if i == 0:
-                    A[j, 8*i:8*(i+1)] = arr
-                else:
-                    ind = -(4-j)
-                    if ind >= 0:
-                        continue
-
-                    A[ind, 8*(i-1):8*(i)] = arr
-                pol = pol.derivative()
-
-            tmp = np.array([wp, 0, 0, 0]).reshape((4, 1))
-
-            if i == 0:
-                b[0:4] = tmp
-            else:
-                b[-4:] = tmp
-
-        else:  # continuity constraints
-
-            array_to_add_prev = np.zeros((8, 8))
-            for j in range(0, 8):
-                vec = np.array(pol.pol_coeffs_at_t(t))
-
-                # padding with zeros
-                vec = np.pad(vec, (8-len(vec), 0), 'constant')
-                array_to_add_prev[j, :] = vec
-                pol = pol.derivative()
-
-            # TODO: Make this a separate function
             pol = Polynomial([1, 1, 1, 1, 1, 1, 1, 1])
-            array_to_add_next = np.zeros((8, 8))
-            for j in range(0, 8):
-                # t=0 because it is the start of the next polynomial
-                vec = np.array(pol.pol_coeffs_at_t(t=0))
 
-                # padding with zeros
-                vec = np.pad(vec, (8-len(vec), 0), 'constant')
-                array_to_add_next[j, :] = vec
-                pol = pol.derivative()
+            if (i == 0 or i == n):  # start/end constraints
 
-            # print("array_to_add_prev:", array_to_add_prev)
-            # print("array_to_add_next:", array_to_add_next)
+                for j in range(0, 4):
+                    arr = np.array(pol.pol_coeffs_at_t(t))
 
-            startl = 4+(i-1)*8  # start line index
-            endl = 4+(i-1)*8 + 6   # end line index
-            # conitnuity constraints
-            A[startl:endl, 8*(i-1):8*(i)] = array_to_add_prev[1:7, :]
-            A[startl:endl, 8*(i):8*(i+1)] = -array_to_add_next[1:7, :]
+                    # padding with zeros
+                    arr = np.pad(arr, (8-len(arr), 0), 'constant')
+                    if i == 0:
+                        A[j, 8*i:8*(i+1)] = arr
+                    else:
+                        ind = -(4-j)
+                        if ind >= 0:
+                            continue
 
-            b[startl:endl] = np.zeros((6, 1))
+                        A[ind, 8*(i-1):8*(i)] = arr
+                    pol = pol.derivative()
 
-            # waypoints constraints
-            A[endl,  8*(i-1):8*(i)] = array_to_add_prev[0, :]
-            A[endl+1, 8*(i):8*(i+1)] = array_to_add_next[0, :]
+                tmp = np.array([wp, 0, 0, 0]).reshape((4, 1))
 
-            b[endl] = wp
-            b[endl+1] = wp
+                if i == 0:
+                    b[0:4] = tmp
+                else:
+                    b[-4:] = tmp
 
-        # copy the time
-        prev_t = traj_point.t
+            else:  # continuity constraints
 
-    # if (wp_type == Waypoint.WP_TYPE_X):
-        # print("det(A):", np.linalg.det(A))
-        # np.savetxt("A.csv", A, delimiter=",")
-        # np.savetxt("b.csv", b, delimiter=",")
+                array_to_add_prev = np.zeros((8, 8))
+                for j in range(0, 8):
+                    vec = np.array(pol.pol_coeffs_at_t(t))
 
-    polynomials_coefficients = np.linalg.solve(a=A, b=b)
+                    # padding with zeros
+                    vec = np.pad(vec, (8-len(vec), 0), 'constant')
+                    array_to_add_prev[j, :] = vec
+                    pol = pol.derivative()
 
-    piece_pols:List[Polynomial] = []  # piecewise polynomials
-    for i in range(n):
-        p = polynomials_coefficients[8*i:8*(i+1)]
-        piece_pols.append(Polynomial(p))
+                # TODO: Make this a separate function
+                pol = Polynomial([1, 1, 1, 1, 1, 1, 1, 1])
+                array_to_add_next = np.zeros((8, 8))
+                for j in range(0, 8):
+                    # t=0 because it is the start of the next polynomial
+                    vec = np.array(pol.pol_coeffs_at_t(t=0))
 
-    # tests
-    DEBUG = 0
-    if DEBUG:
-        for i, wp in enumerate(waypoints):
-            t = wp.t
-            print("i:", i)
-            if i >= len(waypoints)-2:
-                continue
+                    # padding with zeros
+                    vec = np.pad(vec, (8-len(vec), 0), 'constant')
+                    array_to_add_next[j, :] = vec
+                    pol = pol.derivative()
 
-            if wp_type != Waypoint.WP_TYPE_X:
-                break
-            if i == 0:
-                print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
-                print(
-                    f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
-                print(
-                    f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
+                # print("array_to_add_prev:", array_to_add_prev)
+                # print("array_to_add_next:", array_to_add_next)
 
-                t = waypoints[i+1].t
-                print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
-                print(
-                    f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(0)}")
+                startl = 4+(i-1)*8  # start line index
+                endl = 4+(i-1)*8 + 6   # end line index
+                # conitnuity constraints
+                A[startl:endl, 8*(i-1):8*(i)] = array_to_add_prev[1:7, :]
+                A[startl:endl, 8*(i):8*(i+1)] = -array_to_add_next[1:7, :]
 
-                print(
-                    f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
-                print(
-                    f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(0)}")
-                print(
-                    f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
-                print(
-                    f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(0)}")
+                b[startl:endl] = np.zeros((6, 1))
 
+                # waypoints constraints
+                A[endl,  8*(i-1):8*(i)] = array_to_add_prev[0, :]
+                A[endl+1, 8*(i):8*(i+1)] = array_to_add_next[0, :]
+
+                b[endl] = wp
+                b[endl+1] = wp
+
+            # copy the time
+            prev_t = traj_point.t
+
+        # if (wp_type == Waypoint.WP_TYPE_X):
+            # print("det(A):", np.linalg.det(A))
+            # np.savetxt("A.csv", A, delimiter=",")
+            # np.savetxt("b.csv", b, delimiter=",")
+
+        polynomials_coefficients = np.linalg.solve(a=A, b=b)
+
+        piece_pols:List[Polynomial] = []  # piecewise polynomials
+        for i in range(n):
+            p = polynomials_coefficients[8*i:8*(i+1)]
+            piece_pols.append(Polynomial(p))
+
+        # tests
+        DEBUG = 0
+        if DEBUG:
+            for i, wp in enumerate(waypoints):
+                t = wp.t
+                print("i:", i)
+                if i >= len(waypoints)-2:
+                    continue
+
+                if wp_type != Waypoint.WP_TYPE_X:
+                    break
+                if i == 0:
+                    print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
+                    print(
+                        f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
+                    print(
+                        f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
+
+                    t = waypoints[i+1].t
+                    print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
+                    print(
+                        f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(0)}")
+
+                    print(
+                        f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
+                    print(
+                        f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(0)}")
+                    print(
+                        f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
+                    print(
+                        f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(0)}")
+
+                else:
+                    t = waypoints[i+1].t
+                    print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
+                    print(
+                        f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(t)}")
+
+                    print(
+                        f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
+                    print(
+                        f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(t)}")
+                    print(
+                        f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
+                    print(
+                        f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(t)}")
+
+
+        total_pol = PiecewisePolynomial(piece_pols, time_points)
+
+        return piece_pols, total_pol
+
+    @staticmethod
+    def calculate_trajectory4D(waypoints:List[Point_time])->Tuple[List[np.array],List[PiecewisePolynomial]]:
+        """
+        Calculates a trajectory for the given waypoints.
+        @param waypoints: list of waypoints in shape (n,4) where :
+            --> n is the number of waypoints 
+            --> each waypoint is a tuple/array (x,y,z,t)
+
+        @return: polynomials_coefficients: list of polynomials coefficients in shape (n,8)
+            --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
+            --> each polynomial is a polynomial of degree 7
+        @return: pc_pols : list of PiecewisePolynomials
+        """
+        # waypoints:list of Point_time instances
+
+        polx, pc_polx = TrajectoryGenerator.calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_X)
+        poly, pc_poly = TrajectoryGenerator.calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_Y)
+        polz, pc_polz = TrajectoryGenerator.calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_Z)
+        polyaw, pc_polyaw = TrajectoryGenerator.calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_YAW)
+
+        pols_coeffs = [polx, poly, polz, polyaw]
+        pc_pols = [pc_polx, pc_poly, pc_polz, pc_polyaw]
+
+
+        return pols_coeffs, pc_pols
+
+    @staticmethod
+    def allocateTime(waypoints: np.array, max_vel: float, max_acc: float)->np.ndarray:
+        """
+        Allocates time to the waypoints based on the max_vel and max_acc parameters.
+        @param waypoints: numpy array of waypoints in shape (n,3).
+        @param max_vel: maximum velocity
+        @param max_acc: maximum acceleration
+        @return: numpy array of times in shape (n,1)
+        """
+
+        # exclude last (yaw) column from the waypoints
+        waypoints = waypoints[:, :-1]
+
+        N = len(waypoints)-1
+        durations = np.zeros(N)
+
+        for k in range(N):
+            p0 = waypoints[k, :]
+            p1 = waypoints[k+1, :]
+
+            # get distance between points
+            D = np.linalg.norm(np.array(p0)-np.array(p1))
+
+            acct = max_vel / max_acc
+            accd = (max_acc * acct * acct / 2)
+            dcct = max_vel / max_acc
+            dccd = max_acc * dcct * dcct / 2
+
+            if (D < accd + dccd):
+                t1 = np.sqrt(max_acc * D) / max_acc
+                t2 = (max_acc * t1) / max_acc
+                dtxyz = t1 + t2
             else:
-                t = waypoints[i+1].t
-                print(f"pos at t={t} and pol={i}  -->{piece_pols[i].eval(t)}")
-                print(
-                    f"pos at t={t} and pol={i+1}-->{piece_pols[i+1].eval(t)}")
+                t1 = acct
+                t2 = (D - accd - dccd) / max_vel
+                t3 = dcct
+                dtxyz = t1 + t2 + t3
 
-                print(
-                    f"vel at t={t} and pol={i}-->{piece_pols[i+0].derivative().eval(t)}")
-                print(
-                    f"vel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().eval(t)}")
-                print(
-                    f"accel at t={t} and pol={i}-->{piece_pols[i+0].derivative().derivative().eval(t)}")
-                print(
-                    f"accel at t={t} and pol={i+1}-->{piece_pols[i+1].derivative().derivative().eval(t)}")
+            durations[k] = dtxyz
 
+        return durations
 
-    total_pol = PiecewisePolynomial(piece_pols, time_points)
+    @staticmethod
+    def allocateTimeProportional(waypoints: np.array, total_time):
+        """
+        Allocates portion of total time to the waypoints proportionally to their between distances.
+        
+        @param waypoints: numpy array of waypoints in shape (n,3).
+        @param total_time: total time in seconds
 
-    return piece_pols, total_pol
-
-
-def calculate_trajectory4D(waypoints:List[Point_time])->Tuple[List[np.array],List[PiecewisePolynomial]]:
-    """
-    Calculates a trajectory for the given waypoints.
-    @param waypoints: list of waypoints in shape (n,4) where :
-        --> n is the number of waypoints 
-        --> each waypoint is a tuple/array (x,y,z,t)
-
-    @return: polynomials_coefficients: list of polynomials coefficients in shape (n,8)
-        --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
-        --> each polynomial is a polynomial of degree 7
-    @return: pc_pols : list of PiecewisePolynomials
-    """
-    # waypoints:list of Point_time instances
-
-    polx, pc_polx = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_X)
-    poly, pc_poly = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_Y)
-    polz, pc_polz = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_Z)
-    polyaw, pc_polyaw = calculate_trajectory1D(waypoints, Waypoint.WP_TYPE_YAW)
-
-    pols_coeffs = [polx, poly, polz, polyaw]
-    pc_pols = [pc_polx, pc_poly, pc_polz, pc_polyaw]
+        @return: numpy array of times in shape (n,1)
+        """
 
 
-    return pols_coeffs, pc_pols
+        # exclude last (yaw) column from the waypoints
+        waypoints = waypoints[:, :-1]
 
-def allocateTime(waypoints: np.array, max_vel: float, max_acc: float)->np.ndarray:
-    """
-    Allocates time to the waypoints based on the max_vel and max_acc parameters.
-    @param waypoints: numpy array of waypoints in shape (n,3).
-    @param max_vel: maximum velocity
-    @param max_acc: maximum acceleration
-    @return: numpy array of times in shape (n,1)
-    """
+        # TODO: check if this time allocation leads to crazy trajectories and if so,
+        #     increase the total time
+        
+        N = len(waypoints)-1
+        durations = np.zeros(N)
+        distances = np.zeros(N)
 
-    # exclude last (yaw) column from the waypoints
-    waypoints = waypoints[:, :-1]
+        for k in range(N):
+            p0 = waypoints[k, :]
+            p1 = waypoints[k+1, :]
 
-    N = len(waypoints)-1
-    durations = np.zeros(N)
+            # get distance between points
+            D = np.linalg.norm(np.array(p0)-np.array(p1))
+            distances[k] = D
 
-    for k in range(N):
-        p0 = waypoints[k, :]
-        p1 = waypoints[k+1, :]
+        #find max distance
+        dist_sum = np.sum(distances)
+        
+        for k in range(N):
+            durations[k] = distances[k] / dist_sum * total_time
 
-        # get distance between points
-        D = np.linalg.norm(np.array(p0)-np.array(p1))
+        return durations
 
-        acct = max_vel / max_acc
-        accd = (max_acc * acct * acct / 2)
-        dcct = max_vel / max_acc
-        dccd = max_acc * dcct * dcct / 2
+    @staticmethod
+    def generate_traj(waypoints: np.array,total_time):
+        traj_points = []
+        t = 0
+        # time_allocation = allocateTime(waypoints,MAX_VEL,MAX_ACC)
 
-        if (D < accd + dccd):
-            t1 = np.sqrt(max_acc * D) / max_acc
-            t2 = (max_acc * t1) / max_acc
-            dtxyz = t1 + t2
-        else:
-            t1 = acct
-            t2 = (D - accd - dccd) / max_vel
-            t3 = dcct
-            dtxyz = t1 + t2 + t3
+        time_allocation = TrajectoryGenerator.allocateTimeProportional(waypoints,total_time)
+        # print("time_allocation:", time_allocation)
 
-        durations[k] = dtxyz
+        for i, point in enumerate(waypoints):
+            # time allocation
+            if i != 0:
+                t = t+time_allocation[i-1]
 
-    return durations
+            traj_points.append(Point_time(
+                Waypoint(point[0], point[1], point[2], point[3]), t=t))
 
+        pols_coeffs, pc_pols = TrajectoryGenerator.calculate_trajectory4D(traj_points)
 
-def allocateTimeProportional(waypoints: np.array, total_time):
-    """
-    Allocates portion of total time to the waypoints proportionally to their between distances.
-    
-    @param waypoints: numpy array of waypoints in shape (n,3).
-    @param total_time: total time in seconds
+        return pols_coeffs, pc_pols
 
-    @return: numpy array of times in shape (n,1)
-    """
+    @staticmethod
+    def create_traj(pols_coeffs, pc_pols)->Trajectory:
+        """
+        Creates a Trajectory instance from the given polynomials coefficients and PiecewisePolynomials.
+        @param pols_coeffs: list of polynomials coefficients in shape (n,8)
+            --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
+            --> each polynomial is a polynomial of degree 7
+        @param pc_pols: list of PiecewisePolynomials
+        @return: Trajectory instance
+        """
+        segments_number = len(pols_coeffs[0])
+        matrix = np.zeros((segments_number, 4*8+1))
 
+        for i in range(segments_number):
+            # prev_time = matrix[i-1, 0] if i > 0 else 0
+            matrix[i, 0] = pc_pols[0].time_durations[i] 
+            # matrix[i, 0] = i*1
+            matrix[i:i+1, 1:9] = pols_coeffs[0][i].p.T
+            matrix[i, 9:17] = pols_coeffs[1][i].p.T
+            matrix[i, 17:25] = pols_coeffs[2][i].p.T
+            matrix[i, 25:33] = pols_coeffs[3][i].p.T
 
-    # exclude last (yaw) column from the waypoints
-    waypoints = waypoints[:, :-1]
+        matrix = np.array(matrix)
+        # print("matrix.shape: ", matrix.shape)
 
-    # TODO: check if this time allocation leads to crazy trajectories and if so,
-    #     increase the total time
-    
-    N = len(waypoints)-1
-    durations = np.zeros(N)
-    distances = np.zeros(N)
+        tr = Trajectory()
+        tr.load_from_matrix(matrix)
 
-    for k in range(N):
-        p0 = waypoints[k, :]
-        p1 = waypoints[k+1, :]
+        return tr
 
-        # get distance between points
-        D = np.linalg.norm(np.array(p0)-np.array(p1))
-        distances[k] = D
-
-    #find max distance
-    dist_sum = np.sum(distances)
-    
-    for k in range(N):
-        durations[k] = distances[k] / dist_sum * total_time
-
-    return durations
-
-def generate_traj(waypoints: np.array,total_time):
-    traj_points = []
-    t = 0
-    # time_allocation = allocateTime(waypoints,MAX_VEL,MAX_ACC)
-
-    time_allocation = allocateTimeProportional(waypoints,total_time)
-    # print("time_allocation:", time_allocation)
-
-    for i, point in enumerate(waypoints):
-        # time allocation
-        if i != 0:
-            t = t+time_allocation[i-1]
-
-        traj_points.append(Point_time(
-            Waypoint(point[0], point[1], point[2], point[3]), t=t))
-
-    pols_coeffs, pc_pols = calculate_trajectory4D(traj_points)
-
-    return pols_coeffs, pc_pols
-
-
-def create_traj(pols_coeffs, pc_pols)->Trajectory:
-    """
-    Creates a Trajectory instance from the given polynomials coefficients and PiecewisePolynomials.
-    @param pols_coeffs: list of polynomials coefficients in shape (n,8)
-        --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
-        --> each polynomial is a polynomial of degree 7
-    @param pc_pols: list of PiecewisePolynomials
-    @return: Trajectory instance
-    """
-    segments_number = len(pols_coeffs[0])
-    matrix = np.zeros((segments_number, 4*8+1))
-
-    for i in range(segments_number):
-        # prev_time = matrix[i-1, 0] if i > 0 else 0
-        matrix[i, 0] = pc_pols[0].time_durations[i] 
-        # matrix[i, 0] = i*1
-        matrix[i:i+1, 1:9] = pols_coeffs[0][i].p.T
-        matrix[i, 9:17] = pols_coeffs[1][i].p.T
-        matrix[i, 17:25] = pols_coeffs[2][i].p.T
-        matrix[i, 25:33] = pols_coeffs[3][i].p.T
-
-    matrix = np.array(matrix)
-    # print("matrix.shape: ", matrix.shape)
-
-    tr = Trajectory()
-    tr.load_from_matrix(matrix)
-
-    return tr
-
-def min_snap_traj_generation(waypoints:np.ndarray,total_time:float)->Trajectory:
-    """
-    Generates a trajectory from the given waypoints with a duration of the total_time.
-    @param waypoints: numpy array of waypoints in shape (n,3).
-    @param total_time: total time in seconds
-    @return: Trajectory instance
-    """
-    pols_coeffs, pc_pols = generate_traj(waypoints,total_time)
-    tr = create_traj(pols_coeffs, pc_pols)
-    
-    return tr
-    
+    @staticmethod
+    def min_snap_traj_generation(waypoints:np.ndarray,total_time:float)->Trajectory:
+        """
+        Generates a trajectory from the given waypoints with a duration of the total_time.
+        @param waypoints: numpy array of waypoints in shape (n,3).
+        @param total_time: total time in seconds
+        @return: Trajectory instance
+        """
+        pols_coeffs, pc_pols = TrajectoryGenerator.generate_traj(waypoints,total_time)
+        tr = TrajectoryGenerator.create_traj(pols_coeffs, pc_pols)
+        
+        return tr
+        
 if __name__ == "__main__":
     # waypoints format: t,x,y,z,yaw
     # waypoints = [
@@ -597,8 +601,8 @@ if __name__ == "__main__":
         print(waypoints.shape)
         downsample_step = 4
 
-        tr=min_snap_traj_generation(waypoints[::downsample_step,:],total_time= total_time)    
+        tr=TrajectoryGenerator.min_snap_traj_generation(waypoints[::downsample_step,:],total_time= total_time)    
 
-        debug_traj_generation(waypoints, tr,downsample_step)
+        TrajectoryDebugger.debug_traj_generation(waypoints, tr,downsample_step)
 
     plt.show()
