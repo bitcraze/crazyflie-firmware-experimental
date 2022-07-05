@@ -23,7 +23,7 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
-TRAJECTORY_COUNT=4
+TRAJECTORY_COUNT=2
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -105,8 +105,21 @@ class TrafficController:
         pending_trajs=self.trajs_uploaded-self.trajs_uploaded_success
         expected_states=[self.STATE_WAITING_TO_RECEIVE_TRAJECTORY,self.STATE_RUNNING_TRAJECTORY]
         is_in_valid_state= self.copter_state == expected_states[0] or self.copter_state == expected_states[1]
+
+        stage1 = is_in_valid_state and pending_trajs==0 and self.can_upload_trajectory
         
-        return  is_in_valid_state and pending_trajs==0 and self.can_upload_trajectory
+        if stage1:
+            trajcount=self.get_trajectory_count()
+            print(Fore.MAGENTA,self.get_short_uri(),trajcount)
+            trajectory_going_to_pad = int(trajcount) == 0 or int(trajcount) == 255
+            print("trajectory_going_to_pad",trajectory_going_to_pad,Fore.RESET)
+            
+            if not trajectory_going_to_pad:
+                return True
+            else:
+                return False
+        
+        return False
 
     def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]

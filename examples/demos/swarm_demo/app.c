@@ -323,7 +323,10 @@ static void appTimer(xTimerHandle timer) {
       }
 
       start_trajectory=0;
-      
+      DEBUG_PRINT("Starting traj with remain traj: %d\n", remainingTrajectories);
+      // if going to land, then execute trajectory slower (to avoid collisions)
+      // float traj_scale= remainingTrajectories ==255 ? SEQUENCE_SPEED * 2.0f: SEQUENCE_SPEED ;
+
       start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
       state = STATE_RUNNING_TRAJECTORY;
       
@@ -333,7 +336,7 @@ static void appTimer(xTimerHandle timer) {
       if (terminateTrajectoryAndLand){
         crtpCommanderHighLevelStop();
         terminateTrajectoryAndLand = false;
-        DEBUG_PRINT("Terminating trajectory, going to pad...\n");
+        DEBUG_PRINT("Terminating trajectory, going to pad mlk...\n");
         float timeToPadPosition = 2.0;
         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
         currentProgressInTrajectory = NO_PROGRESS;
@@ -341,7 +344,8 @@ static void appTimer(xTimerHandle timer) {
       }
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
+        DEBUG_PRINT("Trajectory finished, remaining trajectories: %d\n", remainingTrajectories);
+        if (terminateTrajectoryAndLand || (remainingTrajectories == 255)) {
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
@@ -349,12 +353,13 @@ static void appTimer(xTimerHandle timer) {
           currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
-          if (remainingTrajectories > 0) {
+          if (remainingTrajectories >= 0) {
             float delayMs=3000.0f;
             timeWhenToGoToInitialPosition = now + delayMs;
+            DEBUG_PRINT("Going to state WAITING_TO_RECEIVE_TRAJECTORY \n");
             state=STATE_WAITING_TO_RECEIVE_TRAJECTORY;
             
-            int temp= remainingTrajectories-1;
+            uint8_t temp= remainingTrajectories-1;
             paramSet(paramIdTrajcount.index,  &temp);
           }
         }
@@ -395,7 +400,7 @@ static void appTimer(xTimerHandle timer) {
         DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
           ledseqRun(&seq_lock);
-          state = STATE_WAIT_FOR_TAKE_OFF;
+          state = STATE_IDLE;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
           crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT, 1.0);
