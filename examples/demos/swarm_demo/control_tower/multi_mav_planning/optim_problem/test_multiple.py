@@ -79,7 +79,7 @@ def solve_multiple_MAV_problem(x0s, xrefs):
     # call the solver with the initial and reference states
     solver_status = mng.call(z)
 
-    print("solver_status:", solver_status["exit_status"])
+    print("solver_status:", solver_status["exit_status"] ,"in {:.2f} msec".format(solver_status["solve_time_ms"]))
     # print("solver_status:", solver_status["max_constraint_violation"])
     us = solver_status['solution']
 

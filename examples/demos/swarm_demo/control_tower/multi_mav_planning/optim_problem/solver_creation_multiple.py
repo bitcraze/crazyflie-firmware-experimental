@@ -67,6 +67,13 @@ for t in range(0, N):  # for each time step in the horizon
         x0s[i][1] += ts * u[curr_t+1]
         x0s[i][2] += ts * u[curr_t+2]
 
+        #obstacle cost
+        cylinder_pos=(0,0,0)
+        cylinder_radius=0.5
+        cylinder_height=3
+        h=cylinder_radius - cs.sqrt((x0s[i][0]-cylinder_pos[0])**2 + (x0s[i][1]-cylinder_pos[1])**2)
+        cost += qObs*cs.fmax(0, h)
+
     # Swarm Collision cost
     swarm_combinations = it.combinations(range(N_MAV), 2)
     epsilon=0.0000001# to avoid being zero at the beginning
