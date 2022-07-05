@@ -2,6 +2,7 @@
 try:
     from trajectory_gen.uav_trajectory import Trajectory
     from trajectory_gen import min_snap_traj_gen as min_snap_tg
+    from trajectory_gen import traj_utils 
     from optim_problem.test_multiple import * 
     from optim_problem.test_multiple import * 
     from logged_trajs_visualizer import analyse_trajs_from_matrix
@@ -10,6 +11,7 @@ try:
 except:
     from .trajectory_gen.uav_trajectory import Trajectory
     from .trajectory_gen import min_snap_traj_gen as min_snap_tg
+    from .trajectory_gen import traj_utils 
     from .optim_problem.test_multiple import *
     from .logged_trajs_visualizer import analyse_trajs_from_matrix
     from .MAV_utils import find_times_of_closest_distances
@@ -85,6 +87,19 @@ def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float
         #insert column of zeros at the end(yaw)
         waypoints=np.insert(waypoints,3,0,axis=1)
 
+        # Check if generated trajectory is stable,otherwise, reduce total time
+        # dt=0
+        # while True:
+        #     tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time-dt)
+        #     tr_unstable = tr.is_unstable(should_plot=0)
+        #     print("Trajectory {} unstable: {}".format(i,tr_unstable))
+             
+        #     if( not tr_unstable):
+        #         break
+        #         # 
+        #     dt+=0.25
+        #     print("Increasing dt to {}".format(dt))
+        
         tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time)
         trajs.append( tr )
         waypoints_used_for_traj_gen.append(waypoints)
@@ -136,6 +151,19 @@ xrefs = [[
 [ 0.89 , 1.39,      0.40],
 ]]
 
+x0s= [[
+    [1.00001493, 1.00008743, 1.00000786   ], 
+    [-0.99999097, -0.99999993,  1.        ],
+    [ 0.99996825, -1.00008681,  0.9999922 ],
+    [-0.99999097,  1.00000002,  1.        ],
+    ]]
+
+xrefs=[[
+    [-0.9824921488761902, 1.1573436260223389, 0.4],
+    [-1.0102819204330444, -0.5790976285934448, 0.4], 
+    [0.8624248504638672, -0.6220494508743286, 0.4], 
+    [0.894738495349884, 1.3935884237289429, 0.4]
+    ]]
 
 
 def main(case=2)->List[Trajectory]:

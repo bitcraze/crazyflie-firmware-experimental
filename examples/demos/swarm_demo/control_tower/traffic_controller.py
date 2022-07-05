@@ -110,9 +110,7 @@ class TrafficController:
         
         if stage1:
             trajcount=self.get_trajectory_count()
-            print(Fore.MAGENTA,self.get_short_uri(),trajcount)
             trajectory_going_to_pad = int(trajcount) == 0 or int(trajcount) == 255
-            print("trajectory_going_to_pad",trajectory_going_to_pad,Fore.RESET)
             
             if not trajectory_going_to_pad:
                 return True

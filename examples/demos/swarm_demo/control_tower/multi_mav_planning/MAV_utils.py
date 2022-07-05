@@ -10,6 +10,7 @@ except:
     from .trajectory_gen import uav_trajectory,traj_utils
     from .optim_problem import plotting
 
+MIN_DISTANCE_TO_INCREASE_RESOLUTION = 0.7
 
 def analyse_trajs_from_matrix(trajs_mat):
     x0s,xrefs=None,None
@@ -67,9 +68,9 @@ def analyze_MAV_sequences(x0s,xrefs, MAV_sequence):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    plotting.animate3D(MAV_sequence,ax=ax,fig=fig)
+    # plotting.animate3D(MAV_sequence,ax=ax,fig=fig)
 
-    # plotting.plotGridSpec(MAV_sequences=MAV_sequence)
+    plotting.plotGridSpec(MAV_sequences=MAV_sequence)
     plt.show()
 
 def plot_distance_in_MAV_pairs(dists,MAV_pairs):
@@ -183,6 +184,11 @@ def find_times_of_closest_distances(dists:List[List[List[float]]],MAV_index:int,
     
     #sort the dictionary by distance
     min_distances_dict=sorted(min_distances_dict.items(), key=lambda x: x[1])
+    
+    #add times that occur at the minimum distances being below the threshold
+    for i in range(number_of_times):
+        if min_distances_dict[i][1]>MIN_DISTANCE_TO_INCREASE_RESOLUTION:
+            number_of_times -= 1
 
     #get the times of the 3 closest distances
     times=[]

@@ -140,6 +140,8 @@ class Polynomial4D:
 
 
 class Trajectory:
+    ACCELERATION_STABILITY_THRESHOLD = 10
+
     def __init__(self):
         self.polynomials :List[Polynomial4D] = None
         self.duration = None
@@ -274,6 +276,51 @@ class Trajectory:
         positions = np.array([x,y,z])
 
         return positions,time
+
+    def is_unstable(self,should_plot:bool=False):
+        """
+        Checks maximum acceleration of the  trajectory and then decides if it is unstable based on the threshold.
+        """
+
+        time=np.linspace(0,self.duration,50)
+        if should_plot:
+            #plot velocity of trajectory
+            plt.figure()
+            plt.suptitle("Acceleration of trajectory")
+            plt.subplot(3,2,1)
+            plt.plot(time,[self.eval(t).acc[0] for t in time])
+            plt.title('x')
+            plt.grid()
+            plt.subplot(3,2,3)
+            plt.plot(time,[self.eval(t).acc[1] for t in time])
+            plt.title('y')
+            plt.grid()
+            plt.subplot(3,2,5)
+            plt.plot(time,[self.eval(t).acc[2] for t in time])
+            plt.title('z')
+            plt.grid()
+
+            plt.subplot(3,2,2)
+            plt.plot(time,[self.eval(t).vel[0] for t in time])
+            plt.title('Velocity x')
+            plt.grid()
+            plt.subplot(3,2,4)
+            plt.plot(time,[self.eval(t).vel[1] for t in time])
+            plt.title('Velocity y')
+            plt.grid()
+            plt.subplot(3,2,6)
+            plt.plot(time,[self.eval(t).vel[2] for t in time])
+            plt.title('Velocity z')
+            plt.grid()
+
+            plt.show()
+
+        for i in range(3):
+            vals=[abs(self.eval(t).acc[i]) for t in time]
+            if max(vals)>self.ACCELERATION_STABILITY_THRESHOLD:
+                return True
+        
+        return False
 
 class Waypoint():
     def __init__(self, x, y, z, yaw):
