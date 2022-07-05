@@ -90,7 +90,7 @@ def interpolate_time_setpoints(waypoints, waypoints_original, t_wps):
            min_i = i
            min_v = v
     
-    print(t_wps_original)
+    # print(t_wps_original)
 
     return t_wps_original
 
@@ -216,3 +216,4 @@ def separate_plots(waypoints_original, x, y, z, t_traj, x_wps, y_wps, z_wps, t_w
     ax3d.set_ylabel('y')
     ax3d.set_zlabel('z')
     ax3d.grid()
+

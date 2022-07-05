@@ -94,7 +94,7 @@ class Tower(TowerBase):
                 currently_flying = self.flying_count()
                 missing = wanted - currently_flying
                 if missing > 0:
-                    print("Want", missing, "more copters")
+                    # print("Want", missing, "more copters")
                     self.prepare_copters(missing)
                     self.start_copters(missing, wanted)
             else:
@@ -241,16 +241,16 @@ class Tower(TowerBase):
         missing = count - prepared_count
         new_prepared_count = 0
         if missing > 0:
-            print("Trying to prepare", missing, "copter(s)")
+            # print("Trying to prepare", missing, "copter(s)")
             best_controllers = self.find_best_controllers()
-            print("Best controllers:", [controller.uri for controller in best_controllers])
+            # print("Best controllers:", [controller.uri for controller in best_controllers])
 
             for best_controller in best_controllers[:missing]:
                 if best_controller:
                     print("Preparing " + best_controller.uri)
                     new_prepared_count += 1
                     best_controller.take_off()
-            print("Prepared", new_prepared_count, "copter(s)")
+            # print("Prepared", new_prepared_count, "copter(s)")
 
     def start_copters(self, count, total):
         for controller in self.controllers:
