@@ -157,3 +157,39 @@ def get_xos_xrefs_from_sequences(MAV_sequences)->Tuple[List[np.ndarray],List[np.
     xrefs=[ i[-1] for i in MAV_sequences]
     
     return x0s, xrefs
+
+
+def find_times_of_closest_distances(dists:List[List[List[float]]],MAV_index:int,number_of_times:int=3):
+    """
+    Finds the times of closest distance between MAVs
+    @param dists: distance matrix in shape (N_MAVs,N_MAVs,horizon_length)
+    @param MAV_index: index of MAV to find closest distance to
+    @param number_of_times: number of times to find closest distance to
+    @return: list of times of closest distance
+    """
+    min_distances_dict={}
+    
+    for i in range(len(dists)):
+        if i==MAV_index:
+            continue
+
+        #distances between MAV_index and i
+        distances=dists[MAV_index,i,:]
+        #find the 3 minimum distances and their indices
+        min_distances_indices=np.argsort(distances)[:3]
+        #make a dictionary of the indices and their distances
+        for j in range(len(min_distances_indices)):
+            min_distances_dict[min_distances_indices[j]]=distances[j]
+    
+    #sort the dictionary by distance
+    min_distances_dict=sorted(min_distances_dict.items(), key=lambda x: x[1])
+
+    #get the times of the 3 closest distances
+    times=[]
+    while len(times)<number_of_times:
+        if min_distances_dict[0][0] not in times:        
+            times.append(min_distances_dict[0][0])
+
+        min_distances_dict.pop(0)
+    
+    return times

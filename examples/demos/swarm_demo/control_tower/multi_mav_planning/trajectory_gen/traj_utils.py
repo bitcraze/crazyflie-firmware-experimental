@@ -12,7 +12,7 @@ except:
     from .uav_trajectory import *
 
 
-def debug_traj_generation(waypoints:np.ndarray, tr:Trajectory,downsample_step,plt_title=None):
+def debug_traj_generation(waypoints:np.ndarray, tr:Trajectory,waypoints_used_for_gen,plt_title=None):
     """
     This function is used to debug the trajectory generation.
     It plots the generated trajectory and the waypoints.
@@ -25,7 +25,7 @@ def debug_traj_generation(waypoints:np.ndarray, tr:Trajectory,downsample_step,pl
         waypoints = np.array(waypoints)
 
     waypoints_original = waypoints.copy()
-    waypoints = waypoints[::downsample_step,:]
+    waypoints = waypoints_used_for_gen
 
     timestep=0.01
     pos,traj_time=tr.get_path(timestep=timestep)
@@ -74,11 +74,12 @@ def interpolate_time_setpoints(waypoints, waypoints_original, t_wps):
     @return: list of time setpoints in shape (original_waypoints_number,)
     """
 
+    # fix array of form [t0,None,None,t1,None,None,t2,None,None,...]
     original_shape = waypoints_original.shape
     t_wps_original=[None] * original_shape[0]
     for i in range(original_shape[0]):
         for j in range(len(waypoints)):
-            if (waypoints_original[i,:]==waypoints[j,:]).all():
+            if (waypoints_original[i,:]==waypoints[j,:3]).all():
                 t_wps_original[i]=t_wps[j]
     
     min_i = 0

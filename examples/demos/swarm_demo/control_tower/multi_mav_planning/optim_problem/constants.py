@@ -1,5 +1,5 @@
 ts = 0.05
-N = 50
+N = 100
 N_MAV = 4
 (nu, nx) = (3, 3)  # control and state dimensions
 # Costs Constants
