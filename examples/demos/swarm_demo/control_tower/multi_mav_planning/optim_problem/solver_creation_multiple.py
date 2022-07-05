@@ -71,7 +71,9 @@ for t in range(0, N):  # for each time step in the horizon
         cylinder_pos=(0,0,0)
         cylinder_radius=0.5
         cylinder_height=3
-        h=cylinder_radius - cs.sqrt((x0s[i][0]-cylinder_pos[0])**2 + (x0s[i][1]-cylinder_pos[1])**2)
+        constr2D=cylinder_radius - cs.sqrt((x0s[i][0]-cylinder_pos[0])**2 + (x0s[i][1]-cylinder_pos[1])**2)
+        constrHeight=cylinder_height - cs.sqrt((x0s[i][2]-cylinder_pos[2])**2)
+        h=cs.fmin(cs.fmax(0,constrHeight),constr2D)  
         cost += qObs*cs.fmax(0, h)
 
     # Swarm Collision cost
