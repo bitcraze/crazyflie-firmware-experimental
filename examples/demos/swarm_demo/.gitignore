@@ -1,6 +1,6 @@
 bin/*
 cf2.*
-control_tower/multi_mav_planning/my_optimizers/navigation_multiple/
+control_tower/multi_mav_planning/my_optimizers/
 control_tower/multi_mav_planning/logged_trajs/*
 cache
 test.py
