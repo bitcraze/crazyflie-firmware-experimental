@@ -160,13 +160,6 @@ static void enableMellingerController() { paramSetInt(paramIdStabilizerControlle
 #endif
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 
-// static void defineTrajectory() {
-//   const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
-//   trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
-//   crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
-//   crtpCommanderHighLevelDefineTrajectory(trajectoryId, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
-// }
-
 static void defineLedSequence() {
   ledseqRegisterSequence(&seq_lock);
 }
@@ -250,7 +243,8 @@ static void appTimer(xTimerHandle timer) {
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
-      prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retakinf off
+      // prevent from sending the same trajectory again after retaking off
+      prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
@@ -324,8 +318,6 @@ static void appTimer(xTimerHandle timer) {
 
       start_trajectory=0;
       DEBUG_PRINT("Starting traj with remain traj: %d\n", remainingTrajectories);
-      // if going to land, then execute trajectory slower (to avoid collisions)
-      // float traj_scale= remainingTrajectories ==255 ? SEQUENCE_SPEED * 2.0f: SEQUENCE_SPEED ;
 
       start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
       state = STATE_RUNNING_TRAJECTORY;
@@ -345,7 +337,7 @@ static void appTimer(xTimerHandle timer) {
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Trajectory finished, remaining trajectories: %d\n", remainingTrajectories);
-        if (terminateTrajectoryAndLand || (remainingTrajectories == 255)) {
+        if (terminateTrajectoryAndLand || (remainingTrajectories == 255)) { // 255 means all trajectories are finished and we are going to land
           terminateTrajectoryAndLand = false;
           DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
@@ -483,30 +475,6 @@ static void resetLockData() {
     }
 }
 
-// static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]){
-//   if(traj_id<255){
-//     struct poly4d first_segment;
-//     uint32_t offset;
-//     if (traj_id==1){
-//       offset=0;
-//     } else {
-//       offset=15;
-//     }
-
-//     int res=crtpCommanderHighLevelReadTrajectory(offset*TRAJECTORY_SEGMENT_SIZE_BYTES, sizeof(first_segment), (uint8_t*)&first_segment);
-//     if (res){
-//       wp[0]=first_segment.p[0][0];
-//       wp[1]=first_segment.p[1][0];
-//       wp[2]=first_segment.p[2][0];
-//       wp[3]=first_segment.p[3][0];
-
-//       DEBUG_PRINT("Trajectory %d first waypoint: %f %f %f\n",latestTrajectoryId,(double) wp[0],(double) wp[1],(double) wp[2]);
-//       return true;
-//     }
-//     return false;
-//   }
-//   return false;
-// }
 
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)

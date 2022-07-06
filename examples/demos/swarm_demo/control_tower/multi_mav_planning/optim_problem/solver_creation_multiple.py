@@ -22,8 +22,6 @@
 
 import opengen as og
 import casadi.casadi as cs
-import matplotlib.pyplot as plt
-import numpy as np
 from constants import *
 import itertools as it
 

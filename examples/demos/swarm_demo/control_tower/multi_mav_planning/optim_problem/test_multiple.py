@@ -85,11 +85,12 @@ def solve_multiple_MAV_problem(x0s, xrefs):
     """Solves the multiple MAV path planning problem and returns the velocity control inputs each MAV."""
     # Create a TCP connection manager
     try:
-        mng = og.tcp.OptimizerTcpManager("my_optimizers/navigation_multiple")
+        path = "my_optimizers/navigation_multiple"
+        mng = og.tcp.OptimizerTcpManager(path)
+        
     except:
-        print("Could not create a TCP connection manager with short path")
-        path = "/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
-
+        print("Could not create a TCP connection manager with short path,trying long path")
+        path = "examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
         mng = og.tcp.OptimizerTcpManager(path)
 
     # Start the TCP server

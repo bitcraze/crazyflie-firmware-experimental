@@ -21,13 +21,9 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 # Useful link :https://realpython.com/linear-programming-python/
-import time
 from typing import List,Tuple
 import numpy as np
-from numpy.core.function_base import linspace
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
-from matplotlib import animation
 
 try:
     from uav_trajectory import *
@@ -40,7 +36,7 @@ except:
 """
 A 7th rank polynomial is used (t^7)
 
-First wp(waipont) conditions:
+First wp(waypont) conditions:
     x(0) = waypoint(0)
     x'(0) = x''(0)=x'''(0)= 0
 
@@ -78,15 +74,12 @@ class TrajectoryGenerator:
     @staticmethod
     def calculate_trajectory1D(waypoints:List[Point_time], wp_type=Waypoint.WP_TYPE_X)->Tuple[List[Polynomial],PiecewisePolynomial]:
         """
-        waypoints: list of Point_Time
+        @param waypoints: list of Point_Time
 
-        wp_type: specifies the type of waypoint (x,y,z or yaw)
+        @param wp_type: specifies the type of waypoint (x,y,z or yaw)
 
-        returns: 
-            piece_pols: list (of Polynomial)
 
-            total pol:  PiecewisePolynomial
-
+        @return: a tuple of (polynomials, piecewise_polynomial)
         """
         # If m is the number of waypoints, n is the number of polynomials
         m = len(waypoints)
@@ -248,6 +241,7 @@ class TrajectoryGenerator:
     def calculate_trajectory4D(waypoints:List[Point_time])->Tuple[List[np.array],List[PiecewisePolynomial]]:
         """
         Calculates a trajectory for the given waypoints.
+        
         @param waypoints: list of waypoints in shape (n,4) where :
             --> n is the number of waypoints 
             --> each waypoint is a tuple/array (x,y,z,t)
@@ -255,6 +249,7 @@ class TrajectoryGenerator:
         @return: polynomials_coefficients: list of polynomials coefficients in shape (n,8)
             --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
             --> each polynomial is a polynomial of degree 7
+        
         @return: pc_pols : list of PiecewisePolynomials
         """
         # waypoints:list of Point_time instances
@@ -274,9 +269,11 @@ class TrajectoryGenerator:
     def allocateTime(waypoints: np.array, max_vel: float, max_acc: float)->np.ndarray:
         """
         Allocates time to the waypoints based on the max_vel and max_acc parameters.
+        
         @param waypoints: numpy array of waypoints in shape (n,3).
         @param max_vel: maximum velocity
         @param max_acc: maximum acceleration
+        
         @return: numpy array of times in shape (n,1)
         """
 
@@ -375,10 +372,12 @@ class TrajectoryGenerator:
     def create_traj(pols_coeffs, pc_pols)->Trajectory:
         """
         Creates a Trajectory instance from the given polynomials coefficients and PiecewisePolynomials.
+        
         @param pols_coeffs: list of polynomials coefficients in shape (n,8)
             --> each polynomial is a tuple/array (p0,p1,p2,p3,p4,p5,p6,p7)
             --> each polynomial is a polynomial of degree 7
         @param pc_pols: list of PiecewisePolynomials
+        
         @return: Trajectory instance
         """
         segments_number = len(pols_coeffs[0])
@@ -405,8 +404,10 @@ class TrajectoryGenerator:
     def min_snap_traj_generation(waypoints:np.ndarray,total_time:float)->Trajectory:
         """
         Generates a trajectory from the given waypoints with a duration of the total_time.
+        
         @param waypoints: numpy array of waypoints in shape (n,3).
         @param total_time: total time in seconds
+        
         @return: Trajectory instance
         """
         pols_coeffs, pc_pols = TrajectoryGenerator.generate_traj(waypoints,total_time)

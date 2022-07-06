@@ -20,26 +20,20 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-import random
 from typing import List
 import time
 import cflib.crtp  # noqa
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
-import statistics
-import sys
 import threading
-import math
 
 import numpy as np
 from cflib.crazyflie.mem.trajectory_memory import TrajectoryMemory
 from cflib.crazyflie.mem import MemoryElement
 from cflib.crazyflie.mem import Poly4D
 
-import zmq
 
 from multi_mav_planning import main as multi_MAV
-import simpleaudio
 from colorama import Fore, Back, Style
 
 #CONSTANTS
@@ -186,7 +180,6 @@ class TrafficController:
         self.final_position=self.get_final_position(trajectory).pos
         print(self.short_uri+"Final position:",self.final_position)
         self.traj_start_time = time.time()
-        # trajectory_mem.write_data_marios(self._upload_done,write_failed_cb=self._upload_failed,tr_id=self.latest_trajectory_id)
         
         self.upload_trajectory_to_memory(trajectory_mem,self._upload_done,self._upload_failed,self.latest_trajectory_id)
 
