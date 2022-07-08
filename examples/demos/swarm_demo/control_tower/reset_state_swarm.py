@@ -28,13 +28,21 @@ if __name__ == '__main__':
     # param_value=("led.bitmask",255)
 
     cflib.crtp.init_drivers(enable_debug_driver=False)
-
+    prev_connected_count = 0
+    conencted_count = 0
+    
     h=Handler(uris,param_value)
     while True:
         got_callback=[i.is_connected!=None for i in h.cfs]
-
+        
+        conencted_count=sum(got_callback)
+        if conencted_count!=prev_connected_count:
+            print("Connected: {}".format(conencted_count))
+            prev_connected_count=conencted_count
+            
         if all(got_callback):
             time.sleep(2)
+           
             for i in h.cfs:
                 i.terminate_thread()
             break

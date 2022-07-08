@@ -1,8 +1,8 @@
+import string
 import threading
 import time
 from collections import namedtuple
-from queue import Queue
-from typing import List
+from typing import Any, List, Tuple
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 
@@ -14,8 +14,9 @@ from cflib.crazyflie.swarm import Swarm
 
 uris = [
     'radio://0/20/2M/E7E7E7E700',
-    # 'radio://0/20/2M/E7E7E7E701', nope
+    'radio://0/20/2M/E7E7E7E701',# nope
     'radio://0/20/2M/E7E7E7E702',
+    'radio://0/20/2M/E7E7E7E703',
     'radio://0/20/2M/E7E7E7E704',
     'radio://0/20/2M/E7E7E7E706',
     'radio://0/20/2M/E7E7E7E707',
@@ -23,6 +24,7 @@ uris = [
 ]
 
 class SimpleInterface:
+    """This simple class interface is used to connect to a Crazyflie and set a parameter as soon as it is able to do so. """
     def __init__(self, uri,param_value):
         self.param_value = param_value
         self.stay_alive=True
@@ -61,9 +63,16 @@ class SimpleInterface:
         self.stay_alive = False
     
 class Handler:
-    def __init__(self,uris,param_value_pair) -> None:
+    """ Handler for all the SimpleInterface objects."""
+
+    def __init__(self,uris:List[str],param_value_pair:Tuple[str,float or int]) -> None:
+        """
+        Initialize the Handler.
+
+        @param uris: List of URIs to connect to.
+        @param param_value_pair: Tuple of (parameter,value) to set.
+        """
         self.cfs :List[SimpleInterface]= []
         self.uris = uris
         for uri in uris:
             self.cfs.append(SimpleInterface(uri,param_value_pair))
-    

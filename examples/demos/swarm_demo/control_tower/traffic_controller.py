@@ -471,7 +471,8 @@ class TrafficController:
             print(Style.RESET_ALL,end="")
             
             if data['app.state']==self.STATE_LANDING:
-                 self.set_trajectory_count(TRAJECTORY_COUNT)
+                self.set_trajectory_count(TRAJECTORY_COUNT)
+                self.final_position = None # reset final position so after taking of use the current position
 
             if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY or data['app.state']==self.STATE_RUNNING_TRAJECTORY :
                 # can_upload_trajectory is set only when copter enters for first time the state 
@@ -482,6 +483,11 @@ class TrafficController:
                 self._waiting_to_start_traj = True
             else:
                 self._waiting_to_start_traj = False
+
+            if data['app.state']==self.STATE_CRASHED:
+                self._cf.param.set_value("led.bitmask",255)
+            elif self.copter_state== self.STATE_CRASHED or self.copter_state==self.STATE_UNKNOWN :# if previous state was crashed
+                self._cf.param.set_value("led.bitmask",0)
 
         self.copter_state = data['app.state']
 
