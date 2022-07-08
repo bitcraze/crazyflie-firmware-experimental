@@ -74,6 +74,8 @@ generated = [
 ]
 
 class Tower(TowerBase):
+    TRAJ_RECEIVE_CONFLICT_TIMEOUT = 4
+
     def __init__(self, uris, report_socket=None):
         TowerBase.__init__(self, uris, report_socket)
         
@@ -85,6 +87,8 @@ class Tower(TowerBase):
         ]
 
         self.wanted :int = None
+
+        self.traj_receive_conflict=False
 
     def fly(self, wanted):
         self.wanted=wanted
@@ -134,9 +138,78 @@ class Tower(TowerBase):
                 print("All flying copters are waiting to start trajectories")
                 self.all_flying_copters_start_trajectory()
             
+            #Check if traj_receive_conflict and resolve the conflict by resolving the problem for the current positions
+            if self.check_waiting_to_start_traj_conflict():
+                print(Fore.RED,"Trajectory receive conflict detected !!!",Fore.RESET)
+                #use current positions as start since copters haven't executed the previously uploaded trajectory
+                self.solve_multiple_MAV(use_current_positions=True)
+            
+            self.check_if_too_many_crashed()
+            
             self.send_report()
 
             time.sleep(0.2)
+
+    def check_if_too_many_crashed(self):
+        """
+            Check if there are flying copers waiting for trajectories and the \
+            rest of the copters are crashed. If so, land all the waiting copters.
+        """
+
+        copters_crashed = self.get_crashed_copters()
+        crashed_count = len(copters_crashed)
+
+        if self.wanted > len(self.controllers)-crashed_count:
+            print("Too many crashed copters, landing all waiting copters")
+        
+        self.wanted = min([4, len(self.controllers)-crashed_count])
+    
+    def get_copters_waiting_for_trajectories(self):
+        return [controller for controller in self.get_flying_controllers() if controller.copter_state==TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY] 
+
+    def get_crashed_copters(self):
+        return [controller for controller in self.controllers if controller.copter_state==TrafficController.STATE_CRASHED]
+
+    def check_waiting_to_start_traj_conflict(self):
+        """
+        Check if some copters are on state WAITING_FOR_TRAJECTORY while 
+        others are on state WAITING_TO_START_TRAJECTORY (usually happens when
+        a copter crashes when it has already received the next trajectory)
+        
+        Returns True if there is at least one copter on state WAITING_TO_RECEIVE_TRAJECTORY
+        and one on state WAITING_TO_START_TRAJECTORY and this situation persists for more 
+        than a time threshold.
+        """
+
+        flying_controllers = self.get_flying_controllers()
+
+        waiting_to_receive_traj_controllers = [c for c in flying_controllers if c.copter_state == TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY]        
+        waiting_to_start_traj_controllers   = [c for c in flying_controllers if c.copter_state == TrafficController.STATE_WAITING_TO_START_TRAJECTORY]
+        
+        #count
+        waiting_to_receive_traj_count = len(waiting_to_receive_traj_controllers)
+        waiting_to_start_traj_count   = len(waiting_to_start_traj_controllers)
+
+        conflict_exists = waiting_to_receive_traj_count > 0 and waiting_to_start_traj_count > 0
+
+        if  not self.traj_receive_conflict:
+            self.traj_receive_conflict=conflict_exists
+            self.traj_receive_conflict_start_time=time.time()   
+
+            return False
+        else:
+            if conflict_exists:
+                if time.time() - self.traj_receive_conflict_start_time > Tower.TRAJ_RECEIVE_CONFLICT_TIMEOUT:
+                    print("Conflict detected:")
+                    print("Waiting to receive traj:", waiting_to_receive_traj_count)
+                    print("Waiting to start traj:", waiting_to_start_traj_count)
+                    self.traj_receive_conflict=False
+                    self.traj_receive_conflict_start_time=time.time()
+                    return True
+            else:
+                self.traj_receive_conflict=False
+                return False
+
 
     def safety_check(self):
         for controller in self.controllers:
@@ -174,12 +247,14 @@ class Tower(TowerBase):
         return copters_ids_to_go_on_chargers
                 
 
-    def solve_multiple_MAV(self):
+    def solve_multiple_MAV(self,use_current_positions=False):
         flying_controllers = self.get_flying_controllers()
         
         x0s=[]
         for cf in flying_controllers:
-            if type(cf.final_position)==type(None):#if final position is not set yet
+            #if final position is not set yet or if we want to use current positions
+            if type(cf.final_position)==type(None) or use_current_positions:
+                print("Using current position for:",cf.get_short_uri())
                 pos=[cf.est_x,cf.est_y,cf.est_z]
             else:
                 pos=cf.final_position
@@ -217,13 +292,13 @@ class Tower(TowerBase):
                     elif j==len(predef_xrefs)-1:
                         print("final xref is the same as the final x0 left")
                         xrefs.append(xrefs[0])
-                        xrefs[0]=predef_xrefs[j] #TODO: this is a "hack" to make sure we don't use the same xref twice 
+                        xrefs[0]=predef_xrefs[j] #this is a way to make sure we don't use the same xref twice 
 
 
         points_to_pad=multi_MAV.N_MAV-len(x0s)
         for i in range(points_to_pad):
-            x0s.append([0,0,0])
-            xrefs.append([0,0,0])
+            x0s.append(  [2,2,2] )  #padding with zeros seemed to crash the solver     
+            xrefs.append([2,2,2] )  #padding with zeros seemed to crash the solver
         
         print("Trying to solve problem with:")
         print("x0s:",x0s)
@@ -321,3 +396,14 @@ class Tower(TowerBase):
         unsued_slot_times = list(
             map(lambda s: offset + s / total_slots, unused_slots))
         return unsued_slot_times
+
+    def reset_crash_states(self):
+        print(Fore.RED,"Waiting 5 seconds",Fore.RESET)
+        print("Resetting crash states")
+        for controller in self.controllers:
+            controller.reset_crash_state()
+
+    def safety_land_all_flying(self):
+        for controller in self.get_flying_controllers():
+            controller.safety_land()
+            controller.reset_internal()

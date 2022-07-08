@@ -106,6 +106,7 @@ static paramVarId_t paramIdCommanderEnHighLevel;
 static paramVarId_t paramIdLighthouseMethod;
 static paramVarId_t paramIdTrajcount;
 
+static paramVarId_t paramIdLedBitMask;
 //#define USE_MELLINGER
 
 #define TRAJ_Y_OFFSET 0.35
@@ -189,6 +190,8 @@ void appMain() {
   paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
   paramIdTrajcount =paramGetVarId("app","trajcount");
 
+  paramIdLedBitMask = paramGetVarId("led", "bitmask");
+
   timer = xTimerCreate("AppTimer", M2T(20), pdTRUE, NULL, appTimer);
   xTimerStart(timer, 20);
 
@@ -248,13 +251,17 @@ static void appTimer(xTimerHandle timer) {
     state = STATE_IDLE;
     resetLockData();
     enableHighlevelCommander();
-    crtpCommanderHighLevelInit();
+    // crtpCommanderHighLevelInit();
   }
-
+  
+  // uint8_t bitmaskValue;
   
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+      // bitmaskValue = 0;
+      // paramSet(paramIdLedBitMask.index,&bitmaskValue);
+      
       // prevent from sending the same trajectory again after retaking off
       prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAIT_FOR_POSITION_LOCK;
@@ -317,7 +324,6 @@ static void appTimer(xTimerHandle timer) {
         break;
       }
 
-      prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAITING_TO_START_TRAJECTORY;
 
       uint8_t temp= remainingTrajectories-1;
@@ -332,9 +338,10 @@ static void appTimer(xTimerHandle timer) {
       }
 
       start_trajectory=0;
-      DEBUG_PRINT("Starting traj with remain traj: %d\n", remainingTrajectories);
+      DEBUG_PRINT("Starting traj of id: %d with remain traj: %d\n", latestTrajectoryId ,remainingTrajectories);
 
       start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+      prevTrajectoryId = latestTrajectoryId; 
       state = STATE_RUNNING_TRAJECTORY;
       
       flightTime += delta;
@@ -343,7 +350,7 @@ static void appTimer(xTimerHandle timer) {
       if (terminateTrajectoryAndLand){
         crtpCommanderHighLevelStop();
         terminateTrajectoryAndLand = false;
-        DEBUG_PRINT("Terminating trajectory, going to pad mlk...\n");
+        DEBUG_PRINT("Terminating trajectory, going to pad ...\n");
         float timeToPadPosition = 2.0;
         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
         currentProgressInTrajectory = NO_PROGRESS;
@@ -354,7 +361,7 @@ static void appTimer(xTimerHandle timer) {
         DEBUG_PRINT("Trajectory finished, remaining trajectories: %d\n", remainingTrajectories);
         if (terminateTrajectoryAndLand || (remainingTrajectories == 255)) { // 255 means all trajectories are finished and we are going to land
           terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Terminating trajectory, going to pad...\n");
+          DEBUG_PRINT("Last trajectory finished, going to pad...\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
           currentProgressInTrajectory = NO_PROGRESS;
@@ -373,7 +380,7 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_GOING_TO_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         stabilizeEndTime = now + 5000;
         state = STATE_WAITING_AT_PAD;
       }
@@ -415,7 +422,7 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_REPOSITION_ON_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, 1.5, false);
         state = STATE_GOING_TO_PAD;
       }
@@ -423,6 +430,9 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
+      // bitmaskValue = 255;
+      // paramSet(paramIdLedBitMask.index,&bitmaskValue);
+      
       break;
     default:
       break;
