@@ -86,6 +86,8 @@ static uint8_t prevTrajectoryId = 255;
 
 static uint8_t start_trajectory=0;
 static uint8_t safety_land_flag=0;
+static uint8_t reset_crash_state_flag = 0;
+
 static uint8_t is_safety_landing=0;
 
 // Log and param ids
@@ -221,6 +223,7 @@ static void appTimer(xTimerHandle timer) {
           DEBUG_PRINT("Error starting trajectory: %d\n", start_trajectory_result);
   }
 
+  // safety landing check from control tower
   if (safety_land_flag==1){
     if (is_safety_landing==0){
       crtpCommanderHighLevelLand(0,SAFETY_LAND_DURATION);
@@ -238,7 +241,16 @@ static void appTimer(xTimerHandle timer) {
 
     return;
   }
-  
+
+  // state crash resetting from control tower
+  if (reset_crash_state_flag && !supervisorIsTumbled()) {
+    reset_crash_state_flag = false;
+    state = STATE_IDLE;
+    resetLockData();
+    enableHighlevelCommander();
+    crtpCommanderHighLevelInit();
+  }
+
   
   switch(state) {
     case STATE_IDLE:
@@ -292,7 +304,7 @@ static void appTimer(xTimerHandle timer) {
           goToInitialPositionWhenReady = -1.0f;
           DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
           state = STATE_WAITING_TO_RECEIVE_TRAJECTORY;
-          prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retakinf off
+          prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retaking off
         }
       }
       flightTime += delta;
@@ -307,6 +319,9 @@ static void appTimer(xTimerHandle timer) {
 
       prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAITING_TO_START_TRAJECTORY;
+
+      uint8_t temp= remainingTrajectories-1;
+      paramSet(paramIdTrajcount.index,  &temp);
 
       flightTime += delta;
       break;
@@ -351,8 +366,6 @@ static void appTimer(xTimerHandle timer) {
             DEBUG_PRINT("Going to state WAITING_TO_RECEIVE_TRAJECTORY \n");
             state=STATE_WAITING_TO_RECEIVE_TRAJECTORY;
             
-            uint8_t temp= remainingTrajectories-1;
-            paramSet(paramIdTrajcount.index,  &temp);
           }
         }
       }
@@ -486,7 +499,9 @@ PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, trajcount, &remainingTrajectories)
   PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
   PARAM_ADD(PARAM_UINT8, start_traj, &start_trajectory)
+
   PARAM_ADD(PARAM_UINT8, safety_land, &safety_land_flag)
+  PARAM_ADD(PARAM_UINT8, reset_crash_state, &reset_crash_state_flag)
 
 PARAM_GROUP_STOP(app)
 

@@ -36,7 +36,7 @@ The demo is started by running the control_tower.py script
 
 ## <u>Description</u>
 In this demo a swarm of Crazyflies is created and controlled by a control tower.
-As soon as the desired number of flying copters have been taken off,random points of a rectangular area are chosen for each copter.A optimization problem is solved to find the best way to reach the chosen point while maintaining a collision free status.Both between the copters and static obstacles.
+As soon as the desired number of flying copters have been taken off,random points of a rectangular area are chosen for each copter.A optimization problem is solved to find the best way to reach the chosen point while maintaining a collision free status .Both between the copters and static obstacles(in this code there is an obstacle modeled as a cylinder).
 
 As soon the desired waypoints have been created from the solver a minimum snap trajectory is generated through them and sent to the copters.
 
@@ -47,6 +47,7 @@ While flying the next trajectories are calculated,generated and uploaded.As a re
 Finally,after a certain amount of trajectories a trajectory that leads back to the charging station is generated and sent to each drone.
 
 After that the copters are brought back to the charging station and the swarm is reset.
+
 
 
 

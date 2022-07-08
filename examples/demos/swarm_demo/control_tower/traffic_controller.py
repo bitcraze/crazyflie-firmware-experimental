@@ -73,7 +73,7 @@ class TrafficController:
 
     PRE_STATE_TIMEOUT = 3
 
-    OUT_OF_BOUNDS_CUBE =(1.4,1.4,1.8)
+    OUT_OF_BOUNDS_CUBE =(1.6,1.6,1.8)
 
     def __init__(self, uri):
         self.uri = uri
@@ -102,6 +102,7 @@ class TrafficController:
 
         self._trajcount = 255
         self.final_position=None
+        self._fully_connected = False
 
     def pos_out_of_bounds(self):
         return self.est_x>self.OUT_OF_BOUNDS_CUBE[0]\
@@ -126,7 +127,8 @@ class TrafficController:
         
         if stage1:
             trajcount=self.get_trajectory_count()
-            trajectory_going_to_pad = int(trajcount) == 0 or int(trajcount) == 255
+            # trajectory_going_to_pad = int(trajcount) == 0 or int(trajcount) == 255
+            trajectory_going_to_pad = int(trajcount) == 255
             
             if not trajectory_going_to_pad:
                 return True
@@ -134,7 +136,7 @@ class TrafficController:
                 return False
         
         return False
-
+    
     def upload_trajectory(self, trajectory:np.array):
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
         trajectory_mem:TrajectoryMemory
@@ -230,7 +232,7 @@ class TrafficController:
         dt=time.time()-self.traj_start_time
         print(Fore.GREEN+'Trajectory upload succesfull to {} after {:0.3f} sec!'.format(self.uri[-2:],dt)+Style.RESET_ALL)
 
-        # self.latest_offset refers to pol segments so multiplcation by 132 is needed to get the real offset
+        # self.latest_offset refers to pol segments so multiplication by 132 is needed to get the real offset
         # since each segment is 132 bytes long
         for i,conf in enumerate(self._traj_upload_configs):
             if conf.defined or conf.trajectory_id==None:
@@ -376,6 +378,7 @@ class TrafficController:
 
     def _all_updated(self,link_uri):
         """Callback that is called when all parameters have been updated"""
+        self._fully_connected = True
 
         self.set_trajectory_count(TRAJECTORY_COUNT)
         self._setup_logging()
@@ -506,6 +509,13 @@ class TrafficController:
         self.est_x = data['stateEstimate.x']
         self.est_y = data['stateEstimate.y']
         self.est_z = data['stateEstimate.z']
+
+    def reset_crash_state(self):
+        self._cf.param.add_update_callback("app","reset_crash_state",self._reset_crash_state_callback)
+        self._cf.param.set_value('app.reset_crash_state', 1)
+
+    def _reset_crash_state_callback(self, name, value):
+        print(self.get_short_uri(),"Reset crash state callback ->new value: {}".format(value))
 
     def dump(self):
         print("***", self.uri)
