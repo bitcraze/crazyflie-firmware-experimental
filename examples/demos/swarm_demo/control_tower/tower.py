@@ -159,15 +159,16 @@ class Tower(TowerBase):
 
         copters_crashed = self.get_crashed_copters()
         crashed_count = len(copters_crashed)
-        # connected_count = len(self.get_connected_copters()) #didnt work,there was only 1 connected copter 
-        connected_count = len(self.controllers)
+        # able_to_fly_count = len(self.get_connected_copters()) #didnt work,there was only 1 connected copter 
+        # able_to_fly_count = len(self.controllers)
+        able_to_fly_count = len(self.get_controllers_able_to_fly())
 
-        if self.wanted > connected_count-crashed_count:
+        if self.wanted > able_to_fly_count-crashed_count:
             print("Too many crashed copters , landing all waiting copters")
         
-        # print("Wanted copters:",self.wanted,"Connected copters:",connected_count,"Crashed copters:",crashed_count)
+        # print("Wanted copters:",self.wanted,"Connected copters:",able_to_fly_count,"Crashed copters:",crashed_count)
 
-        self.wanted = min([self.wanted_original , connected_count-crashed_count])
+        self.wanted = min([self.wanted_original , able_to_fly_count-crashed_count])
     
     def get_copters_waiting_for_trajectories(self):
         return [controller for controller in self.get_flying_controllers() if controller.copter_state==TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY] 
@@ -215,8 +216,12 @@ class Tower(TowerBase):
                 self.traj_receive_conflict=False
                 return False
 
-    def get_connected_copters(self):
-        return [controller for controller in self.controllers if controller.copter_state==TrafficController.CS_CONNECTED]
+    def get_controllers_able_to_fly(self):#TODO: make this check event based whenever a copter changes state
+        """
+            Returns the number of copters that are able to fly in general,not necessarily now.(not crashed and not never connected)
+        """
+        # return [controller for controller in self.controllers if controller.copter_state==TrafficController.CS_CONNECTED]# not working
+        return [controller for controller in self.controllers if controller.able_to_fly()]
 
     def safety_check(self):
         for controller in self.controllers:
@@ -333,7 +338,9 @@ class Tower(TowerBase):
             return False
         
         if len(flying_controllers) != self.wanted:
-            print("Some flying copters are flying but not as many as wanted ({}) to start trajectories".format(self.wanted))
+            uris=[cf.short_uri for cf in flying_controllers]
+            print("{} flying copters are flying ({}) but not as many as wanted ({}) to start trajectories".format(len(flying_controllers),uris,self.wanted))
+            print("crashed count :",len(self.get_crashed_copters()))
             return False
 
         for controller in flying_controllers:

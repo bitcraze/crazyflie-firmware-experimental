@@ -47,18 +47,15 @@ from tower import Tower
 from tower_sync import SyncTower
 
 
-def beep():
-    wave_obj = simpleaudio.WaveObject.from_wave_file("/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/beep.wav")
-    play_obj = wave_obj.play()
-    play_obj.wait_done()
-
 uris = [
-    # 'radio://0/20/2M/E7E7E7E701',
+    # 'radio://0/20/2M/E7E7E7E700',#
+    'radio://0/20/2M/E7E7E7E701',
     'radio://0/20/2M/E7E7E7E702',
-    'radio://0/20/2M/E7E7E7E706',
-
+    'radio://0/20/2M/E7E7E7E703',
     'radio://0/20/2M/E7E7E7E704',
-    'radio://0/20/2M/E7E7E7E707',
+    'radio://0/20/2M/E7E7E7E706',#
+    'radio://0/20/2M/E7E7E7E707',#
+    # 'radio://0/20/2M/E7E7E7E709'# 
 
     # 'radio://0/10/2M/E7E7E7E701',
     # 'radio://0/10/2M/E7E7E7E702',
@@ -71,27 +68,6 @@ uris = [
     # 'radio://0/10/2M/E7E7E7E709'
 ]
 
-x0s = [
-       [ [0, 0, 1],[0, 1, 1] ],
-       [ [0.5, 0, 1],[0.5, 1, 1] ], 
-       [ [0.5, 0.5, 0.5],[0.5, 0.5, 1.5] ],
-       [ [0, 0, 1],[1, 0, 1] ],
-       [ [-1, -1 , 1] , [ 1, 1, 1] ],
-
-   ]
-
-xrefs = [
-    [ [1, 1, 1],[1, 0, 1] ],
-    [ [0.5, 1, 1.5],[0.5, 0, 1.5] ],
-    [ [0.5, 0.5, 1.5],[0.5, 0.5, 0.5] ],
-    [ [1, 1, 1.5],[0, 1, 1.5] ],
-    [ [1, 1, 1],[-1, -1, 1] ],
-]
-
-
-# trajs=multi_MAV.solve_problem(x0s[-1],xrefs=xrefs[-1])
-# print(trajs)
-# input("Press enter to start")
 
 count = 4
 mode = 'normal'

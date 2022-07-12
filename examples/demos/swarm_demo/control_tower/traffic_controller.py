@@ -75,6 +75,8 @@ class TrafficController:
 
     OUT_OF_BOUNDS_CUBE =(1.6,1.6,1.8)
     
+    CHARGED_FOR_FLIGHT_THRESHOLD = 3.6
+
     LOW_BATTERY_THRESHOLD = 3.2
 
     def __init__(self, uri):
@@ -357,7 +359,7 @@ class TrafficController:
         return self.vbat
 
     def is_charged_for_flight(self):
-        return self.vbat > 3.6
+        return self.vbat > TrafficController.CHARGED_FOR_FLIGHT_THRESHOLD
 
     def needs_charging(self):
         return self.vbat < TrafficController.LOW_BATTERY_THRESHOLD
@@ -406,6 +408,11 @@ class TrafficController:
             
             trajectory_mem.trajectory.append(pol)
 
+    def able_to_fly(self):#TODO: make this check event based whenever a copter changes state
+        """
+            Returns true if the copter is able to fly in general.
+        """
+        return self.copter_state >self.STATE_UNKNOWN and self.copter_state < self.STATE_CRASHED and not self.needs_charging() 
         
     def _connection_failed(self, link_uri, msg):
         print('Connection to %s failed: %s' % (link_uri, msg))

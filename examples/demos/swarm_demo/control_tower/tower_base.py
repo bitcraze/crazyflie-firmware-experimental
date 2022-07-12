@@ -64,7 +64,7 @@ class TowerBase:
                 count += 1
         return count
 
-    def find_best_controllers(self):
+    def find_best_controllers(self)->List[TrafficController]:
         too_low_battery = []
 
         charging_controllers = []

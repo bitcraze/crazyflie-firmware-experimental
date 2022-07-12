@@ -31,6 +31,8 @@ if __name__ == '__main__':
     prev_connected_count = 0
     conencted_count = 0
     
+    # uris=['radio://0/20/2M/E7E7E7E707']#if you want to set a specific copter set its value here
+    
     h=Handler(uris,param_value)
     while True:
         got_callback=[i.is_connected!=None for i in h.cfs]
