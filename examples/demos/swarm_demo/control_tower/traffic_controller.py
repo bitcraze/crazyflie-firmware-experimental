@@ -74,6 +74,8 @@ class TrafficController:
     PRE_STATE_TIMEOUT = 3
 
     OUT_OF_BOUNDS_CUBE =(1.6,1.6,1.8)
+    
+    LOW_BATTERY_THRESHOLD = 3.2
 
     def __init__(self, uri):
         self.uri = uri
@@ -339,8 +341,8 @@ class TrafficController:
                 self._cf.param.set_value('app.start', trajectory_delay)
 
     def force_land(self):
-        if self.connection_state == self.CS_CONNECTED:
-            self._cf.param.set_value('app.stop', 1)
+        # if self.connection_state == self.CS_CONNECTED:
+        self._cf.param.set_value('app.stop', 1)
 
     def set_trajectory_count(self, count):
         if self.connection_state == self.CS_CONNECTED:
@@ -356,6 +358,9 @@ class TrafficController:
 
     def is_charged_for_flight(self):
         return self.vbat > 3.6
+
+    def needs_charging(self):
+        return self.vbat < TrafficController.LOW_BATTERY_THRESHOLD
 
     def get_traj_cycles(self):
         return self.traj_cycles
@@ -486,7 +491,7 @@ class TrafficController:
 
             if data['app.state']==self.STATE_CRASHED:
                 self._cf.param.set_value("led.bitmask",255)
-            elif self.copter_state== self.STATE_CRASHED or self.copter_state==self.STATE_UNKNOWN :# if previous state was crashed
+            elif self.copter_state== self.STATE_CRASHED or self.copter_state==self.STATE_UNKNOWN :# if previous state was crashed or unknown
                 self._cf.param.set_value("led.bitmask",0)
 
         self.copter_state = data['app.state']

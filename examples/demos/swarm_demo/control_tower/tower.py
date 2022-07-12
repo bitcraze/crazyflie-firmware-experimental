@@ -87,10 +87,12 @@ class Tower(TowerBase):
         ]
 
         self.wanted :int = None
+        self.wanted_original :int = None
 
         self.traj_receive_conflict=False
 
     def fly(self, wanted):
+        self.wanted_original=wanted
         self.wanted=wanted
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
@@ -114,7 +116,7 @@ class Tower(TowerBase):
 
         while True:
             
-            self.safety_check()
+            self.safety_check()#checks if any copter is out of the safety zone and if so, it lands it
 
             if wanted:
                 currently_flying = self.flying_count()
@@ -129,7 +131,6 @@ class Tower(TowerBase):
 
             
             # Check if new trajectories need to be calculated
-            # time.sleep(3)
             if self.all_flying_copters_waiting_for_trajectories():
                 print("All copters are waiting for trajectories")
                 self.solve_multiple_MAV()
@@ -158,11 +159,15 @@ class Tower(TowerBase):
 
         copters_crashed = self.get_crashed_copters()
         crashed_count = len(copters_crashed)
+        # connected_count = len(self.get_connected_copters()) #didnt work,there was only 1 connected copter 
+        connected_count = len(self.controllers)
 
-        if self.wanted > len(self.controllers)-crashed_count:
-            print("Too many crashed copters, landing all waiting copters")
+        if self.wanted > connected_count-crashed_count:
+            print("Too many crashed copters , landing all waiting copters")
         
-        self.wanted = min([4, len(self.controllers)-crashed_count])
+        # print("Wanted copters:",self.wanted,"Connected copters:",connected_count,"Crashed copters:",crashed_count)
+
+        self.wanted = min([self.wanted_original , connected_count-crashed_count])
     
     def get_copters_waiting_for_trajectories(self):
         return [controller for controller in self.get_flying_controllers() if controller.copter_state==TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY] 
@@ -210,6 +215,8 @@ class Tower(TowerBase):
                 self.traj_receive_conflict=False
                 return False
 
+    def get_connected_copters(self):
+        return [controller for controller in self.controllers if controller.copter_state==TrafficController.CS_CONNECTED]
 
     def safety_check(self):
         for controller in self.controllers:
@@ -241,7 +248,13 @@ class Tower(TowerBase):
         for i,controller in enumerate(flying_controllers):
             traj_count=controller.get_trajectory_count()
             print("controller",controller.uri[-2:], "traj count:",traj_count, type(traj_count))
-            if int(traj_count)==1:
+            
+            if controller.needs_charging():
+                print("controller",controller.uri[-2:],"needs charging ,planning trajectory to go on charger")
+                controller.force_land()
+                print("Forced Landing Signal sent")
+
+            if int(traj_count)==1 or int(traj_count)==0 or controller.needs_charging():
                 copters_ids_to_go_on_chargers.append(i)
         
         return copters_ids_to_go_on_chargers
@@ -320,7 +333,7 @@ class Tower(TowerBase):
             return False
         
         if len(flying_controllers) != self.wanted:
-            print("Some flying copters are flying but not as many as wanted to start trajectories")
+            print("Some flying copters are flying but not as many as wanted ({}) to start trajectories".format(self.wanted))
             return False
 
         for controller in flying_controllers:

@@ -17,6 +17,7 @@
 #include "supervisor.h"
 #include "controller.h"
 #include "ledseq.h"
+#include "led.h"
 #include "pptraj.h"
 #include "lighthouse_position_est.h"
 #include "lighthouse_core.h"
@@ -31,6 +32,8 @@ static bool isInit = false;
 static void appTimer(xTimerHandle timer);
 
 #define LED_LOCK         LED_GREEN_R
+#define LED_CRASH        LED_GREEN_R
+
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
 #define MAX_PAD_ERR 0.005
@@ -42,6 +45,10 @@ static void appTimer(xTimerHandle timer);
 
 #define SAFETY_LAND_HEIGHT 0.05f
 #define SAFETY_LAND_DURATION 3.0 // in seconds
+
+#define OUT_OF_BOUNDS_X 2.0f
+#define OUT_OF_BOUNDS_Y 2.0f
+#define OUT_OF_BOUNDS_Z 2.2f
 
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
@@ -107,7 +114,7 @@ static paramVarId_t paramIdLighthouseMethod;
 static paramVarId_t paramIdTrajcount;
 
 static paramVarId_t paramIdLedBitMask;
-//#define USE_MELLINGER
+// #define USE_MELLINGER
 
 #define TRAJ_Y_OFFSET 0.35
 
@@ -137,9 +144,45 @@ ledseqStep_t seq_lock_def[] = {
   {    0, LEDSEQ_LOOP},
 };
 
+// ledseqStep_t seq_crash_def[] = {
+//   { true, LEDSEQ_WAITMS(100)},
+//   {false, LEDSEQ_WAITMS(100)},
+//   { true, LEDSEQ_WAITMS(100)},
+//   {false, LEDSEQ_WAITMS(100)},
+//   { true, LEDSEQ_WAITMS(100)},
+//   {false, LEDSEQ_WAITMS(1000)},
+
+//   {    0, LEDSEQ_LOOP},
+// };
+
+ledseqStep_t seq_crash_def[] = {
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(500)},
+
+  {    0, LEDSEQ_LOOP},
+  
+};
+
 ledseqContext_t seq_lock = {
   .sequence = seq_lock_def,
   .led = LED_LOCK,
+};
+
+ledseqContext_t seq_crash = {
+  .sequence = seq_crash_def,
+  .led = LED_CRASH,
 };
 
 const uint8_t trajectoryId = 1;
@@ -152,7 +195,7 @@ static float getZ() { return logGetFloat(logIdStateEstimateZ); }
 static float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
 static float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
 static float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
-static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
+// static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 static bool isCharging() { return logGetInt(logIdPmState) == charging; }
 static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 
@@ -165,6 +208,7 @@ static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel
 
 static void defineLedSequence() {
   ledseqRegisterSequence(&seq_lock);
+  ledseqRegisterSequence(&seq_crash);
 }
 
 void appMain() {
@@ -218,25 +262,37 @@ static void appTimer(xTimerHandle timer) {
     state = STATE_CRASHED;
   }
 
-  if (isBatLow()) {
-    terminateTrajectoryAndLand = true;
-  }
+  // if (isBatLow()) {
+  //   terminateTrajectoryAndLand = true;
+  // }
 
   if (start_trajectory_result != 0) {
           DEBUG_PRINT("Error starting trajectory: %d\n", start_trajectory_result);
   }
 
+  //out of bounds check
+  if (getX() > OUT_OF_BOUNDS_X || getX() < -OUT_OF_BOUNDS_X || getY() > OUT_OF_BOUNDS_Y || getY() < -OUT_OF_BOUNDS_Y || getZ() > OUT_OF_BOUNDS_Z || getZ() < -OUT_OF_BOUNDS_Z) {
+    if (state>=STATE_TAKING_OFF && state<=STATE_REPOSITION_ON_PAD) {
+      safety_land_flag = 1;
+      state=STATE_CRASHED;
+    }   
+  }
+
+
   // safety landing check from control tower
   if (safety_land_flag==1){
     if (is_safety_landing==0){
+      DEBUG_PRINT("Safety landing executing!\n");
       crtpCommanderHighLevelLand(0,SAFETY_LAND_DURATION);
       is_safety_landing=1;
     }else{
       // it is already landing
       if (crtpCommanderHighLevelIsTrajectoryFinished()){
         crtpCommanderHighLevelStop();
-        state = STATE_IDLE;
-
+        if (state!=STATE_CRASHED){
+          state = STATE_IDLE;
+        }
+        
         safety_land_flag=0;
         is_safety_landing=0;
       }
@@ -254,14 +310,14 @@ static void appTimer(xTimerHandle timer) {
     // crtpCommanderHighLevelInit();
   }
   
-  // uint8_t bitmaskValue;
+  uint8_t bitmaskValue;
   
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
-      // bitmaskValue = 0;
-      // paramSet(paramIdLedBitMask.index,&bitmaskValue);
-      
+      bitmaskValue = 0;
+      paramSet(paramIdLedBitMask.index,&bitmaskValue);
+      ledseqStop(&seq_crash);
       // prevent from sending the same trajectory again after retaking off
       prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAIT_FOR_POSITION_LOCK;
@@ -269,7 +325,7 @@ static void appTimer(xTimerHandle timer) {
     case STATE_WAIT_FOR_POSITION_LOCK:
       if (hasLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
-        ledseqRun(&seq_lock);
+        // ledseqRun(&seq_lock);
         state = STATE_WAIT_FOR_TAKE_OFF;
       }
       break;
@@ -292,7 +348,7 @@ static void appTimer(xTimerHandle timer) {
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Hovering, waiting for command to start\n");
-        ledseqStop(&seq_lock);
+        // ledseqStop(&seq_lock);
         state = STATE_HOVERING;
 
       }
@@ -327,7 +383,8 @@ static void appTimer(xTimerHandle timer) {
       state = STATE_WAITING_TO_START_TRAJECTORY;
 
       uint8_t temp= remainingTrajectories-1;
-      paramSet(paramIdTrajcount.index,  &temp);
+      paramSet(paramIdTrajcount.index,  &temp);// not needed since param is declared in the same file as the app
+      remainingTrajectories=temp;
 
       flightTime += delta;
       break;
@@ -347,21 +404,21 @@ static void appTimer(xTimerHandle timer) {
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
-      if (terminateTrajectoryAndLand){
-        crtpCommanderHighLevelStop();
-        terminateTrajectoryAndLand = false;
-        DEBUG_PRINT("Terminating trajectory, going to pad ...\n");
-        float timeToPadPosition = 2.0;
-        crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
-        currentProgressInTrajectory = NO_PROGRESS;
-        state = STATE_GOING_TO_PAD;
-      }
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Trajectory finished, remaining trajectories: %d\n", remainingTrajectories);
-        if (terminateTrajectoryAndLand || (remainingTrajectories == 255)) { // 255 means all trajectories are finished and we are going to land
+        // 255 means all trajectories are finished and we are going to land
+        // terminateTrajectoryAndLand is set to true when the landing is requested by the control tower 
+        // or when the battery is low and we need to land
+        if (terminateTrajectoryAndLand || remainingTrajectories == 255) { 
+          if(terminateTrajectoryAndLand){
+            DEBUG_PRINT("Forced Landing, going to pad ...\n");
+          }
+          else{
+            DEBUG_PRINT("Last trajectory finished, going to pad...\n");
+          }
+
           terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Last trajectory finished, going to pad...\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
           currentProgressInTrajectory = NO_PROGRESS;
@@ -411,7 +468,7 @@ static void appTimer(xTimerHandle timer) {
       if (now > landingTimeCheckCharge) {
         DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
-          ledseqRun(&seq_lock);
+          // ledseqRun(&seq_lock);
           state = STATE_IDLE;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
@@ -430,8 +487,15 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
-      // bitmaskValue = 255;
-      // paramSet(paramIdLedBitMask.index,&bitmaskValue);
+
+
+      uint8_t curr_vallue= paramGetUint(paramIdLedBitMask);
+      if (curr_vallue!=255) {
+        bitmaskValue = 255;
+        DEBUG_PRINT("Crashed,so setting bitmask.\n");
+        paramSet(paramIdLedBitMask.index,&bitmaskValue);
+        ledseqRun(&seq_crash);
+      }
       
       break;
     default:
