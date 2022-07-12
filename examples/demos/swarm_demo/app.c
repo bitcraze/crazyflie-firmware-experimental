@@ -59,7 +59,7 @@ static bool hasLock();
 
 static bool takeOffWhenReady = false;
 static float goToInitialPositionWhenReady = -1.0f;
-static bool terminateTrajectoryAndLand = false;
+static uint8_t terminateTrajectoryAndLand = false;
 
 static float padX = 0.0;
 static float padY = 0.0;
@@ -169,7 +169,7 @@ ledseqStep_t seq_crash_def[] = {
   { true, LEDSEQ_WAITMS(50)},
   {false, LEDSEQ_WAITMS(50)},
   { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(500)},
+  {false, LEDSEQ_WAITMS(300)},
 
   {    0, LEDSEQ_LOOP},
   
@@ -316,7 +316,8 @@ static void appTimer(xTimerHandle timer) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
       bitmaskValue = 0;
-      paramSet(paramIdLedBitMask.index,&bitmaskValue);
+      paramSetInt(paramIdLedBitMask,bitmaskValue);
+      
       ledseqStop(&seq_crash);
       // prevent from sending the same trajectory again after retaking off
       prevTrajectoryId=latestTrajectoryId;
@@ -383,7 +384,7 @@ static void appTimer(xTimerHandle timer) {
       state = STATE_WAITING_TO_START_TRAJECTORY;
 
       uint8_t temp= remainingTrajectories-1;
-      paramSet(paramIdTrajcount.index,  &temp);// not needed since param is declared in the same file as the app
+      paramSetInt(paramIdTrajcount,  temp);// not needed since param is declared in the same file as the app
       remainingTrajectories=temp;
 
       flightTime += delta;
@@ -410,9 +411,13 @@ static void appTimer(xTimerHandle timer) {
         // 255 means all trajectories are finished and we are going to land
         // terminateTrajectoryAndLand is set to true when the landing is requested by the control tower 
         // or when the battery is low and we need to land
-        if (terminateTrajectoryAndLand || remainingTrajectories == 255) { 
-          if(terminateTrajectoryAndLand){
-            DEBUG_PRINT("Forced Landing, going to pad ...\n");
+        DEBUG_PRINT("terminateTrajectoryAndLand: %d  prevTrajectoryId: %d\n", terminateTrajectoryAndLand, prevTrajectoryId);
+        
+        bool land_now = terminateTrajectoryAndLand == prevTrajectoryId || remainingTrajectories == 255;
+        
+        if ( land_now ) { 
+          if(terminateTrajectoryAndLand == prevTrajectoryId){
+            DEBUG_PRINT("Forced Landing, going to pad now ...\n");
           }
           else{
             DEBUG_PRINT("Last trajectory finished, going to pad...\n");
@@ -424,6 +429,13 @@ static void appTimer(xTimerHandle timer) {
           currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
+          if (terminateTrajectoryAndLand>0){
+            DEBUG_PRINT("Landing flag set execute one more trajectory\n");
+            uint8_t temp= 0;
+            paramSetInt(paramIdTrajcount,  temp);// not needed since param is declared in the same file as the app
+            remainingTrajectories=temp;
+          }
+
           if (remainingTrajectories >= 0) {
             float delayMs=3000.0f;
             timeWhenToGoToInitialPosition = now + delayMs;
@@ -493,7 +505,7 @@ static void appTimer(xTimerHandle timer) {
       if (curr_vallue!=255) {
         bitmaskValue = 255;
         DEBUG_PRINT("Crashed,so setting bitmask.\n");
-        paramSet(paramIdLedBitMask.index,&bitmaskValue);
+        paramSetInt(paramIdLedBitMask,bitmaskValue);
         ledseqRun(&seq_crash);
       }
       

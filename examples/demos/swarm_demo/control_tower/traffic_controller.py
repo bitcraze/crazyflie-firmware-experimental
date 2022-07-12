@@ -342,9 +342,9 @@ class TrafficController:
                 self._pre_state_going_to_initial_position_end_time = time.time() + self.PRE_STATE_TIMEOUT
                 self._cf.param.set_value('app.start', trajectory_delay)
 
-    def force_land(self):
+    def force_land(self,value=1):
         # if self.connection_state == self.CS_CONNECTED:
-        self._cf.param.set_value('app.stop', 1)
+        self._cf.param.set_value('app.stop', value)
 
     def set_trajectory_count(self, count):
         if self.connection_state == self.CS_CONNECTED:
@@ -410,9 +410,9 @@ class TrafficController:
 
     def able_to_fly(self):#TODO: make this check event based whenever a copter changes state
         """
-            Returns true if the copter is able to fly in general.
+            Returns true if the copter is able to fly in general(is connected).
         """
-        return self.copter_state >self.STATE_UNKNOWN and self.copter_state < self.STATE_CRASHED and not self.needs_charging() 
+        return self.copter_state >self.STATE_UNKNOWN and self.copter_state <= self.STATE_CRASHED and not self.needs_charging() 
         
     def _connection_failed(self, link_uri, msg):
         print('Connection to %s failed: %s' % (link_uri, msg))
@@ -444,6 +444,8 @@ class TrafficController:
         self._cf.connection_lost.add_callback(self._connection_lost)
         self._cf.fully_connected.add_callback(self._all_updated)
         self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+        self._cf.param.add_update_callback(group='app', name='stop', cb=self._force_land_cb)
+
 
         print("Connecting to " + self.uri)
         self._cf.open_link(self.uri)
@@ -548,3 +550,5 @@ class TrafficController:
     def terminate(self):
         self.stay_alive = False
 
+    def _force_land_cb(self, name, value):
+        print(Fore.CYAN,self.get_short_uri(),"Force land callback ->new value: {}".format(value),Fore.RESET )
