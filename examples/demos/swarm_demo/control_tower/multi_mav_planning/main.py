@@ -115,7 +115,7 @@ def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float
     dists=calculate_distances(MAV_sequences)
 
     waypoints_used_for_traj_gen=[]
-    for i in range(N_MAV):
+    for i in range(len(MAV_sequences)):
         waypoints=MAV_sequences[i]
 
         extra_times_to_add=MAVUtils.find_times_of_closest_distances(dists,MAV_index=i)
@@ -188,6 +188,18 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
 
     MAV_sequences = getMAVPaths(us,x0s)
     
+    sequences_to_ignore=[]
+    for i in range(len(x0s)):
+        if np.linalg.norm(np.array(x0s[i])-np.array(xrefs[i]))==0:
+            sequences_to_ignore.append(i)
+
+    if (len(sequences_to_ignore)>0):
+        print("Sequences to ignore:",sequences_to_ignore)
+        #TODO: do not generate trajectories for the sequences to ignore
+        MAV_sequences = [MAV_sequences[i] for i in range(len(MAV_sequences)) if i not in sequences_to_ignore]
+    
+    
+
     downsample_step=9
     total_time=4.5
     trajs ,waypoints_used_for_gen= generate_trajectories(MAV_sequences,total_time=total_time,downsample_step=downsample_step)

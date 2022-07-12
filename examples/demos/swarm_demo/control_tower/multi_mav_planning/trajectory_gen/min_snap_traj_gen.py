@@ -22,6 +22,7 @@
 
 # Useful link :https://realpython.com/linear-programming-python/
 from typing import List,Tuple
+from colorama import Fore
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -410,8 +411,14 @@ class TrajectoryGenerator:
         
         @return: Trajectory instance
         """
-        pols_coeffs, pc_pols = TrajectoryGenerator.generate_traj(waypoints,total_time)
-        tr = TrajectoryGenerator.create_traj(pols_coeffs, pc_pols)
+        try:
+            pols_coeffs, pc_pols = TrajectoryGenerator.generate_traj(waypoints,total_time)
+            tr = TrajectoryGenerator.create_traj(pols_coeffs, pc_pols)
+        except:
+            print(Fore.RED,"Error in min_snap_traj_generation,printing waypoints that caused it:")
+            print(waypoints)
+            print(Fore.RESET)
+            raise Exception("Error in min_snap_traj_generation")
         
         return tr
         
