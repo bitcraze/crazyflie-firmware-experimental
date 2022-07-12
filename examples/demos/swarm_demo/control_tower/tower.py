@@ -161,15 +161,24 @@ class Tower(TowerBase):
         crashed_count = len(copters_crashed)
         # able_to_fly_count = len(self.get_connected_copters()) #didnt work,there was only 1 connected copter 
         # able_to_fly_count = len(self.controllers)
-        able_to_fly_count = len(self.get_controllers_able_to_fly())
+        able_to_fly=self.get_controllers_able_to_fly()
+        able_to_fly_count = len(able_to_fly)
+
+        if able_to_fly_count == 0 and crashed_count == 0:
+            print("No copters connected")
+            return
 
         if self.wanted > able_to_fly_count-crashed_count:
             print("Too many crashed copters , landing all waiting copters")
         
         # print("Wanted copters:",self.wanted,"Connected copters:",able_to_fly_count,"Crashed copters:",crashed_count)
-
+        prev_wanted = self.wanted
         self.wanted = min([self.wanted_original , max(able_to_fly_count-crashed_count,1)])
-    
+        if prev_wanted != self.wanted:
+            print("Wanted copters changed:",self.wanted)
+            print("able to fly:",[ c.short_uri for c in able_to_fly] , "crashed:",[ c.short_uri for c in copters_crashed])
+
+
     def get_copters_waiting_for_trajectories(self):
         return [controller for controller in self.get_flying_controllers() if controller.copter_state==TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY] 
 

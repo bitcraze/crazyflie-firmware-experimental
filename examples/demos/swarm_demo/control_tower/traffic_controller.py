@@ -39,7 +39,7 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
-TRAJECTORY_COUNT=2
+TRAJECTORY_COUNT=3
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -75,7 +75,7 @@ class TrafficController:
 
     OUT_OF_BOUNDS_CUBE =(1.6,1.6,1.8)
     
-    CHARGED_FOR_FLIGHT_THRESHOLD = 3.6
+    CHARGED_FOR_FLIGHT_THRESHOLD = 4.0
 
     LOW_BATTERY_THRESHOLD = 3.2
 
@@ -412,7 +412,10 @@ class TrafficController:
         """
             Returns true if the copter is able to fly in general(is connected).
         """
-        return self.copter_state >self.STATE_UNKNOWN and self.copter_state <= self.STATE_CRASHED and not self.needs_charging() 
+        is_airborne = self.copter_state > self.STATE_WAIT_FOR_TAKE_OFF and self.copter_state <= self.STATE_CRASHED
+        charging_and_ready_for_flight = self.is_charging() and self.is_charged_for_flight()
+
+        return is_airborne or charging_and_ready_for_flight 
         
     def _connection_failed(self, link_uri, msg):
         print('Connection to %s failed: %s' % (link_uri, msg))

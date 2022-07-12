@@ -244,6 +244,9 @@ class MAVUtils:
         @param number_of_times: number of times to find closest distance to
         @return: list of times of closest distance
         """
+        if len(dists)==0:
+            return []
+
         min_distances_dict={}
         
         for i in range(len(dists)):
@@ -260,12 +263,13 @@ class MAVUtils:
         
         #sort the dictionary by distance
         min_distances_dict=sorted(min_distances_dict.items(), key=lambda x: x[1])
-        
+        print("min_distances_dict:",min_distances_dict)
+
         #add times that occur at the minimum distances being below the threshold
         for i in range(number_of_times):
             if min_distances_dict[i][1]>MIN_DISTANCE_TO_INCREASE_RESOLUTION:
                 number_of_times -= 1
-
+        
         #get the times of the 3 closest distances
         times=[]
         while len(times)<number_of_times:

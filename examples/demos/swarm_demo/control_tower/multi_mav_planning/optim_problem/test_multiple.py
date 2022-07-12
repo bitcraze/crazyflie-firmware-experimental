@@ -125,6 +125,9 @@ def calculate_distances(MAV_sequences):
         
         e.g: (i,j,k) = distance between MAV i and MAV j at "time" k
     """
+    if len(MAV_sequences)==1:
+        return []
+
     if type(MAV_sequences) is not np.ndarray:
         MAV_sequences = np.array(MAV_sequences)
 
