@@ -168,7 +168,7 @@ class Tower(TowerBase):
         
         # print("Wanted copters:",self.wanted,"Connected copters:",able_to_fly_count,"Crashed copters:",crashed_count)
 
-        self.wanted = min([self.wanted_original , able_to_fly_count-crashed_count])
+        self.wanted = min([self.wanted_original , max(able_to_fly_count-crashed_count,1)])
     
     def get_copters_waiting_for_trajectories(self):
         return [controller for controller in self.get_flying_controllers() if controller.copter_state==TrafficController.STATE_WAITING_TO_RECEIVE_TRAJECTORY] 
@@ -218,7 +218,7 @@ class Tower(TowerBase):
 
     def get_controllers_able_to_fly(self):#TODO: make this check event based whenever a copter changes state
         """
-            Returns the number of copters that are able to fly in general,not necessarily now.(not crashed and not never connected)
+            Returns the number of copters that are able to fly in general,not necessarily now.(not never connected)
         """
         # return [controller for controller in self.controllers if controller.copter_state==TrafficController.CS_CONNECTED]# not working
         return [controller for controller in self.controllers if controller.able_to_fly()]
@@ -256,7 +256,9 @@ class Tower(TowerBase):
             
             if controller.needs_charging():
                 print("controller",controller.uri[-2:],"needs charging ,planning trajectory to go on charger")
-                controller.force_land()
+                traj_id_to_land_after = 2 if int(controller.latest_trajectory_id)==1 else 1
+                #sending the id of the trajectory to land after
+                controller.force_land(traj_id_to_land_after)
                 print("Forced Landing Signal sent")
 
             if int(traj_count)==1 or int(traj_count)==0 or controller.needs_charging():
@@ -339,10 +341,13 @@ class Tower(TowerBase):
         
         if len(flying_controllers) != self.wanted:
             uris=[cf.short_uri for cf in flying_controllers]
-            print("{} flying copters are flying ({}) but not as many as wanted ({}) to start trajectories".format(len(flying_controllers),uris,self.wanted))
+            print("{} flying copters are flying ({}) but not as many as wanted ({}) to receive trajectories".format(len(flying_controllers),uris,self.wanted))
             print("crashed count :",len(self.get_crashed_copters()))
             return False
-
+        else:
+            uris=[cf.short_uri for cf in flying_controllers]
+            print("Flying copters ({}) as many as wanted ({}) to receive trajectories".format(uris,self.wanted))
+        
         for controller in flying_controllers:
             if not controller.is_waiting_for_trajectory() :
                 return False
