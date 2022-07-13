@@ -49,7 +49,8 @@ from predefined_trajs import spiral_traj
 SPIRAL_TRAJ_ID=5
 
 class Tower(TowerBase):
-    TRAJ_RECEIVE_CONFLICT_TIMEOUT = 4
+    TRAJ_RECEIVE_CONFLICT_TIMEOUT = 4 #secs
+    TIME_PER_TRAJ=5 # secs
 
     def __init__(self, uris, report_socket=None):
         TowerBase.__init__(self, uris, report_socket)
@@ -152,6 +153,40 @@ class Tower(TowerBase):
         if prev_wanted != self.wanted:
             print("Wanted copters changed:",self.wanted)
             print("able to fly:",[ c.short_uri for c in able_to_fly] , "crashed:",[ c.short_uri for c in copters_crashed])
+
+    def calculate_wanted_based_on_battery(self, able_to_fly:List[TrafficController]):
+        """
+            Calculate the wanted number of copters based on the battery level of the copters.
+            TODO: implement this further and find way of changing self.wanted safely without affecting all copters while flying.
+        """
+        prev_wanted_orginal=self.wanted_original
+        traj_number_able_to_fly = []
+        #get an approximation of remaining flight time
+        for c in able_to_fly:
+            if c.is_flying() or c.is_crashed():
+                continue
+            
+            flight_time = c.get_expected_flight_time()
+            safe_flight_time = 0.75*flight_time
+            trajs_able_to_fly = int(safe_flight_time/self.TIME_PER_TRAJ + 0.5)
+            trajs_able_to_fly = max(trajs_able_to_fly,2)
+            traj_number_able_to_fly.append(trajs_able_to_fly)
+
+        #get most frequent number of trajectories
+        if (len(traj_number_able_to_fly) == 0):
+            return
+
+        new_trajs_to_be_executed_number = max(set(traj_number_able_to_fly), key=traj_number_able_to_fly.count)
+        new_wanted = traj_number_able_to_fly.count(new_trajs_to_be_executed_number)
+
+
+        self.wanted_original = max(1,min(new_wanted,3))
+        for c in able_to_fly:
+            c.trajectory_count = new_trajs_to_be_executed_number
+        
+        print(Fore.MAGENTA,"Wanted original copters:",self.wanted_original,Fore.RESET)
+        print(Fore.MAGENTA,"new traj count:",new_trajs_to_be_executed_number,Fore.RESET)
+
 
 
     def get_copters_waiting_for_trajectories(self):

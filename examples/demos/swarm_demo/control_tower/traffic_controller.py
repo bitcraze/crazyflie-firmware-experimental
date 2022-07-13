@@ -39,7 +39,6 @@ from colorama import Fore, Back, Style
 #CONSTANTS
 TRAJECTORY_SEGMENT_SIZE_BYTES = 132
 
-TRAJECTORY_COUNT=3
 
 class TrajectoryUploadConfig():
     def __init__(self) -> None:
@@ -76,9 +75,16 @@ class TrafficController:
 
     OUT_OF_BOUNDS_CUBE =(1.6,1.6,1.8)
     
-    CHARGED_FOR_FLIGHT_THRESHOLD = 3.9
+    CHARGED_FOR_FLIGHT_THRESHOLD = 4.0
+    
+    HIGH_BATTERY_THRESHOLD = 4.2  # V
+    LOW_BATTERY_THRESHOLD = 3.2   # V
+    
+    # minutes of flight time when batter is charged enough
+    # (not precise but used to determine the calculation of the parameters for the demo)
+    TOTAL_FLIGHT_TIME = 4.0  
 
-    LOW_BATTERY_THRESHOLD = 3.2
+    trajectory_count=3
 
     def __init__(self, uri):
         self.uri = uri
@@ -388,7 +394,7 @@ class TrafficController:
         """Callback that is called when all parameters have been updated"""
         self._fully_connected = True
 
-        self.set_trajectory_count(TRAJECTORY_COUNT)
+        self.set_trajectory_count(self.trajectory_count)
         self._setup_logging()
         
         self.latest_trajectory_id = self._cf.param.get_value('app.curr_traj_id')
@@ -489,7 +495,7 @@ class TrafficController:
             print(Style.RESET_ALL,end="")
             
             if data['app.state']==self.STATE_LANDING:
-                self.set_trajectory_count(TRAJECTORY_COUNT)
+                self.set_trajectory_count(self.trajectory_count)
                 self.final_position = None # reset final position so after taking of use the current position
 
             if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY or data['app.state']==self.STATE_RUNNING_TRAJECTORY :
@@ -518,7 +524,7 @@ class TrafficController:
         #charging pad position set
         if self.charging_pad_position== None:
             self.charging_pad_position = (data['stateEstimate.x'], data['stateEstimate.y'], data['stateEstimate.z'])
-            print("Charging pad position set to {}".format(self.charging_pad_position))
+            print(self.short_uri,"Charging pad position set to {}".format(self.charging_pad_position))
 
         self.vbat = data['pm.vbat']
 
@@ -556,3 +562,16 @@ class TrafficController:
 
     def _force_land_cb(self, name, value):
         print(Fore.CYAN,self.get_short_uri(),"Force land callback ->new value: {}".format(value),Fore.RESET )
+    
+    def get_battery_percentage(self)->float:
+        """
+            Returns a linear approximation of the battery %  
+            (not precise but used to determine the calculation of the parameters for the demo)
+        """
+        return (self.HIGH_BATTERY_THRESHOLD - self.vbat)/(self.HIGH_BATTERY_THRESHOLD - self.LOW_BATTERY_THRESHOLD) * 100
+
+    def get_expected_flight_time(self)->float:
+        """
+            Returns the expected flight time in seconds
+        """
+        return self.get_battery_percentage() * self.TOTAL_FLIGHT_TIME
