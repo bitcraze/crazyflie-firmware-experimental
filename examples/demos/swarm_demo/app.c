@@ -148,23 +148,6 @@ static struct poly4d sequence[] = {
   {.duration = 0.55, .p = {{2.657819140362752e-11,0.029194371526024346,-0.10554318434787024,0.05389264510610344,0.14869556371716416,-0.11729506325396347,-0.057406932212603616,0.05185415937314559}, {-0.01022225217203592,0.036960150373509054,0.00882584023135473,-0.15157853263098095,0.10194295680128089,0.12610945422193115,-0.12863100760957105,0.021560512581067035}, {0.5558712946793309,0.23395499478462367,0.03898547046555688,-0.008834723582265662,-0.0007360910302886222,0.00010007288325451688,5.591396797932501e-06,-5.806568866668146e-07}, {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,}}},
 };
 
-static float sequenceTime(struct poly4d sequence[], int count) {
-  float totalDuration = 0.0f;
-
-  for (int i = 0; i < count; i++) {
-    totalDuration += sequence[i].duration;
-  }
-
-  return totalDuration;
-}
-
-static void defineSpiralTrajectory() {
-  const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
-  trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
-  crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
-  crtpCommanderHighLevelDefineTrajectory(SPIRAL_TRAJ_ID, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
-}
-
 enum State {
   // Initialization
   STATE_IDLE = 0,
@@ -191,17 +174,6 @@ ledseqStep_t seq_lock_def[] = {
   { true, LEDSEQ_WAITMS(1000)},
   {    0, LEDSEQ_LOOP},
 };
-
-// ledseqStep_t seq_crash_def[] = {
-//   { true, LEDSEQ_WAITMS(100)},
-//   {false, LEDSEQ_WAITMS(100)},
-//   { true, LEDSEQ_WAITMS(100)},
-//   {false, LEDSEQ_WAITMS(100)},
-//   { true, LEDSEQ_WAITMS(100)},
-//   {false, LEDSEQ_WAITMS(1000)},
-
-//   {    0, LEDSEQ_LOOP},
-// };
 
 ledseqStep_t seq_crash_def[] = {
   { true, LEDSEQ_WAITMS(50)},
@@ -233,6 +205,22 @@ ledseqContext_t seq_crash = {
   .led = LED_CRASH,
 };
 
+static float sequenceTime(struct poly4d sequence[], int count) {
+  float totalDuration = 0.0f;
+
+  for (int i = 0; i < count; i++) {
+    totalDuration += sequence[i].duration;
+  }
+
+  return totalDuration;
+}
+
+static void defineSpiralTrajectory() {
+  const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
+  trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
+  crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
+  crtpCommanderHighLevelDefineTrajectory(SPIRAL_TRAJ_ID, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
+}
 
 static float getX() { return logGetFloat(logIdStateEstimateX); }
 static float getY() { return logGetFloat(logIdStateEstimateY); }

@@ -40,36 +40,25 @@ from cflib.crazyflie.mem import Poly4D
 import zmq
 
 from multi_mav_planning import main as multi_MAV
-import simpleaudio
 from colorama import Fore, Back, Style
 from traffic_controller import TrafficController
 from tower import Tower
-from tower_sync import SyncTower
 
 
 uris = [
-    # 'radio://0/20/2M/E7E7E7E700',#
+    'radio://0/20/2M/E7E7E7E700',
     'radio://0/20/2M/E7E7E7E701',
     'radio://0/20/2M/E7E7E7E702',
     'radio://0/20/2M/E7E7E7E703',
     'radio://0/20/2M/E7E7E7E704',
-    'radio://0/20/2M/E7E7E7E706',#
-    'radio://0/20/2M/E7E7E7E707',#
-    # 'radio://0/20/2M/E7E7E7E709'# 
-
-    # 'radio://0/10/2M/E7E7E7E701',
-    # 'radio://0/10/2M/E7E7E7E702',
-    # 'radio://0/10/2M/E7E7E7E703',
-    # 'radio://0/10/2M/E7E7E7E704',
-    # 'radio://0/10/2M/E7E7E7E705',
-    # 'radio://0/10/2M/E7E7E7E706',
-    # 'radio://0/10/2M/E7E7E7E707',
-    # 'radio://0/10/2M/E7E7E7E708',
-    # 'radio://0/10/2M/E7E7E7E709'
+    'radio://0/20/2M/E7E7E7E706',
+    'radio://0/20/2M/E7E7E7E707',
+    'radio://0/20/2M/E7E7E7E708',
+    'radio://0/20/2M/E7E7E7E709'
 ]
 
 
-count = 4
+count = 3
 mode = 'normal'
 if len(sys.argv) > 1:
     if sys.argv[1] == 'd':

@@ -27,24 +27,17 @@ import cflib.crtp  # noqa
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
 import statistics
-import sys
 import threading
-import math
 
 import numpy as np
-from cflib.crazyflie.mem.trajectory_memory import TrajectoryMemory
-from cflib.crazyflie.mem import MemoryElement
-from cflib.crazyflie.mem import Poly4D
 
 import zmq
 
 from multi_mav_planning import main as multi_MAV
-import simpleaudio
 from colorama import Fore, Back, Style
 from traffic_controller import TrafficController
 from tower_base import TowerBase
 import copy
-from predefined_trajs import spiral_traj
 
 SPIRAL_TRAJ_ID=5
 
@@ -72,22 +65,6 @@ class Tower(TowerBase):
         self.wanted=wanted
          # Wait for all CF to connect (to avoid race)
         time.sleep(10)
-
-        # self.upload_trajectory_multiple(figure8 ,cf_uris=['radio://0/20/2M/E7E7E7E702'])
-        # time.sleep(6)
-        # self.upload_trajectory_multiple(generated ,cf_uris=['radio://0/20/2M/E7E7E7E702'])
-        # time.sleep(6)
-        # self.upload_trajectory_multiple(figure8 ,cf_uris=['radio://0/20/2M/E7E7E7E702'])
-        # time.sleep(6)
-        # self.upload_trajectory_multiple(generated ,cf_uris=['radio://0/20/2M/E7E7E7E702'])
-        # time.sleep(6)
-        
-        # self.upload_trajectory_multiple(figure8   ,cf_uris=-1)
-        # time.sleep(10)
-        # self.upload_trajectory_multiple(figure8   ,cf_uris=-1)
-
-        # self.upload_trajectory_multiple(trajs[1],1,cf_uris=['radio://0/40/2M/E7E7E7E704'])
-        # self.upload_trajectory_multiple(trajs[1],2,cf_uris=['radio://0/40/2M/E7E7E7E701'])
 
 
         while True:
@@ -136,7 +113,6 @@ class Tower(TowerBase):
         copters_crashed = self.get_crashed_copters()
         crashed_count = len(copters_crashed)
         # able_to_fly_count = len(self.get_connected_copters()) #didnt work,there was only 1 connected copter 
-        # able_to_fly_count = len(self.controllers)
         able_to_fly=self.get_controllers_able_to_fly()
         able_to_fly_count = len(able_to_fly)
 
