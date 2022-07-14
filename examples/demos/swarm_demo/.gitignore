@@ -2,6 +2,7 @@ bin/*
 cf2.*
 control_tower/multi_mav_planning/my_optimizers/
 control_tower/multi_mav_planning/logged_trajs/*
+control_tower/multi_mav_planning/my_c_optimizers/
 cache
 test.py
 *.npy
