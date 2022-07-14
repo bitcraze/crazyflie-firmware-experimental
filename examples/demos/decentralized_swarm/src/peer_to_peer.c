@@ -57,19 +57,23 @@ static float getX() { return logGetFloat(logIdStateEstimateX); }
 static float getY() { return logGetFloat(logIdStateEstimateY); }
 static float getZ() { return logGetFloat(logIdStateEstimateZ); }
 
-
+typedef struct Position_struct {
+    float x;
+    float y;
+    float z;
+} Position;
 
 
 void p2pcallbackHandler(P2PPacket *p)
 {
   // Parse the data from the other crazyflie and print it
   uint8_t other_id = p->data[0];
-  static float pos[3];
-  memcpy(&pos, &p->data[1], sizeof(float)*3);
-  
+  static Position pos;
+  memcpy(&pos, &p->data[1], sizeof(Position));
+
   uint8_t rssi = p->rssi;
 
-  DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d, x:%.2f y:%.2f z:%.2f \n", rssi, other_id, (double)pos[0], (double)pos[1], (double)pos[2]);
+  DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d, x:%.2f y:%.2f z:%.2f \n", rssi, other_id, (double)pos.x, (double)pos.y, (double)pos.z);
 }
 
 void appMain()
@@ -101,7 +105,7 @@ void appMain()
   // Register the callback function so that the CF can receive packets as well.
   p2pRegisterCB(p2pcallbackHandler);
 
-  float pos[3];
+  Position pos;
 
   while(1) {
     // Send a message every 2 seconds
@@ -112,11 +116,12 @@ void appMain()
     vTaskDelay(M2T(2000));
     
     //get current position and send it as the payload
-    pos[0]=getX();
-    pos[1]=getY();
-    pos[2]=getZ();
-    memcpy(&p_reply.data[1], pos, sizeof(float)*3);
-    p_reply.size=sizeof(float)*3+1;
+    pos.x=getX();
+    pos.y=getY();
+    pos.z=getZ();
+
+    memcpy(&p_reply.data[1], &pos, sizeof(Position));
+    p_reply.size=sizeof(Position)+1;
 
     radiolinkSendP2PPacketBroadcast(&p_reply);
   }
