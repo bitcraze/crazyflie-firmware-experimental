@@ -123,7 +123,7 @@ def log_trajectories(trajs:List[Trajectory],x0s:List[List[float]],xrefs:List[Lis
     #[x0s,xrefs,traj_matrices_copy]
     traj_matrices_copy.insert(0,xrefs) 
     traj_matrices_copy.insert(0,x0s)   
-    np.save('/home/oem/MARIOS/crazyflie-firmware-experimental/examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/traj_matrices_{}.npy'.format(log_trajectories.counter),traj_matrices_copy)
+    np.save('examples/demos/swarm_demo/control_tower/multi_mav_planning/logged_trajs/traj_matrices_{}.npy'.format(log_trajectories.counter),traj_matrices_copy)
     log_trajectories.counter += 1
 
 log_trajectories.counter=0
