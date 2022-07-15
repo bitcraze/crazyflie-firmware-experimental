@@ -20,6 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 import casadi.casadi as cs
 import opengen as og
 import matplotlib.pyplot as plt
@@ -89,9 +90,14 @@ def solve_multiple_MAV_problem(x0s, xrefs):
         mng = og.tcp.OptimizerTcpManager(path)
         
     except:
-        print("Could not create a TCP connection manager with short path,trying long path")
-        path = "examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
-        mng = og.tcp.OptimizerTcpManager(path)
+        try:
+            logging.debug("Could not create a TCP connection manager with short path,trying long path")
+            path = "control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
+            mng = og.tcp.OptimizerTcpManager(path)
+        except:
+            logging.debug("Could not create a TCP connection manager with short path,trying longer path")
+            path = "examples/demos/swarm_demo/control_tower/multi_mav_planning/my_optimizers/navigation_multiple"
+            mng = og.tcp.OptimizerTcpManager(path)
 
     # Start the TCP server
     mng.start()
@@ -102,8 +108,8 @@ def solve_multiple_MAV_problem(x0s, xrefs):
     # call the solver with the initial and reference states
     solver_status = mng.call(z)
 
-    print("solver_status:", solver_status["exit_status"] ,"in {:.2f} msec".format(solver_status["solve_time_ms"]))
-    # print("solver_status:", solver_status["max_constraint_violation"])
+    logging.debug("solver_status: "+ solver_status["exit_status"] +" in {:.2f} msec".format(solver_status["solve_time_ms"]))
+    # logging.debug("solver_status:", solver_status["max_constraint_violation"])
     us = solver_status['solution']
 
     # print("us: ", us)
@@ -131,7 +137,7 @@ def calculate_distances(MAV_sequences):
     if type(MAV_sequences) is not np.ndarray:
         MAV_sequences = np.array(MAV_sequences)
 
-    print("MAV_sequences.shape:", MAV_sequences.shape)
+    logging.debug("MAV_sequences.shape: {}".format(MAV_sequences.shape) )
     try:
         ticks=MAV_sequences.shape[1]
     except:
@@ -148,7 +154,7 @@ def calculate_distances(MAV_sequences):
                     continue
                 dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
     
-    print("min distance:", min(dist.flatten()))
+    logging.debug("min distance: {}".format(min(dist.flatten())) )
 
     return dist
 

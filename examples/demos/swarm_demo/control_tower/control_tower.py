@@ -44,6 +44,10 @@ from colorama import Fore, Back, Style
 from traffic_controller import TrafficController
 from tower import Tower
 
+import logging,sys
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING)
+logging.getLogger("cflib.crazyflie").propagate = False
+
 
 uris = [
     'radio://0/20/2M/E7E7E7E700',
@@ -77,12 +81,8 @@ socket.bind("tcp://*:5555")
 cflib.crtp.init_drivers(enable_debug_driver=False)
 
 print('Starting tower with', count, 'Crazyflie(s)')
-if mode == 'synch':
-    print('Flying with synchronized trajectories')
-    tower = SyncTower(uris, socket)
-else:
-    print('Flying with interleaved trajectories')
-    tower = Tower(uris, socket)
+print('Flying with interleaved trajectories')
+tower = Tower(uris, socket)
             
 if not mode == 'dump':
     tower.fly(count)

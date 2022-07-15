@@ -30,7 +30,7 @@ import statistics
 import threading
 
 import numpy as np
-
+import logging
 import zmq
 
 from multi_mav_planning import main as multi_MAV
@@ -117,18 +117,18 @@ class Tower(TowerBase):
         able_to_fly_count = len(able_to_fly)
 
         if able_to_fly_count == 0 and crashed_count == 0:
-            print("No copters connected")
+            print("No copters able to fly yet")
             return
 
         if self.wanted > able_to_fly_count-crashed_count:
-            print("Too many crashed copters , landing all waiting copters")
+            logging.debug("Too many crashed copters , landing all waiting copters")
         
-        # print("Wanted copters:",self.wanted,"Connected copters:",able_to_fly_count,"Crashed copters:",crashed_count)
+        # logging.debug("Wanted copters:",self.wanted,"Connected copters:",able_to_fly_count,"Crashed copters:",crashed_count)
         prev_wanted = self.wanted
         self.wanted = min([self.wanted_original , max(able_to_fly_count-crashed_count,1)])
         if prev_wanted != self.wanted:
-            print("Wanted copters changed:",self.wanted)
-            print("able to fly:",[ c.short_uri for c in able_to_fly] , "crashed:",[ c.short_uri for c in copters_crashed])
+            logging.debug("Wanted copters changed:{}".format(self.wanted) )
+            logging.debug("able to fly:{} crashed:{}".format([ c.short_uri for c in able_to_fly],[ c.short_uri for c in copters_crashed]) )
 
     def calculate_wanted_based_on_battery(self, able_to_fly:List[TrafficController]):
         """
@@ -160,8 +160,8 @@ class Tower(TowerBase):
         for c in able_to_fly:
             c.trajectory_count = new_trajs_to_be_executed_number
         
-        print(Fore.MAGENTA,"Wanted original copters:",self.wanted_original,Fore.RESET)
-        print(Fore.MAGENTA,"new traj count:",new_trajs_to_be_executed_number,Fore.RESET)
+        logging.debug(Fore.MAGENTA+"Wanted original copters:{}".format(self.wanted_original)+Fore.RESET)
+        logging.debug(Fore.MAGENTA+"new traj count:{}".format(new_trajs_to_be_executed_number)+Fore.RESET)
 
 
 
@@ -202,8 +202,8 @@ class Tower(TowerBase):
             if conflict_exists:
                 if time.time() - self.traj_receive_conflict_start_time > Tower.TRAJ_RECEIVE_CONFLICT_TIMEOUT:
                     print("Conflict detected:")
-                    print("Waiting to receive traj:", waiting_to_receive_traj_count)
-                    print("Waiting to start traj:", waiting_to_start_traj_count)
+                    logging.debug("Waiting to receive traj:{}".format(waiting_to_receive_traj_count) )
+                    logging.debug("Waiting to start traj{}:".format(waiting_to_start_traj_count) )
                     self.traj_receive_conflict=False
                     self.traj_receive_conflict_start_time=time.time()
                     return True
@@ -247,14 +247,14 @@ class Tower(TowerBase):
         copters_ids_to_go_on_chargers=[]
         for i,controller in enumerate(flying_controllers):
             traj_count=controller.get_trajectory_count()
-            print("controller",controller.uri[-2:], "traj count:",traj_count, type(traj_count))
+            logging.debug("controller {} traj count: {}  {}".format(controller.uri[-2:],traj_count, type(traj_count) ) )
             
             if controller.needs_charging():
-                print("controller",controller.uri[-2:],"needs charging ,planning trajectory to go on charger")
+                logging.debug("controller {} needs charging ,planning trajectory to go on charger".format(controller.uri[-2:]))
                 traj_id_to_land_after = 2 if int(controller.latest_trajectory_id)==1 else 1
                 #sending the id of the trajectory to land after
                 controller.force_land(traj_id_to_land_after)
-                print("Forced Landing Signal sent")
+                logging.debug("Forced Landing Signal sent")
 
             if int(traj_count)==1 or int(traj_count)==0 or controller.needs_charging():
                 copters_ids_to_go_on_chargers.append(i)
@@ -279,7 +279,7 @@ class Tower(TowerBase):
         for cf in flying_controllers:
             #if final position is not set yet or if we want to use current positions
             if type(cf.final_position)==type(None) or use_current_positions:
-                print("Using current position for:",cf.get_short_uri())
+                logging.debug("Using current position for: {}".format(cf.get_short_uri()) )
                 pos=[cf.est_x,cf.est_y,cf.est_z]
             else:
                 pos=cf.final_position
@@ -289,7 +289,7 @@ class Tower(TowerBase):
         #xrefs
         xrefs=[]
         copters_ids_to_go_on_chargers=self.copters_landing_after_traj(flying_controllers)
-        print("copters_ids_to_go_on_chargers: ",[flying_controllers[i].uri[-2:] for i in copters_ids_to_go_on_chargers])
+        logging.debug("copters_ids_to_go_on_chargers: ".format([flying_controllers[i].uri[-2:] for i in copters_ids_to_go_on_chargers]) )
 
         predef_xrefs=copy.deepcopy(self.predefined_xrefs)
         random.shuffle(predef_xrefs)# shuffle so that we don't always go to the same one
@@ -315,7 +315,7 @@ class Tower(TowerBase):
                         del predef_xrefs[j]
                         break
                     elif j==len(predef_xrefs)-1:
-                        print("final xref is the same as the final x0 left")
+                        logging.debug("final xref is the same as the final x0 left")
                         xrefs.append(xrefs[0])
                         xrefs[0]=predef_xrefs[j] #this is a way to make sure we don't use the same xref twice 
 
@@ -325,10 +325,10 @@ class Tower(TowerBase):
             x0s.append(  [2,2,2] )  #padding with zeros seemed to crash the solver     
             xrefs.append([2,2,2] )  #padding with zeros seemed to crash the solver
         
-        print("Trying to solve problem with:")
-        print("x0s:",x0s)
-        print("xrefs:",xrefs)
-        print("")
+        logging.debug("Trying to solve problem with:")
+        logging.debug("x0s: {}".format(x0s) )
+        logging.debug("xrefs: {}".format(xrefs) )
+        logging.debug("")
         # input("Press enter to continue")
         trajs=multi_MAV.solve_problem(x0s,xrefs)
         
@@ -346,12 +346,12 @@ class Tower(TowerBase):
         
         if len(flying_controllers) != self.wanted:
             uris=[cf.short_uri for cf in flying_controllers]
-            print("{} flying copters are flying ({}) but not as many as wanted ({}) to receive trajectories".format(len(flying_controllers),uris,self.wanted))
-            print("crashed count :",len(self.get_crashed_copters()))
+            logging.debug("{} flying copters are flying ({}) but not as many as wanted ({}) to receive trajectories".format(len(flying_controllers),uris,self.wanted))
+            logging.debug("crashed count : {}".format( len(self.get_crashed_copters())))
             return False
         else:
             uris=[cf.short_uri for cf in flying_controllers]
-            print("Flying copters ({}) as many as wanted ({}) to receive trajectories".format(uris,self.wanted))
+            logging.debug("Flying copters ({}) as many as wanted ({}) to receive trajectories".format(uris,self.wanted))
         
         for controller in flying_controllers:
             if not controller.is_waiting_for_trajectory() :

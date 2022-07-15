@@ -20,6 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 from typing import List
 import time
 import cflib.crtp  # noqa
@@ -153,7 +154,7 @@ class TrafficController:
         trajectory_mem:TrajectoryMemory
 
         if len(trajectory) > 15:
-            print('Trajectory is too long!')
+            logging.debug('Trajectory is too long!')
             raise Exception('Trajectory is too long ({} segments)!'.format(len(trajectory)))
 
         self.trajectory_mem=trajectory_mem
@@ -175,7 +176,7 @@ class TrafficController:
             total_duration += duration
         
         #setting upload config and mechanisms
-        print(self.short_uri + "Previous latest_trajectory_id:",self.latest_trajectory_id)
+        logging.debug(self.short_uri + "Previous latest_trajectory_id:{}".format(self.latest_trajectory_id) )
 
         self.latest_trajectory_id = 2 if int(self.latest_trajectory_id)==1 else 1
         id = self.latest_trajectory_id-1 #0-based indexing
@@ -191,7 +192,7 @@ class TrafficController:
         
         #get the final position of the trajectory
         self.final_position=self.get_final_position(trajectory).pos
-        print(self.short_uri+"Final position:",self.final_position)
+        logging.debug(self.short_uri+"Final position:{}".format(self.final_position) )
         self.traj_start_time = time.time()
         
         self.upload_trajectory_to_memory(trajectory_mem,self._upload_done,self._upload_failed,self.latest_trajectory_id)
@@ -241,7 +242,7 @@ class TrafficController:
 
     def _upload_done(self, mem, addr):
         dt=time.time()-self.traj_start_time
-        print(Fore.GREEN+'Trajectory upload succesfull to {} after {:0.3f} sec!'.format(self.uri[-2:],dt)+Style.RESET_ALL)
+        print(Fore.GREEN+'Trajectory upload successful to {} after {:0.3f} sec!'.format(self.uri[-2:],dt)+Style.RESET_ALL)
 
         # self.latest_offset refers to pol segments so multiplication by 132 is needed to get the real offset
         # since each segment is 132 bytes long
@@ -251,7 +252,7 @@ class TrafficController:
             
             id=conf.trajectory_id+1
             pol_segment_count=conf.pol_segment_count
-            print("Defining trajectory with id: {}...".format(id))
+            logging.debug("Defining trajectory with id: {}...".format(id))
             
             offset=0 if id==1 else 15
             self._cf.high_level_commander.define_trajectory(id, offset*TRAJECTORY_SEGMENT_SIZE_BYTES, pol_segment_count)
@@ -259,7 +260,7 @@ class TrafficController:
             conf.defined=True
             
             self._cf.param.set_value('app.curr_traj_id', id)
-            print("CF:{} Current trajectory id: {}".format(self.uri[-2:],id))
+            logging.debug("CF:{} Current trajectory id: {}".format(self.uri[-2:],id))
         
         self._traj_upload_done = True
         self._traj_upload_success = True
@@ -311,7 +312,7 @@ class TrafficController:
         return self.copter_state == self.STATE_TAKING_OFF or self._pre_state_taking_off()
 
     def is_ready_for_flight(self):
-        # print(self.short_uri + "is_ready_for_flight:",self.copter_state, (not self._pre_state_going_to_initial_position()) )
+        # logging.debug(self.short_uri + "is_ready_for_flight:",self.copter_state, (not self._pre_state_going_to_initial_position()) )
         return self.copter_state == self.STATE_HOVERING and not self._pre_state_going_to_initial_position()
 
     def is_flying(self):
@@ -398,7 +399,7 @@ class TrafficController:
         self._setup_logging()
         
         self.latest_trajectory_id = self._cf.param.get_value('app.curr_traj_id')
-        print(self.short_uri+'Latest trajectory id: {}'.format(self.latest_trajectory_id))
+        logging.debug(self.short_uri+' Latest trajectory id: {}'.format(self.latest_trajectory_id))
 
         # append traj memory
         trajectory_mem = self._cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
@@ -425,14 +426,14 @@ class TrafficController:
         return is_airborne or charging_and_ready_for_flight 
         
     def _connection_failed(self, link_uri, msg):
-        print('Connection to %s failed: %s' % (link_uri, msg))
+        print(Fore.RED,'Connection to %s failed: %s' % (link_uri, msg),Fore.RESET)
         self._set_disconnected(5)
 
     def _connection_lost(self, link_uri, msg):
-        print('Connection to %s lost: %s' % (link_uri, msg))
+        print(Fore.RED,'Connection to %s lost: %s' % (link_uri, msg),Fore.RESET)
 
     def _disconnected(self, link_uri):
-        print('Disconnected from %s' % link_uri)
+        print(Fore.RED,'Disconnected from %s' % link_uri,Fore.RESET)
         self._set_disconnected()
 
     def _set_disconnected(self, hold_back_time=5):
@@ -453,7 +454,9 @@ class TrafficController:
         self._cf.connection_failed.add_callback(self._connection_failed)
         self._cf.connection_lost.add_callback(self._connection_lost)
         self._cf.fully_connected.add_callback(self._all_updated)
-        self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+        if logging.root.level == logging.DEBUG: 
+            self._cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+            
         self._cf.param.add_update_callback(group='app', name='stop', cb=self._force_land_cb)
 
 
@@ -473,7 +476,7 @@ class TrafficController:
             self._console_buffer = ""
 
     def _setup_logging(self):
-        # print("Setting up logging")
+        # logging.debug("Setting up logging")
         self._log_conf = LogConfig(name='Tower', period_in_ms=100)
         self._log_conf.add_variable('app.state', 'uint8_t')
         # self._log_conf.add_variable('app.prgr', 'float')
@@ -491,8 +494,7 @@ class TrafficController:
     def _log_data(self, timestamp, data, logconf):
         if(data['app.state'] !=self.copter_state): 
             #copter state has changed            
-            print(Fore.BLUE+"Copter {} state changed to {} {} ".format(self.uri[-2:],data['app.state'] , type(data['app.state'])))
-            print(Style.RESET_ALL,end="")
+            logging.debug(Fore.BLUE+"Copter {} state changed to {} {} ".format(self.uri[-2:],data['app.state'] , type(data['app.state'])) + Style.RESET_ALL)
             
             if data['app.state']==self.STATE_LANDING:
                 self.set_trajectory_count(self.trajectory_count)
@@ -500,7 +502,7 @@ class TrafficController:
 
             if data['app.state']==self.STATE_WAITING_TO_RECEIVE_TRAJECTORY or data['app.state']==self.STATE_RUNNING_TRAJECTORY :
                 # can_upload_trajectory is set only when copter enters for first time the state 
-                print("Copter {} can upload trajectory".format(self.uri[-2:]))
+                logging.debug("Copter {} can upload trajectory".format(self.uri[-2:]))
                 self.can_upload_trajectory = True
             
             if  data['app.state']==self.STATE_WAITING_TO_START_TRAJECTORY:
@@ -524,7 +526,7 @@ class TrafficController:
         #charging pad position set
         if self.charging_pad_position== None:
             self.charging_pad_position = (data['stateEstimate.x'], data['stateEstimate.y'], data['stateEstimate.z'])
-            print(self.short_uri,"Charging pad position set to {}".format(self.charging_pad_position))
+            logging.debug(self.short_uri+" Charging pad position set to {}".format(self.charging_pad_position))
 
         self.vbat = data['pm.vbat']
 

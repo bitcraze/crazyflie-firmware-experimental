@@ -20,6 +20,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+import logging
 from typing import List, Tuple
 from colorama import Fore
 import numpy as np 
@@ -142,7 +143,7 @@ class MAVUtils:
             for j in range(len(x)):
                 seq.append([x[j],y[j],z[j]])
             seq=np.array(seq)
-            print(seq.shape)
+            logging.debug(seq.shape)
             MAV_sequence.append(seq)
         return MAV_sequence
     
@@ -152,7 +153,7 @@ class MAVUtils:
 
         lengths=[len(i) for i in MAV_sequence]
         min_len=min(lengths)
-        print("min_len:", min_len)
+        logging.debug("min_len:{}".format(min_len) )
         for i in range(len(MAV_sequence)):
             MAV_sequence[i]=MAV_sequence[i][:min_len]
         MAV_sequence=np.array(MAV_sequence)
@@ -181,7 +182,7 @@ class MAVUtils:
             e.g: (i,j,k) = distance between MAV i and MAV j at "time" k
         """
 
-        print("MAV_sequences.shape:", MAV_sequences.shape)
+        logging.debug("MAV_sequences.shape: {} ".format(MAV_sequences.shape) )
         dist=np.ones((len(MAV_sequences),len(MAV_sequences),MAV_sequences.shape[1]))
         
         for i in range(len(MAV_sequences)):
@@ -191,7 +192,7 @@ class MAVUtils:
                 for k in range(MAV_sequences.shape[1]):
                     dist[i,j,k]=np.linalg.norm(MAV_sequences[i][k]-MAV_sequences[j][k])
         
-        print("min distance:", min(dist.flatten()))
+        logging.debug("min distance:", min(dist.flatten()))
 
         return dist
 
@@ -220,19 +221,19 @@ class MAVUtils:
         downsampled_times= range(0,len(waypoints),downsample_step)
         times_added=[]
         for ii in range(len(downsampled_times) ):
-            # print("ii: {}".format(downsampled_times[ii]))
+            # logging.debug("ii: {}".format(downsampled_times[ii]))
             new_waypoints.append(waypoints[downsampled_times[ii],:])
             times_added.append(downsampled_times[ii])
             
             while len(extra_times_to_add)>0  and (downsampled_times[ii]<extra_times_to_add[0] and extra_times_to_add[0]<downsampled_times[ii+1] )  :
                 index=extra_times_to_add[0]
                 
-                # print("Adding extra waypoint at time {}".format(index))
+                # logging.debug("Adding extra waypoint at time {}".format(index))
                 new_waypoints.append(waypoints[index,:])
                 times_added.append(index)
                 extra_times_to_add.pop(0)
 
-        # print("Times added: {}".format(times_added))
+        # logging.debug("Times added: {}".format(times_added))
         return new_waypoints
 
     @staticmethod
@@ -263,7 +264,7 @@ class MAVUtils:
         
         #sort the dictionary by distance
         min_distances_dict=sorted(min_distances_dict.items(), key=lambda x: x[1])
-        print("min_distances_dict:",min_distances_dict)
+        logging.debug("min_distances_dict:{}".format(min_distances_dict) )
 
         #add times that occur at the minimum distances being below the threshold
         for i in range(number_of_times):

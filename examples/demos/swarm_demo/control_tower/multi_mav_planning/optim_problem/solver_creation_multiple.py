@@ -74,7 +74,7 @@ for t in range(0, N):  # for each time step in the horizon
         #             (x0s[i][2] - xrefs[i][2])**2)
 
         MAV_offset = i*nu*N
-        print(MAV_offset)
+        # print(MAV_offset)
         curr_t = MAV_offset + nu*t
 
         u_t = u[curr_t:curr_t+nu]

@@ -35,6 +35,7 @@ except:
     from .MAV_utils import MAVPlannerDebugger,MAVUtils
 
 import copy
+import logging
 from colorama import Fore
 import matplotlib.pyplot as plt
 import numpy as np
@@ -87,7 +88,7 @@ def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float
             # waypoints=np.append(waypoints,final,axis=1)
             waypoints=np.vstack((waypoints,final))
 
-        print(Fore.RED,waypoints.shape,Fore.RESET)
+        logging.debug(Fore.RED + str(waypoints.shape) + Fore.RESET)
 
         #insert column of zeros at the end(yaw)
         waypoints=np.insert(waypoints,3,0,axis=1)
@@ -97,13 +98,13 @@ def generate_trajectories(MAV_sequences:List[List[List[float]]],total_time:float
         # while True:
         #     tr=min_snap_tg.min_snap_traj_generation(waypoints,total_time=total_time-dt)
         #     tr_unstable = tr.is_unstable(should_plot=0)
-        #     print("Trajectory {} unstable: {}".format(i,tr_unstable))
+        #     logging.debug("Trajectory {} unstable: {}".format(i,tr_unstable))
              
         #     if( not tr_unstable):
         #         break
         #         # 
         #     dt+=0.25
-        #     print("Increasing dt to {}".format(dt))
+        #     logging.debug("Increasing dt to {}".format(dt))
         
         tr=TrajectoryGenerator.min_snap_traj_generation(waypoints,total_time=total_time)
         trajs.append( tr )
@@ -148,7 +149,7 @@ def solve_problem(x0s:List[List[float]] , xrefs:List[List[float]] ) ->List[np.ar
             sequences_to_ignore.append(i)
 
     if (len(sequences_to_ignore)>0):
-        print("Sequences to ignore:",sequences_to_ignore)
+        logging.debug("Sequences to ignore: {}".format(sequences_to_ignore) )
         #TODO: do not generate trajectories for the sequences to ignore
         MAV_sequences = [MAV_sequences[i] for i in range(len(MAV_sequences)) if i not in sequences_to_ignore]
     
