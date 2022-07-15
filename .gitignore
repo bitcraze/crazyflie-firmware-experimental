@@ -46,3 +46,5 @@ build/
 **/*.a
 *.elf
 src/utils/src/version_gen.c
+
+cache

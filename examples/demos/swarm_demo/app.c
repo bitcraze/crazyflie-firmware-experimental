@@ -17,6 +17,7 @@
 #include "supervisor.h"
 #include "controller.h"
 #include "ledseq.h"
+#include "led.h"
 #include "pptraj.h"
 #include "lighthouse_position_est.h"
 #include "lighthouse_core.h"
@@ -31,22 +32,36 @@ static bool isInit = false;
 static void appTimer(xTimerHandle timer);
 
 #define LED_LOCK         LED_GREEN_R
+#define LED_CRASH        LED_GREEN_R
+
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
 #define MAX_PAD_ERR 0.005
 #define TAKE_OFF_HEIGHT 0.2f
 #define LANDING_HEIGHT 0.12f
 #define SEQUENCE_SPEED 1.0f
-#define DURATION_TO_INITIAL_POSITION 2.0
+#define DURATION_TO_INITIAL_POSITION 1.5
+#define TRAJECTORY_SEGMENT_SIZE_BYTES 132
+
+#define SAFETY_LAND_HEIGHT 0.05f
+#define SAFETY_LAND_DURATION 3.0 // in seconds
+
+#define OUT_OF_BOUNDS_X 2.0f
+#define OUT_OF_BOUNDS_Y 2.0f
+#define OUT_OF_BOUNDS_Z 2.2f
+
+#define SPIRAL_TRAJ_ID 5
 
 static uint32_t lockWriteIndex;
 static float lockData[LOCK_LENGTH][3];
 static void resetLockData();
 static bool hasLock();
 
+// static bool getFirstWaypointofTraj(uint8_t traj_id,float wp[4]);
+
 static bool takeOffWhenReady = false;
 static float goToInitialPositionWhenReady = -1.0f;
-static bool terminateTrajectoryAndLand = false;
+static uint8_t terminateTrajectoryAndLand = false;
 
 static float padX = 0.0;
 static float padY = 0.0;
@@ -62,16 +77,27 @@ static uint32_t trajectoryStartTime = 0;
 static uint32_t timeWhenToGoToInitialPosition = 0;
 static float trajectoryDurationMs = 0.0f;
 
-static float trajecory_center_offset_x = 0.0f;
-static float trajecory_center_offset_y = 0.0f;
-static float trajecory_center_offset_z = 0.0f;
+static float trajectory_center_offset_x = 0.0f;
+static float trajectory_center_offset_y = 0.0f;
+static float trajectory_center_offset_z = 0.0f;
 
 static uint32_t now = 0;
 static uint32_t flightTime = 0;
 
+static int start_trajectory_result = 0;
 // The nr of trajectories to fly
-static uint8_t trajectoryCount = 255;
+// static uint8_t trajectoryCount = 255;
 static uint8_t remainingTrajectories = 0;
+
+// The latest trajectory id
+static uint8_t latestTrajectoryId = 255;
+static uint8_t prevTrajectoryId = 255;
+
+static uint8_t start_trajectory=0;
+static uint8_t safety_land_flag=0;
+static uint8_t reset_crash_state_flag = 0;
+
+static uint8_t is_safety_landing=0;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -87,43 +113,12 @@ static logVarId_t logIdlighthouseEstBs1Rt;
 static paramVarId_t paramIdStabilizerController;
 static paramVarId_t paramIdCommanderEnHighLevel;
 static paramVarId_t paramIdLighthouseMethod;
+static paramVarId_t paramIdTrajcount;
 
-//#define USE_MELLINGER
+static paramVarId_t paramIdLedBitMask;
+// #define USE_MELLINGER
 
 #define TRAJ_Y_OFFSET 0.35
-
-enum State {
-  // Initialization
-  STATE_IDLE = 0,
-  STATE_WAIT_FOR_POSITION_LOCK,
-
-  STATE_WAIT_FOR_TAKE_OFF, // Charging
-  STATE_TAKING_OFF,
-  STATE_HOVERING,
-  STATE_WAITING_TO_GO_TO_INITIAL_POSITION,
-  STATE_GOING_TO_INITIAL_POSITION,
-  STATE_RUNNING_TRAJECTORY,
-  STATE_GOING_TO_PAD,
-  STATE_WAITING_AT_PAD,
-  STATE_LANDING,
-  STATE_CHECK_CHARGING,
-  STATE_REPOSITION_ON_PAD,
-  STATE_CRASHED,
-};
-
-static enum State state = STATE_IDLE;
-
-ledseqStep_t seq_lock_def[] = {
-  { true, LEDSEQ_WAITMS(1000)},
-  {    0, LEDSEQ_LOOP},
-};
-
-ledseqContext_t seq_lock = {
-  .sequence = seq_lock_def,
-  .led = LED_LOCK,
-};
-
-const uint8_t trajectoryId = 1;
 
 // duration, x0-x7, y0-y7, z0-z7, yaw0-yaw7
 static struct poly4d sequence[] = {
@@ -153,6 +148,63 @@ static struct poly4d sequence[] = {
   {.duration = 0.55, .p = {{2.657819140362752e-11,0.029194371526024346,-0.10554318434787024,0.05389264510610344,0.14869556371716416,-0.11729506325396347,-0.057406932212603616,0.05185415937314559}, {-0.01022225217203592,0.036960150373509054,0.00882584023135473,-0.15157853263098095,0.10194295680128089,0.12610945422193115,-0.12863100760957105,0.021560512581067035}, {0.5558712946793309,0.23395499478462367,0.03898547046555688,-0.008834723582265662,-0.0007360910302886222,0.00010007288325451688,5.591396797932501e-06,-5.806568866668146e-07}, {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,}}},
 };
 
+enum State {
+  // Initialization
+  STATE_IDLE = 0,
+  STATE_WAIT_FOR_POSITION_LOCK,
+
+  STATE_WAIT_FOR_TAKE_OFF, // Charging
+  STATE_TAKING_OFF,
+  STATE_HOVERING,
+  STATE_WAITING_TO_RECEIVE_TRAJECTORY,
+  STATE_GOING_TO_SPIRAL_FIRST_POINT,
+  STATE_WAITING_TO_START_TRAJECTORY,
+  STATE_RUNNING_TRAJECTORY,
+  STATE_GOING_TO_PAD,
+  STATE_WAITING_AT_PAD,
+  STATE_LANDING,
+  STATE_CHECK_CHARGING,
+  STATE_REPOSITION_ON_PAD,
+  STATE_CRASHED,
+};
+
+static enum State state = STATE_IDLE;
+
+ledseqStep_t seq_lock_def[] = {
+  { true, LEDSEQ_WAITMS(1000)},
+  {    0, LEDSEQ_LOOP},
+};
+
+ledseqStep_t seq_crash_def[] = {
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(50)},
+  { true, LEDSEQ_WAITMS(50)},
+  {false, LEDSEQ_WAITMS(300)},
+
+  {    0, LEDSEQ_LOOP},
+  
+};
+
+ledseqContext_t seq_lock = {
+  .sequence = seq_lock_def,
+  .led = LED_LOCK,
+};
+
+ledseqContext_t seq_crash = {
+  .sequence = seq_crash_def,
+  .led = LED_CRASH,
+};
+
 static float sequenceTime(struct poly4d sequence[], int count) {
   float totalDuration = 0.0f;
 
@@ -163,13 +215,20 @@ static float sequenceTime(struct poly4d sequence[], int count) {
   return totalDuration;
 }
 
+static void defineSpiralTrajectory() {
+  const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
+  trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
+  crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
+  crtpCommanderHighLevelDefineTrajectory(SPIRAL_TRAJ_ID, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
+}
+
 static float getX() { return logGetFloat(logIdStateEstimateX); }
 static float getY() { return logGetFloat(logIdStateEstimateY); }
 static float getZ() { return logGetFloat(logIdStateEstimateZ); }
 static float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
 static float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
 static float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
-static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
+// static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 static bool isCharging() { return logGetInt(logIdPmState) == charging; }
 static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 
@@ -180,15 +239,9 @@ static void enableMellingerController() { paramSetInt(paramIdStabilizerControlle
 #endif
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 
-static void defineTrajectory() {
-  const uint32_t polyCount = sizeof(sequence) / sizeof(struct poly4d);
-  trajectoryDurationMs = 1000 * sequenceTime(sequence, polyCount);
-  crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
-  crtpCommanderHighLevelDefineTrajectory(trajectoryId, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
-}
-
 static void defineLedSequence() {
   ledseqRegisterSequence(&seq_lock);
+  ledseqRegisterSequence(&seq_crash);
 }
 
 void appMain() {
@@ -212,7 +265,9 @@ void appMain() {
   paramIdStabilizerController = paramGetVarId("stabilizer", "controller");
   paramIdCommanderEnHighLevel = paramGetVarId("commander", "enHighLevel");
   paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
+  paramIdTrajcount =paramGetVarId("app","trajcount");
 
+  paramIdLedBitMask = paramGetVarId("led", "bitmask");
 
   timer = xTimerCreate("AppTimer", M2T(20), pdTRUE, NULL, appTimer);
   xTimerStart(timer, 20);
@@ -224,7 +279,7 @@ void appMain() {
   #endif
 
   enableHighlevelCommander();
-  defineTrajectory();
+  // defineTrajectory();
   defineLedSequence();
   resetLockData();
 
@@ -240,19 +295,71 @@ static void appTimer(xTimerHandle timer) {
     state = STATE_CRASHED;
   }
 
-  if (isBatLow()) {
-    terminateTrajectoryAndLand = true;
+  // if (isBatLow()) {
+  //   terminateTrajectoryAndLand = true;
+  // }
+
+  if (start_trajectory_result != 0) {
+          DEBUG_PRINT("Error starting trajectory: %d\n", start_trajectory_result);
   }
 
+  //out of bounds check
+  if (getX() > OUT_OF_BOUNDS_X || getX() < -OUT_OF_BOUNDS_X || getY() > OUT_OF_BOUNDS_Y || getY() < -OUT_OF_BOUNDS_Y || getZ() > OUT_OF_BOUNDS_Z || getZ() < -OUT_OF_BOUNDS_Z) {
+    if (state>=STATE_TAKING_OFF && state<=STATE_REPOSITION_ON_PAD) {
+      safety_land_flag = 1;
+      state=STATE_CRASHED;
+    }   
+  }
+
+
+  // safety landing check from control tower
+  if (safety_land_flag==1){
+    if (is_safety_landing==0){
+      DEBUG_PRINT("Safety landing executing!\n");
+      crtpCommanderHighLevelLand(0,SAFETY_LAND_DURATION);
+      is_safety_landing=1;
+    }else{
+      // it is already landing
+      if (crtpCommanderHighLevelIsTrajectoryFinished()){
+        crtpCommanderHighLevelStop();
+        if (state!=STATE_CRASHED){
+          state = STATE_IDLE;
+        }
+        
+        safety_land_flag=0;
+        is_safety_landing=0;
+      }
+    }
+
+    return;
+  }
+
+  // state crash resetting from control tower
+  if (reset_crash_state_flag && !supervisorIsTumbled()) {
+    reset_crash_state_flag = false;
+    state = STATE_IDLE;
+    resetLockData();
+    enableHighlevelCommander();
+    // crtpCommanderHighLevelInit();
+  }
+  
+  uint8_t bitmaskValue;
+  
   switch(state) {
     case STATE_IDLE:
       DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+      bitmaskValue = 0;
+      paramSetInt(paramIdLedBitMask,bitmaskValue);
+      
+      ledseqStop(&seq_crash);
+      // prevent from sending the same trajectory again after retaking off
+      prevTrajectoryId=latestTrajectoryId;
       state = STATE_WAIT_FOR_POSITION_LOCK;
       break;
     case STATE_WAIT_FOR_POSITION_LOCK:
       if (hasLock()) {
         DEBUG_PRINT("Position lock acquired, ready for take off..\n");
-        ledseqRun(&seq_lock);
+        // ledseqRun(&seq_lock);
         state = STATE_WAIT_FOR_TAKE_OFF;
       }
       break;
@@ -275,7 +382,7 @@ static void appTimer(xTimerHandle timer) {
     case STATE_TAKING_OFF:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
         DEBUG_PRINT("Hovering, waiting for command to start\n");
-        ledseqStop(&seq_lock);
+        // ledseqStop(&seq_lock);
         state = STATE_HOVERING;
 
       }
@@ -288,59 +395,111 @@ static void appTimer(xTimerHandle timer) {
           state = STATE_GOING_TO_PAD;
       } else {
         if (goToInitialPositionWhenReady >= 0.0f) {
-          float delayMs = goToInitialPositionWhenReady * trajectoryDurationMs;
+          float delayMs = goToInitialPositionWhenReady *  3000.0f;
           timeWhenToGoToInitialPosition = now + delayMs;
           trajectoryStartTime = now + delayMs;
           goToInitialPositionWhenReady = -1.0f;
           DEBUG_PRINT("Waiting to go to initial position for %d ms\n", (int)delayMs);
-          state = STATE_WAITING_TO_GO_TO_INITIAL_POSITION;
+          state = STATE_WAITING_TO_RECEIVE_TRAJECTORY;
+          prevTrajectoryId=latestTrajectoryId;// prevent from sending the same trajectory again after retaking off
         }
       }
       flightTime += delta;
       break;
-    case STATE_WAITING_TO_GO_TO_INITIAL_POSITION:
-      if (now >= timeWhenToGoToInitialPosition) {
-        DEBUG_PRINT("Going to initial position\n");
-        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajecory_center_offset_x, sequence[0].p[1][0] + trajecory_center_offset_y, sequence[0].p[2][0] + trajecory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
-        state = STATE_GOING_TO_INITIAL_POSITION;
+    case STATE_WAITING_TO_RECEIVE_TRAJECTORY:
+      // latest trajectory id will be updated as soon as the trajectory is defined
+      if (prevTrajectoryId==latestTrajectoryId && latestTrajectoryId!=SPIRAL_TRAJ_ID) {
+        // DEBUG_PRINT("Previous Traj id same with latest: %d\n", prevTrajectoryId);
+        flightTime += delta;
+        break;
+      }
+
+      if (latestTrajectoryId==SPIRAL_TRAJ_ID){
+        DEBUG_PRINT("Spiral trajectory is being executed \n");
+        defineSpiralTrajectory();
+        crtpCommanderHighLevelGoTo(sequence[0].p[0][0] + trajectory_center_offset_x, sequence[0].p[1][0] + trajectory_center_offset_y, sequence[0].p[2][0] + trajectory_center_offset_z, sequence[0].p[3][0], DURATION_TO_INITIAL_POSITION, false);
+       
+        state=STATE_GOING_TO_SPIRAL_FIRST_POINT;
+
+      }else{
+        state = STATE_WAITING_TO_START_TRAJECTORY;
+      }
+      
+      uint8_t temp= remainingTrajectories-1;
+      paramSetInt(paramIdTrajcount,  temp);// not needed since param is declared in the same file as the app
+      remainingTrajectories=temp;
+
+      flightTime += delta;
+      break;
+    case STATE_GOING_TO_SPIRAL_FIRST_POINT:
+      if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+        DEBUG_PRINT("Reached spiral first point\n");
+        state=STATE_WAITING_TO_START_TRAJECTORY;
       }
       flightTime += delta;
       break;
-    case STATE_GOING_TO_INITIAL_POSITION:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
-      if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("At initial position, starting trajectory...\n");
-        crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
-        remainingTrajectories = trajectoryCount - 1;
-        state = STATE_RUNNING_TRAJECTORY;
+    case STATE_WAITING_TO_START_TRAJECTORY:
+      if (start_trajectory==0) {// wait until receive start_trajectory signal
+        flightTime += delta;
+        break;
       }
+
+      start_trajectory=0;
+      DEBUG_PRINT("Starting traj of id: %d with remain traj: %d\n", latestTrajectoryId ,remainingTrajectories);
+
+      start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+      prevTrajectoryId = latestTrajectoryId; 
+      state = STATE_RUNNING_TRAJECTORY;
+      
       flightTime += delta;
       break;
     case STATE_RUNNING_TRAJECTORY:
-      currentProgressInTrajectory = (now - trajectoryStartTime) / trajectoryDurationMs;
 
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        if (terminateTrajectoryAndLand || (remainingTrajectories == 0)) {
+        DEBUG_PRINT("Trajectory finished, remaining trajectories: %d\n", remainingTrajectories);
+        // 255 means all trajectories are finished and we are going to land
+        // terminateTrajectoryAndLand is set to true when the landing is requested by the control tower 
+        // or when the battery is low and we need to land
+        DEBUG_PRINT("terminateTrajectoryAndLand: %d  prevTrajectoryId: %d\n", terminateTrajectoryAndLand, prevTrajectoryId);
+        
+        bool land_now = terminateTrajectoryAndLand == prevTrajectoryId || remainingTrajectories == 255;
+        
+        if ( land_now ) { 
+          if(terminateTrajectoryAndLand == prevTrajectoryId){
+            DEBUG_PRINT("Forced Landing, going to pad now ...\n");
+          }
+          else{
+            DEBUG_PRINT("Last trajectory finished, going to pad...\n");
+          }
+
           terminateTrajectoryAndLand = false;
-          DEBUG_PRINT("Terminating trajectory, going to pad...\n");
           float timeToPadPosition = 2.0;
           crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, timeToPadPosition, false);
           currentProgressInTrajectory = NO_PROGRESS;
           state = STATE_GOING_TO_PAD;
         } else {
-          if (remainingTrajectories > 0) {
-            DEBUG_PRINT("Trajectory finished, restarting...\n");
-            crtpCommanderHighLevelStartTrajectory(trajectoryId, SEQUENCE_SPEED, true, false);
+          if (terminateTrajectoryAndLand>0){
+            DEBUG_PRINT("Landing flag set execute one more trajectory\n");
+            uint8_t temp= 0;
+            paramSetInt(paramIdTrajcount,  temp);// not needed since param is declared in the same file as the app
+            remainingTrajectories=temp;
           }
-          remainingTrajectories--;
+
+          if (remainingTrajectories >= 0) {
+            float delayMs=3000.0f;
+            timeWhenToGoToInitialPosition = now + delayMs;
+            DEBUG_PRINT("Going to state WAITING_TO_RECEIVE_TRAJECTORY \n");
+            state=STATE_WAITING_TO_RECEIVE_TRAJECTORY;
+            
+          }
         }
       }
       flightTime += delta;
       break;
     case STATE_GOING_TO_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         stabilizeEndTime = now + 5000;
         state = STATE_WAITING_AT_PAD;
       }
@@ -371,8 +530,8 @@ static void appTimer(xTimerHandle timer) {
       if (now > landingTimeCheckCharge) {
         DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
-          ledseqRun(&seq_lock);
-          state = STATE_WAIT_FOR_TAKE_OFF;
+          // ledseqRun(&seq_lock);
+          state = STATE_IDLE;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
           crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT, 1.0);
@@ -382,7 +541,7 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_REPOSITION_ON_PAD:
       if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-        DEBUG_PRINT("Over pad, stabalizing position\n");
+        DEBUG_PRINT("Over pad, stabilizing position\n");
         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, 1.5, false);
         state = STATE_GOING_TO_PAD;
       }
@@ -390,6 +549,16 @@ static void appTimer(xTimerHandle timer) {
       break;
     case STATE_CRASHED:
       crtpCommanderHighLevelStop();
+
+
+      uint8_t curr_vallue= paramGetUint(paramIdLedBitMask);
+      if (curr_vallue!=255) {
+        bitmaskValue = 255;
+        DEBUG_PRINT("Crashed,so setting bitmask.\n");
+        paramSetInt(paramIdLedBitMask,bitmaskValue);
+        ledseqRun(&seq_crash);
+      }
+      
       break;
     default:
       break;
@@ -455,14 +624,21 @@ static void resetLockData() {
     }
 }
 
+
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
   PARAM_ADD(PARAM_FLOAT, start, &goToInitialPositionWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
-  PARAM_ADD(PARAM_FLOAT, offsx, &trajecory_center_offset_x)
-  PARAM_ADD(PARAM_FLOAT, offsy, &trajecory_center_offset_y)
-  PARAM_ADD(PARAM_FLOAT, offsz, &trajecory_center_offset_z)
-  PARAM_ADD(PARAM_UINT8, trajcount, &trajectoryCount)
+  PARAM_ADD(PARAM_FLOAT, offsx, &trajectory_center_offset_x)
+  PARAM_ADD(PARAM_FLOAT, offsy, &trajectory_center_offset_y)
+  PARAM_ADD(PARAM_FLOAT, offsz, &trajectory_center_offset_z)
+  PARAM_ADD(PARAM_UINT8, trajcount, &remainingTrajectories)
+  PARAM_ADD(PARAM_UINT8, curr_traj_id, &latestTrajectoryId)
+  PARAM_ADD(PARAM_UINT8, start_traj, &start_trajectory)
+
+  PARAM_ADD(PARAM_UINT8, safety_land, &safety_land_flag)
+  PARAM_ADD(PARAM_UINT8, reset_crash_state, &reset_crash_state_flag)
+
 PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
