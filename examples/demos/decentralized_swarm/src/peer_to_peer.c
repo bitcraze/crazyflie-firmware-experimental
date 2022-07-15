@@ -41,27 +41,93 @@
 #include "configblock.h"
 
 #include "log.h"
+#include "float.h"
+#include <math.h>
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
 
-#define MESSAGE "hello mlka"
-#define MESSAGE_LENGHT 10
 
-// Log and param ids
-static logVarId_t logIdStateEstimateX;
-static logVarId_t logIdStateEstimateY;
-static logVarId_t logIdStateEstimateZ;
-
-static float getX() { return logGetFloat(logIdStateEstimateX); }
-static float getY() { return logGetFloat(logIdStateEstimateY); }
-static float getZ() { return logGetFloat(logIdStateEstimateZ); }
+#define INTER_DIST 0.6f
+#define MAX_ADDRESS 9 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 
 typedef struct Position_struct {
     float x;
     float y;
     float z;
 } Position;
+
+//The following functions are used to return a new Position struct
+//If you want 
+Position addVectors3D(Position a, Position b) {
+    Position result;
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    result.z = a.z + b.z;
+    return result;
+}
+
+Position subtractVectors3D(Position a, Position b) {
+    Position result;
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
+    return result;
+}
+
+Position multiplyVectorWithScalar(Position a, float scalar) {
+    Position result;
+    result.x = a.x * scalar;
+    result.y = a.y * scalar;
+    result.z = a.z * scalar;
+    return result;
+}
+
+float getVectorMagnitude(Position a) {
+    return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+}
+
+// Log and param ids
+static logVarId_t logIdStateEstimateX;
+static logVarId_t logIdStateEstimateY;
+static logVarId_t logIdStateEstimateZ;
+
+static uint8_t my_id;
+
+static Position others_pos[MAX_ADDRESS];
+
+static float getX() { return logGetFloat(logIdStateEstimateX); }
+static float getY() { return logGetFloat(logIdStateEstimateY); }
+static float getZ() { return logGetFloat(logIdStateEstimateZ); }
+
+static void initializeOtherPositions() {
+    for (int i = 0; i < MAX_ADDRESS; i++) {
+        others_pos[i].x = FLT_MAX;
+        others_pos[i].x = FLT_MAX;
+        others_pos[i].y = FLT_MAX;
+    }
+}
+
+static Position getNextDeltaPosition() {
+    Position p_i = {getX(), getY(), getZ()};
+
+    Position delta_final={0,0,0};
+    for (int j = 0; j < MAX_ADDRESS; j++) {
+        if (others_pos[j].x == FLT_MAX || others_pos[j].y == FLT_MAX || others_pos[j].y == FLT_MAX){
+            continue;
+        }
+
+        Position p_j = others_pos[j];
+        float mag = getVectorMagnitude(subtractVectors3D(p_i, p_j));
+        Position delta = subtractVectors3D(p_i, p_j);
+        float scalar = (mag-INTER_DIST) / mag;
+        delta = multiplyVectorWithScalar(delta, scalar);
+
+    }
+
+    return delta_final;
+}
+
 
 
 void p2pcallbackHandler(P2PPacket *p)
@@ -74,6 +140,9 @@ void p2pcallbackHandler(P2PPacket *p)
   uint8_t rssi = p->rssi;
 
   DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d, x:%.2f y:%.2f z:%.2f \n", rssi, other_id, (double)pos.x, (double)pos.y, (double)pos.z);
+  
+  // Store the position of the other crazyflie
+  others_pos[other_id] = pos;
 }
 
 void appMain()
@@ -84,6 +153,8 @@ void appMain()
   logIdStateEstimateY = logGetVarId("stateEstimate", "y");
   logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
 
+  initializeOtherPositions();
+
   // Initialize the p2p packet 
   static P2PPacket p_reply;
   p_reply.port=0x00;
@@ -92,15 +163,9 @@ void appMain()
   //   the last two digits and send it as the first byte
   //   of the payload
   uint64_t address = configblockGetRadioAddress();
-  uint8_t my_id =(uint8_t)((address) & 0x00000000ff);
+  my_id =(uint8_t)((address) & 0x00000000ff);
   p_reply.data[0]=my_id;
   
-  //Put a string in the payload
-  char *str=MESSAGE;
-  memcpy(&p_reply.data[1], str, sizeof(char)*MESSAGE_LENGHT);
-  
-  // Set the size, which is the amount of bytes the payload with ID and the string 
-  p_reply.size=sizeof(char)*MESSAGE_LENGHT+1;
   
   // Register the callback function so that the CF can receive packets as well.
   p2pRegisterCB(p2pcallbackHandler);
@@ -122,6 +187,8 @@ void appMain()
 
     memcpy(&p_reply.data[1], &pos, sizeof(Position));
     p_reply.size=sizeof(Position)+1;
+
+    getNextDeltaPosition();
 
     radiolinkSendP2PPacketBroadcast(&p_reply);
   }
