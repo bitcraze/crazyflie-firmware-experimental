@@ -45,8 +45,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "estimator_kalman.h"
-#include "ledseq.h"
-#include "timers.h"
+
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -55,7 +54,6 @@
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
 #define INTER_DIST 0.6f
 #define MAX_ADDRESS 9 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
-#define LED_CRASH        LED_GREEN_R
 
 #define ADD_VECTORS_3D(a, b) {a.x += b.x; a.y += b.y; a.z += b.z;}
 #define SUB_VECTORS_3D(a, b) {a.x -= b.x; a.y -= b.y; a.z -= b.z;}
@@ -63,43 +61,11 @@
 #define MUL_VECTOR_3D_WITH_SCALAR(v, scalar) {v.x *= scalar; v.y *= scalar; v.z *= scalar;}
 #define PRINT_POSITION_3D(pos) {DEBUG_PRINT("(%f , %f , %f)\n", (double) pos.x, (double) pos.y, (double) pos.z);}
 
-
-static xTimerHandle timer;
-static bool isInit = false;
-
-
 typedef struct Position_struct {
     float x;
     float y;
     float z;
 } Position;
-
-ledseqStep_t seq_crash_def[] = {
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(50)},
-  { true, LEDSEQ_WAITMS(50)},
-  {false, LEDSEQ_WAITMS(300)},
-
-  {    0, LEDSEQ_LOOP},
-  
-};
-
-ledseqContext_t seq_crash = {
-  .sequence = seq_crash_def,
-  .led = LED_CRASH,
-};
-
-bool seq_crash_running = false;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -116,9 +82,9 @@ static uint32_t others_timestamp[MAX_ADDRESS]={0};
 // static float getY() { return ( rand() % 200)/(1.585f) ;}//logGetFloat(logIdStateEstimateY); }
 // static float getZ() { return ( rand() % 200)/(-1.585f) ;}//logGetFloat(logIdStateEstimateZ); }
 
-static float getX() { return (float) logGetFloat(logIdStateEstimateX)/1.0f; }
-static float getY() { return (float) logGetFloat(logIdStateEstimateY)/1.0f; }
-static float getZ() { return (float) logGetFloat(logIdStateEstimateZ)/1.0f; }
+// static float getX() { return (float) logGetFloat(logIdStateEstimateX)/1.0f; }
+// static float getY() { return (float) logGetFloat(logIdStateEstimateY)/1.0f; }
+// static float getZ() { return (float) logGetFloat(logIdStateEstimateZ)/1.0f; }
 
 
 
@@ -196,99 +162,20 @@ void printOtherPositions() {
 
 void p2pcallbackHandler(P2PPacket *p)
 {
-    // // Parse the data from the other crazyflie and print it
-    // uint8_t other_id = p->data[0];
-    // uint8_t counter = p->data[1];
+    // Parse the data from the other crazyflie and print it
+    uint8_t rssi = p->rssi;
+    uint8_t other_id = p->data[0];
+    uint8_t counter = p->data[1];
 
-    // static Position pos_received;
-    // memcpy(&pos_received, &(p->data[2]), sizeof(Position));
+    static Position pos_received;
+    memcpy(&pos_received, &(p->data[2]), sizeof(Position));
+    DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, other_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d \n", rssi, other_id, counter);
 
-    // DEBUG_PRINT("============================================================================\n");
-    // uint8_t rssi = p->rssi;
-    // for (int i = 2; i < 2+12; i++) {
-    //     DEBUG_PRINT("%d ", p->data[i]);
-    // }
-    // DEBUG_PRINT("\n");
-
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, other_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
-    // // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d \n", rssi, other_id, counter);
-
-    // // Store the position of the other crazyflie
-    // others_pos[other_id].x=pos_received.x;
-    // others_pos[other_id].y=pos_received.y;
-    // others_pos[other_id].z=pos_received.z;
-
-    
-    // uint32_t now_ms = T2M(xTaskGetTickCount());
-    // // uint32_t delta = now_ms - others_timestamp[other_id];
-    
-    // others_timestamp[other_id] = now_ms;
-
-    // // printOtherPositions();
 }
-
-// Initialize the p2p packet 
-static P2PPacket p_reply;
-static float previous[3];
-
-static void initPacket(){
-    p_reply.port=0x00;
-    // Get the current address of the crazyflie and obtain
-    //   the last two digits and send it as the first byte
-    //   of the payload
-    uint64_t address = configblockGetRadioAddress();
-    my_id =(uint8_t)((address) & 0x00000000ff);
-    p_reply.data[0]=my_id;
-}
-
-static void appTimer(xTimerHandle timer) {
-    static uint8_t counter=0;
-    static Position my_pos;
-    
-    my_pos.x=getX();
-    my_pos.y=getY();
-    my_pos.z=getZ();
-    
-    memcpy(&p_reply.data[2], &my_pos, sizeof(Position));
-    
-    if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
-        DEBUG_PRINT("Same value detected\n");
-        if (!seq_crash_running){
-            ledseqRun(&seq_crash);
-            seq_crash_running=1;
-        }
-        DEBUG_PRINT("Same value detected\n");
-
-        logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
-
-        logIdStateEstimateX = logGetVarId("stateEstimate", "x");
-        logIdStateEstimateY = logGetVarId("stateEstimate", "y");
-        logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
-    }else{
-        if (seq_crash_running)            
-            ledseqStop(&seq_crash);
-        seq_crash_running=0;
-    }
-    
-    previous[0]=my_pos.x;
-    previous[1]=my_pos.y;
-    previous[2]=my_pos.z;
-    
-    p_reply.data[1] = counter++;
-    
-    //get current position and send it as the payload
-    DEBUG_PRINT("MY POSITION: "); PRINT_POSITION_3D(my_pos);
-    p_reply.size=sizeof(Position)+2;//+2 for the id and counter
-    radiolinkSendP2PPacketBroadcast(&p_reply);
-}
-
 
 void appMain()
 {
-    if (isInit) {
-        return;
-    }
-
     DEBUG_PRINT("Waiting for activation ...\n");
     // Get log and param ids
     logIdStateEstimateX = logGetVarId("stateEstimate", "x");
@@ -297,23 +184,51 @@ void appMain()
 
     initializeOtherPositions();
 
-    ledseqRegisterSequence(&seq_crash);    
-
-    initPacket();
-
+    // Initialize the p2p packet 
+    static P2PPacket p_reply;
+    p_reply.port=0x00;
+    
+    // Get the current address of the crazyflie and obtain
+    //   the last two digits and send it as the first byte
+    //   of the payload
+    uint64_t address = configblockGetRadioAddress();
+    my_id =(uint8_t)((address) & 0x00000000ff);
+    p_reply.data[0]=my_id;
+    
+    
     // Register the callback function so that the CF can receive packets as well.
-    // p2pRegisterCB(p2pcallbackHandler);
+    p2pRegisterCB(p2pcallbackHandler);
+
     
+    // uint8_t counter = 0;
     // Position delta;
-    
-    previous[0]=0.0f;
-    previous[1]=0.0f;
-    previous[2]=0.0f;
+    while(1) {
 
-    timer = xTimerCreate("AppTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, appTimer);
-    xTimerStart(timer, 20);
+        vTaskDelay(M2T(BROADCAST_PERIOD_MS));
+        
+        // p_reply.data[1] = counter++;
+        
+        // Position my_pos;
 
-  isInit = true;
+        // //get current position and send it as the payload
+        // my_pos.x=getX();
+        // my_pos.y=getY();
+        // my_pos.z=getZ();
 
+        // DEBUG_PRINT("MY POSITION: "); PRINT_POSITION_3D(my_pos);
+
+
+        // memcpy(&p_reply.data[2], &my_pos, sizeof(Position));
+
+        // DEBUG_PRINT("Sending POSITION: ");
+        // for (int i = 2; i < 2+12; i++) {
+        //     DEBUG_PRINT("%d ", p_reply.data[i]);
+        // }
+        // DEBUG_PRINT("\n");
+
+        // p_reply.size=sizeof(Position)+2;//+2 for the id and counter
+
+        // radiolinkSendP2PPacketBroadcast(&p_reply);
+    }
 }
 
