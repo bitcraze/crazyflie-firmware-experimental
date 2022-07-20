@@ -47,6 +47,8 @@
 #include "estimator_kalman.h"
 #include "ledseq.h"
 #include "timers.h"
+// #include "math3d.h" //TODO: import all functions and structs from math3d.h instead of mine
+#include "positions.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -61,22 +63,12 @@
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 #define LED_CRASH        LED_GREEN_R
 
-#define ADD_VECTORS_3D(a, b) {a.x += b.x; a.y += b.y; a.z += b.z;}
-#define SUB_VECTORS_3D(a, b) {a.x -= b.x; a.y -= b.y; a.z -= b.z;}
-#define MUL_VECTORS_3D(a, b) {a.x *= b.x; a.y *= b.y; a.z *= b.z;}
-#define MUL_VECTOR_3D_WITH_SCALAR(v, scalar) {v.x *= scalar; v.y *= scalar; v.z *= scalar;}
-#define PRINT_POSITION_3D(pos) {DEBUG_PRINT("(%f , %f , %f)\n", (double) pos.x, (double) pos.y, (double) pos.z);}
-
+// NEXT DELTA
+#define MAXIMUM_NEXT_DELTA 0.2f
 
 static xTimerHandle timer,timer2;
 static bool isInit = false;
 
-
-typedef struct Position_struct {
-    float x;
-    float y;
-    float z;
-} Position;
 
 ledseqStep_t seq_crash_def[] = {
   { true, LEDSEQ_WAITMS(50)},
@@ -122,67 +114,12 @@ static float getX() { return (float) logGetFloat(logIdStateEstimateX)/1.0f; }
 static float getY() { return (float) logGetFloat(logIdStateEstimateY)/1.0f; }
 static float getZ() { return (float) logGetFloat(logIdStateEstimateZ)/1.0f; }
 
-
-
-//The following functions are used to return a new Position struct
-//If you want to save the result of teh calculation, you can use macros
-Position addVectors3D(Position a, Position b) {
-    Position result;
-    result.x = a.x + b.x;
-    result.y = a.y + b.y;
-    result.z = a.z + b.z;
-    return result;
-}
-
-Position subtractVectors3D(Position a, Position b) {
-    Position result;
-    result.x = a.x - b.x;
-    result.y = a.y - b.y;
-    result.z = a.z - b.z;
-    return result;
-}
-
-Position multiplyVectorWithScalar(Position a, float scalar) {
-    Position result;
-    result.x = a.x * scalar;
-    result.y = a.y * scalar;
-    result.z = a.z * scalar;
-    return result;
-}
-
-float getVectorMagnitude(Position a) {
-    return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-}
-
-
 static void initializeOtherPositions() {
     for (int i = 0; i < MAX_ADDRESS; i++) {
         others_pos[i].x = FLT_MAX;
         others_pos[i].x = FLT_MAX;
         others_pos[i].y = FLT_MAX;
     }
-}
-
-Position getNextDeltaPosition() {
-    Position p_i = {getX(), getY(), getZ()};
-
-    Position delta_final={0,0,0};
-    for (int j = 0; j < MAX_ADDRESS; j++) {
-        if (others_pos[j].x == FLT_MAX || others_pos[j].y == FLT_MAX || others_pos[j].y == FLT_MAX){
-            continue;
-        }
-
-        Position p_j = others_pos[j];
-        float mag = getVectorMagnitude(subtractVectors3D(p_i, p_j));
-        Position delta = subtractVectors3D(p_i, p_j);
-        float scalar = (mag-INTER_DIST) / mag;
-        MUL_VECTOR_3D_WITH_SCALAR(delta, scalar);
-        ADD_VECTORS_3D(delta_final, delta);
-    }
-
-    MUL_VECTOR_3D_WITH_SCALAR(delta_final, -1.0f);
-    
-    return delta_final;
 }
 
 void printOtherPositions() {
@@ -194,7 +131,6 @@ void printOtherPositions() {
         
     }
 }
-
 
 void p2pcallbackHandler(P2PPacket *p)
 {
@@ -243,6 +179,37 @@ static void initLogIds(){
     logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
 }
 
+Position getNextDeltaPosition(uint8_t *copters_used) {
+    Position p_i = my_pos;
+    *copters_used = 0;
+    Position delta_final={0,0,0};
+    for (int j = 0; j < MAX_ADDRESS; j++) {
+        if (others_pos[j].x == FLT_MAX || others_pos[j].y == FLT_MAX || others_pos[j].y == FLT_MAX){
+            continue;
+        }
+        *copters_used = *copters_used + 1;
+
+        Position p_j = others_pos[j];
+        PRINT_POSITION_3D(p_j);
+        float mag = getVectorMagnitude(subtractVectors3D(p_i, p_j));
+        Position delta = subtractVectors3D(p_i, p_j);
+        float scalar = (mag-INTER_DIST) / mag;
+        MUL_VECTOR_3D_WITH_SCALAR(delta, scalar);
+        ADD_VECTORS_3D(delta_final, delta);
+    }
+
+    MUL_VECTOR_3D_WITH_SCALAR(delta_final, -1.0f);
+    
+    // slace down the delta to a maximum of MAXIMUM_NEXT_DELTA
+    float mag = getVectorMagnitude(delta_final);
+    if (mag > MAXIMUM_NEXT_DELTA) {
+        MUL_VECTOR_3D_WITH_SCALAR(delta_final, MAXIMUM_NEXT_DELTA / mag);
+    }
+
+
+    return delta_final;
+}
+
 static void sendPositionTimer(xTimerHandle timer) {
     static uint8_t counter=0;
     initPacket();
@@ -283,8 +250,10 @@ static void sendPositionTimer(xTimerHandle timer) {
 }
 
 static void calculateNextTimer(xTimerHandle timer){
-    Position delta = getNextDeltaPosition();
-    DEBUG_PRINT("curr: %.2f %.2f %.2f --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, (double)delta.x, (double)delta.y, (double)delta.z);
+    DEBUG_PRINT("===================================================\n");    
+    uint8_t copters_used;
+    Position delta = getNextDeltaPosition(&copters_used);
+    DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
 }
 
 
@@ -321,8 +290,8 @@ void appMain()
     timer2 = xTimerCreate("AppTimer", M2T(CALC_NEXT_PERIOD_MS), pdTRUE, NULL, calculateNextTimer);
     xTimerStart(timer2, 20);
 
+    isInit = true;
 
-  isInit = true;
-
+    
 }
 
