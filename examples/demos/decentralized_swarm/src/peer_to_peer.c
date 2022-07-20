@@ -49,9 +49,17 @@
 #include "timers.h"
 // #include "math3d.h" //TODO: import all functions and structs from math3d.h instead of mine
 #include "positions.h"
+#include "param.h"
+#include "crtp_commander_high_level.h"
+#include "sensors.h"
+#include "pm.h"
+#include "supervisor.h"
+
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
+
+#define TAKE_OFF_HEIGHT 0.2f
 
 #define BROADCAST_FEQUENCY_HZ 10
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
@@ -59,18 +67,76 @@
 #define CALC_NEXT_FEQUENCY_HZ 3
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)
 
-#define INTER_DIST 0.6f
+#define INTER_DIST 0.6f //distance between crazyflies
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
-#define LED_CRASH        LED_GREEN_R
+#define LED_ESTIMATOR_STUCK        LED_GREEN_R
+#define LED_CRASH                  LED_GREEN_R
+
+// position lock settings
+#define LOCK_LENGTH 50
+#define LOCK_THRESHOLD 0.001f
 
 // NEXT DELTA
 #define MAXIMUM_NEXT_DELTA 0.2f
 
-static xTimerHandle timer,timer2;
+#define HOVERING_TIME 5000 //ms
+
+static xTimerHandle sendPosTimer;
+static xTimerHandle stateTransitionTimer;
+
 static bool isInit = false;
 
+// States of the state machine 
+enum State {
+    // Initialization
+    STATE_IDLE = 0,
+    STATE_WAIT_FOR_POSITION_LOCK,
 
-ledseqStep_t seq_crash_def[] = {
+    STATE_WAIT_FOR_TAKE_OFF, // Charging
+    STATE_TAKING_OFF,
+    STATE_HOVERING,
+    STATE_LANDING, 
+    STATE_CRASHED,
+};
+
+static enum State state = STATE_IDLE;
+
+static P2PPacket p_reply;
+
+// Log and param ids
+static logVarId_t logIdStateEstimateX;
+static logVarId_t logIdStateEstimateY;
+static logVarId_t logIdStateEstimateZ;
+static logVarId_t logIdKalmanVarPX;
+static logVarId_t logIdKalmanVarPY;
+static logVarId_t logIdKalmanVarPZ;
+static logVarId_t logIdPmState;
+static logVarId_t logIdlighthouseEstBs0Rt;
+static logVarId_t logIdlighthouseEstBs1Rt;
+static paramVarId_t paramIdStabilizerController;
+static paramVarId_t paramIdCommanderEnHighLevel;
+static paramVarId_t paramIdLighthouseMethod;
+
+static uint8_t my_id;
+
+static Position others_pos[MAX_ADDRESS];
+static uint32_t others_timestamp[MAX_ADDRESS]={0};
+
+static Position my_pos;
+static float previous[3];
+static float padX = 0.0;
+static float padY = 0.0;
+static float padZ = 0.0;
+
+static uint32_t now = 0;
+static uint32_t hovering_start_time = 0;
+static uint32_t position_lock_start_time = 0;
+
+// LEDs Interface
+static bool seq_estim_stuck_running = false;
+static uint8_t seq_crash_running = 0;
+
+ledseqStep_t seq_flashing_def[] = {
   { true, LEDSEQ_WAITMS(50)},
   {false, LEDSEQ_WAITMS(50)},
   { true, LEDSEQ_WAITMS(50)},
@@ -90,29 +156,93 @@ ledseqStep_t seq_crash_def[] = {
   
 };
 
+ledseqContext_t seq_estim_stuck = {
+  .sequence = seq_flashing_def,
+  .led = LED_ESTIMATOR_STUCK,
+};
+
 ledseqContext_t seq_crash = {
-  .sequence = seq_crash_def,
+  .sequence = seq_flashing_def,
   .led = LED_CRASH,
 };
 
-bool seq_crash_running = false;
 
-// Log and param ids
-static logVarId_t logIdStateEstimateX;
-static logVarId_t logIdStateEstimateY;
-static logVarId_t logIdStateEstimateZ;
+static float lockData[LOCK_LENGTH][3];
+static bool takeOffWhenReady = false;
+static bool terminateTrajectoryAndLand = false;
+static uint32_t lockWriteIndex;
 
-static uint8_t my_id;
+Position offset = {0, 0, 0};
 
-static Position others_pos[MAX_ADDRESS];
-static uint32_t others_timestamp[MAX_ADDRESS]={0};
+// getting  parameters
+static float getX() { return (float) logGetFloat(logIdStateEstimateX); }
+static float getY() { return (float) logGetFloat(logIdStateEstimateY); }
+static float getZ() { return (float) logGetFloat(logIdStateEstimateZ); }
+static float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
+static float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
+static float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
+static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
+// static bool isCharging() { return logGetInt(logIdPmState) == charging; }
+static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
+static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 
-// Getting current position
-static Position my_pos;
+static void resetLockData() {
+    lockWriteIndex = 0;
+    for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
+      lockData[i][0] = FLT_MAX;
+      lockData[i][1] = FLT_MAX;
+      lockData[i][2] = FLT_MAX;
+    }
+}
 
-static float getX() { return (float) logGetFloat(logIdStateEstimateX)/1.0f; }
-static float getY() { return (float) logGetFloat(logIdStateEstimateY)/1.0f; }
-static float getZ() { return (float) logGetFloat(logIdStateEstimateZ)/1.0f; }
+static bool hasLock() {
+  bool result = false;
+
+  // Store current state
+  lockData[lockWriteIndex][0] = getVarPX();
+  lockData[lockWriteIndex][1] = getVarPY();
+  lockData[lockWriteIndex][2] = getVarPZ();
+
+  lockWriteIndex++;
+  if (lockWriteIndex >= LOCK_LENGTH) {
+    lockWriteIndex = 0;
+  }
+
+  // Check if we have a lock
+  int count = 0;
+
+  float lXMax = FLT_MIN;
+  float lYMax = FLT_MIN;
+  float lZMax = FLT_MIN;
+
+  float lXMin = FLT_MAX;
+  float lYMin = FLT_MAX;
+  float lZMin = FLT_MAX;
+
+  for (int i = 0; i < LOCK_LENGTH; i++) {
+    if (lockData[i][0] != FLT_MAX) {
+      count++;
+
+      lXMax = fmaxf(lXMax, lockData[i][0]);
+      lYMax = fmaxf(lYMax, lockData[i][1]);
+      lZMax = fmaxf(lZMax, lockData[i][2]);
+
+      lXMin = fminf(lXMax, lockData[i][0]);
+      lYMin = fminf(lYMin, lockData[i][1]);
+      lZMin = fminf(lZMin, lockData[i][2]);
+    }
+  }
+
+  result =
+    (count >= LOCK_LENGTH) &&
+    ((lXMax - lXMin) < LOCK_THRESHOLD) &&
+    ((lYMax - lYMin) < LOCK_THRESHOLD) &&
+    ((lZMax - lZMin) < LOCK_THRESHOLD &&
+    isLighthouseAvailable() &&  // Make sure we have a deck and the Lighthouses are powered
+    sensorsAreCalibrated());
+
+  return result;
+}
 
 static void initializeOtherPositions() {
     for (int i = 0; i < MAX_ADDRESS; i++) {
@@ -158,10 +288,6 @@ void p2pcallbackHandler(P2PPacket *p)
 
     // printOtherPositions();
 }
-
-// Initialize the p2p packet 
-static P2PPacket p_reply;
-static float previous[3];
 
 static void initPacket(){
     p_reply.port=0x00;
@@ -210,7 +336,12 @@ Position getNextDeltaPosition(uint8_t *copters_used) {
     return delta_final;
 }
 
-static void sendPositionTimer(xTimerHandle timer) {
+// timers
+static void sendPosition(xTimerHandle timer) {
+
+    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_CRASHED )
+        return;
+        
     static uint8_t counter=0;
     initPacket();
 
@@ -223,18 +354,18 @@ static void sendPositionTimer(xTimerHandle timer) {
     
     if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
         // DEBUG_PRINT("Same value detected\n");
-        if (!seq_crash_running){
-            ledseqRun(&seq_crash);
-            seq_crash_running=1;
+        if (!seq_estim_stuck_running){
+            ledseqRun(&seq_estim_stuck);
+            seq_estim_stuck_running=1;
         }
 
         logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
         initLogIds();
         
     }else{
-        if (seq_crash_running)            
-            ledseqStop(&seq_crash);
-        seq_crash_running=0;
+        if (seq_estim_stuck_running)            
+            ledseqStop(&seq_estim_stuck);
+        seq_estim_stuck_running=0;
     }
     
     previous[0]=my_pos.x;
@@ -249,13 +380,102 @@ static void sendPositionTimer(xTimerHandle timer) {
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
-static void calculateNextTimer(xTimerHandle timer){
-    DEBUG_PRINT("===================================================\n");    
-    uint8_t copters_used;
-    Position delta = getNextDeltaPosition(&copters_used);
-    DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
-}
+// static void calculateNextTimer(xTimerHandle timer){
+//     DEBUG_PRINT("===================================================\n");    
+//     uint8_t copters_used;
+//     Position delta = getNextDeltaPosition(&copters_used);
+//     DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
+// }
 
+static void stateTransition(xTimerHandle timer){
+
+    if (isBatLow()) {
+        DEBUG_PRINT("Battery low, stopping\n");
+        terminateTrajectoryAndLand=1;
+    }
+    
+    if(supervisorIsTumbled()) {
+        state = STATE_CRASHED;
+    }
+
+    now = xTaskGetTickCount();
+    uint32_t dt;
+    switch(state) {
+        case STATE_IDLE:
+        DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+        //reseting
+        resetLockData();
+        if (seq_crash_running == 1){
+            ledseqStop(&seq_crash);
+            seq_crash_running=0;
+        }
+        
+        position_lock_start_time = now;
+        state = STATE_WAIT_FOR_POSITION_LOCK;
+        break;
+        case STATE_WAIT_FOR_POSITION_LOCK:
+        dt=now-position_lock_start_time;
+        if (hasLock() || dt>10000) {
+            DEBUG_PRINT("Position lock acquired, ready for take off..\n");
+            // ledseqRun(&seq_lock);
+            state = STATE_WAIT_FOR_TAKE_OFF;
+        }
+        break;
+        case STATE_WAIT_FOR_TAKE_OFF:
+            DEBUG_PRINT("Waiting for take off...\n");
+
+            if (takeOffWhenReady) {
+                takeOffWhenReady = false;
+                padX = getX();
+                padY = getY();
+                padZ = getZ();
+                DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
+
+                terminateTrajectoryAndLand = false;
+                DEBUG_PRINT("Taking off...\n");
+                crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+                state = STATE_TAKING_OFF;
+            }
+        break;
+        case STATE_TAKING_OFF:
+            if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+                DEBUG_PRINT("Hovering, waiting for command to start\n");
+                // ledseqStop(&seq_lock);
+                state = STATE_HOVERING;
+                hovering_start_time = now;
+            }
+        break;
+        case STATE_HOVERING:
+            dt = now - hovering_start_time ;
+            if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
+                DEBUG_PRINT("Landing...\n");
+                crtpCommanderHighLevelLand(padZ, 1.0);
+                state = STATE_LANDING;
+            }
+            break;
+
+        case STATE_LANDING:
+            if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+              DEBUG_PRINT("Landed. Feed me!\n");
+              crtpCommanderHighLevelStop();
+              state = STATE_IDLE;
+            }
+            break;
+        
+        case STATE_CRASHED:
+            crtpCommanderHighLevelStop();
+            DEBUG_PRINT("Crashed,  seq_crash_running : %d\n",seq_crash_running);
+
+            if (seq_crash_running!=1){
+                ledseqRun(&seq_crash);
+                seq_crash_running=1;
+            }
+        break;
+        
+        default:
+        break;
+    }
+}
 
 void appMain()
 {
@@ -268,30 +488,52 @@ void appMain()
     logIdStateEstimateX = logGetVarId("stateEstimate", "x");
     logIdStateEstimateY = logGetVarId("stateEstimate", "y");
     logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
+    logIdKalmanVarPX = logGetVarId("kalman", "varPX");
+    logIdKalmanVarPY = logGetVarId("kalman", "varPY");
+    logIdKalmanVarPZ = logGetVarId("kalman", "varPZ");
+    logIdPmState = logGetVarId("pm", "state");
+    logIdlighthouseEstBs0Rt = logGetVarId("lighthouse", "estBs0Rt");
+    logIdlighthouseEstBs1Rt = logGetVarId("lighthouse", "estBs1Rt");
+    paramIdStabilizerController = paramGetVarId("stabilizer", "controller");
+    paramIdCommanderEnHighLevel = paramGetVarId("commander", "enHighLevel");
+    paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
 
     initializeOtherPositions();
 
-    ledseqRegisterSequence(&seq_crash);    
+    ledseqRegisterSequence(&seq_estim_stuck);    
+    ledseqRegisterSequence(&seq_crash);
 
     initPacket();
 
+    enableHighlevelCommander();
+    
     // Register the callback function so that the CF can receive packets as well.
     p2pRegisterCB(p2pcallbackHandler);
-    
-    // Position delta;
     
     previous[0]=0.0f;
     previous[1]=0.0f;
     previous[2]=0.0f;
 
-    timer = xTimerCreate("AppTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, sendPositionTimer);
-    xTimerStart(timer, 20);
+    sendPosTimer = xTimerCreate("SendPosTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, sendPosition);
+    xTimerStart(sendPosTimer, 20);
 
-    timer2 = xTimerCreate("AppTimer", M2T(CALC_NEXT_PERIOD_MS), pdTRUE, NULL, calculateNextTimer);
-    xTimerStart(timer2, 20);
+    stateTransitionTimer = xTimerCreate("AppTimer", M2T(CALC_NEXT_PERIOD_MS), pdTRUE, NULL, stateTransition);
+    xTimerStart(stateTransitionTimer, 20);
 
     isInit = true;
 
     
 }
 
+
+PARAM_GROUP_START(app)
+  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
+  PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
+  PARAM_ADD(PARAM_FLOAT, offsx, &offset.x)
+  PARAM_ADD(PARAM_FLOAT, offsy, &offset.y)
+  PARAM_ADD(PARAM_FLOAT, offsz, &offset.z)
+PARAM_GROUP_STOP(app)
+
+LOG_GROUP_START(app)
+  LOG_ADD(LOG_UINT8, state, &state)
+LOG_GROUP_STOP(app)
