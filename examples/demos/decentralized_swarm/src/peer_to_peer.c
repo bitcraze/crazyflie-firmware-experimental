@@ -133,6 +133,7 @@ static logVarId_t logIdlighthouseEstBs1Rt;
 static paramVarId_t paramIdStabilizerController;
 static paramVarId_t paramIdCommanderEnHighLevel;
 static paramVarId_t paramIdLighthouseMethod;
+static paramVarId_t paramIdCollisionAvoidance;
 
 static uint8_t my_id;
 
@@ -202,6 +203,7 @@ static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 // static bool isCharging() { return logGetInt(logIdPmState) == charging; }
 static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
+static void enableCollisionAvoidance() { paramSetInt(paramIdCollisionAvoidance, 1); }
 
 static void resetLockData() {
     lockWriteIndex = 0;
@@ -328,7 +330,14 @@ void p2pcallbackHandler(P2PPacket *p)
     // uint32_t delta = now_ms - others_timestamp[received_id];
     
     others_timestamp[received_id] = now_ms;
-
+    
+    positionMeasurement_t pos_measurement;
+    pos_measurement.x = pos_received.x;
+    pos_measurement.y = pos_received.y;
+    pos_measurement.z = pos_received.z;
+    pos_measurement.source =  MeasurementSourceLighthouse;
+    pos_measurement.stdDev = 0.01f; //
+    peerLocalizationTellPosition(received_id,&pos_measurement);//TODO: if id is 0--> PROBLEM WITH THE LOGIC OF THE PEER LOCALIZATION
     // printOtherPositions();
 }
 
@@ -394,6 +403,15 @@ static void sendPosition(xTimerHandle timer) {
     my_pos.y=getY();
     my_pos.z=getZ();
     
+
+    // positionMeasurement_t pos_measurement;
+    // pos_measurement.x = my_pos.x;
+    // pos_measurement.y = my_pos.y;
+    // pos_measurement.z = my_pos.z;
+    // pos_measurement.source =  MeasurementSourceLighthouse;
+    // pos_measurement.stdDev = 0.01f; // As used in the lighthouse localization
+    // peerLocalizationTellPosition(0,&pos_measurement);
+
 
     memcpy(&p_reply.data[2], &my_pos, sizeof(Position));
     
@@ -490,6 +508,9 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Hovering, waiting for command to start\n");
                 // ledseqStop(&seq_lock);
                 state = STATE_HOVERING;
+                DEBUG_PRINT("Enabling Collision Avoidance\n");
+                enableCollisionAvoidance();
+
                 hovering_start_time = now;
             }
         break;
@@ -503,12 +524,23 @@ static void stateTransition(xTimerHandle timer){
                 break;
             }
             
-            Position delta = getNextDeltaPosition();
-            uint8_t copters_used = coptersReceivedNumber();
-            DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
-            delta.z = 0.0f; // we don't want to move in z
-            crtpCommanderHighLevelGoTo(delta.x, delta.y, delta.z, 0.0,DELTA_DURATION,true);//relative to current position
-            state=STATE_GOING_TO_DELTA_POINT;
+            uint8_t otherId =  my_id == 4 ? 6 : 4;
+
+            if (my_id==9)
+                break;
+            
+            if (peerLocalizationIsIDActive(otherId)) {
+                Position togo = others_pos[otherId];
+                crtpCommanderHighLevelGoTo(togo.x, togo.y, togo.z, 0.0,1.0,false);
+                state=STATE_GOING_TO_DELTA_POINT;
+            }
+
+            // Position delta = getNextDeltaPosition();
+            // uint8_t copters_used = coptersReceivedNumber();
+            // DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
+            // delta.z = 0.0f; // we don't want to move in z
+            // crtpCommanderHighLevelGoTo(delta.x, delta.y, delta.z, 0.0,DELTA_DURATION,true);//relative to current position
+            // state=STATE_GOING_TO_DELTA_POINT;
             break;
         case STATE_GOING_TO_DELTA_POINT:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
@@ -557,6 +589,7 @@ void appMain()
     paramIdStabilizerController = paramGetVarId("stabilizer", "controller");
     paramIdCommanderEnHighLevel = paramGetVarId("commander", "enHighLevel");
     paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
+    paramIdCollisionAvoidance = paramGetVarId("colAv", "enable");
 
     initializeOtherPositions();
 
