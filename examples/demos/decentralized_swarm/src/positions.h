@@ -45,7 +45,10 @@ Position multiplyVectorWithScalar(Position a, float scalar) {
     return result;
 }
 
-float getVectorMagnitude(Position a) {
+float getVectorMagnitude3D(Position a) {
     return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 }
 
+float getVectorMagnitude2D(Position a) {
+    return sqrt(a.x * a.x + a.y * a.y );
+}

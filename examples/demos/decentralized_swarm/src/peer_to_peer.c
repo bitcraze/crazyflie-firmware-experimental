@@ -54,20 +54,21 @@
 #include "sensors.h"
 #include "pm.h"
 #include "supervisor.h"
+#include "peer_localization.h"
 
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
 
-#define TAKE_OFF_HEIGHT 0.2f
+#define TAKE_OFF_HEIGHT 0.6f
 
-#define BROADCAST_FEQUENCY_HZ 10
+#define BROADCAST_FEQUENCY_HZ 15
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
 
 #define CALC_NEXT_FEQUENCY_HZ 3
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)
 
-#define INTER_DIST 0.6f //distance between crazyflies
+#define INTER_DIST 0.8f //distance between crazyflies
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
 #define LED_CRASH                  LED_GREEN_R
@@ -75,11 +76,25 @@
 // position lock settings
 #define LOCK_LENGTH 50
 #define LOCK_THRESHOLD 0.001f
+#define POSITION_LOCK_TIMEOUT 10000
 
 // NEXT DELTA
 #define MAXIMUM_NEXT_DELTA 0.2f
+#define DELTA_DURATION 0.1f //sec duration to go to next delta
 
-#define HOVERING_TIME 5000 //ms
+#define HOVERING_TIME 8000 //ms
+#define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
+
+
+// BOUNDS DEFINITIONS
+#define MIN_X_BOUND -2.5f
+#define MAX_X_BOUND  1.0f
+
+#define MIN_Y_BOUND -2.0f
+#define MAX_Y_BOUND  2.0f
+
+#define MIN_Z_BOUND -0.4f
+#define MAX_Z_BOUND  1.5f
 
 static xTimerHandle sendPosTimer;
 static xTimerHandle stateTransitionTimer;
@@ -95,7 +110,9 @@ enum State {
     STATE_WAIT_FOR_TAKE_OFF, // Charging
     STATE_TAKING_OFF,
     STATE_HOVERING,
+    STATE_GOING_TO_DELTA_POINT,
     STATE_LANDING, 
+
     STATE_CRASHED,
 };
 
@@ -262,12 +279,26 @@ void printOtherPositions() {
     }
 }
 
-uint8_t otherCoptersFlyingNumber() {
-    //TODO: include a timestamp in order to discard crashed copters
-    //TODO: check if are landing
+bool copterPositionReceived(uint8_t copter_index){
+    //Return true if the position of the copter with index copter_index has been received recently.
+    uint32_t now_ms = T2M(xTaskGetTickCount());
+    uint32_t dt=now_ms - others_timestamp[copter_index];
+    bool updated_recently = dt < POSITION_UPDATE_TIMEOUT_MS;
+    bool not_received_yet =    others_pos[copter_index].x == FLT_MAX 
+                            || others_pos[copter_index].y == FLT_MAX 
+                            || others_pos[copter_index].y == FLT_MAX;
+    
+    return !not_received_yet && updated_recently;
+}
+
+uint8_t coptersReceivedNumber() {
+    /*
+    *  Returns the number of copters flying based on the positions of the copters 
+    *  received through the P2P position sharing mechanism.
+    */
     uint8_t count = 0;
     for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
-        if (others_pos[i].x != FLT_MAX && others_pos[i].y != FLT_MAX && others_pos[i].y != FLT_MAX){
+        if (copterPositionReceived(i)) {
             count++;
         }
     }
@@ -277,14 +308,14 @@ uint8_t otherCoptersFlyingNumber() {
 void p2pcallbackHandler(P2PPacket *p)
 {
     // Parse the data from the other crazyflie and print it
-    uint8_t rssi = p->rssi;
+    // uint8_t rssi = p->rssi;
     uint8_t received_id = p->data[0];
-    uint8_t counter = p->data[1];
+    // uint8_t counter = p->data[1];
 
     static Position pos_received;
     memcpy(&pos_received, &(p->data[2]), sizeof(Position));
     // DEBUG_PRINT("===================================================\n");
-    DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
     // // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d \n", rssi, received_id, counter);
 
     // // Store the position of the other crazyflie
@@ -317,19 +348,20 @@ static void initLogIds(){
     logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
 }
 
-Position getNextDeltaPosition(uint8_t *copters_used) {
+Position getNextDeltaPosition() {
     Position p_i = my_pos;
-    *copters_used = 0;
+    
     Position delta_final={0,0,0};
+
     for (int j = 0; j < MAX_ADDRESS; j++) {
-        if (others_pos[j].x == FLT_MAX || others_pos[j].y == FLT_MAX || others_pos[j].y == FLT_MAX){
+        if (!copterPositionReceived(j)) {
             continue;
         }
-        *copters_used = *copters_used + 1;
-
+        
         Position p_j = others_pos[j];
         PRINT_POSITION_3D(p_j);
-        float mag = getVectorMagnitude(subtractVectors3D(p_i, p_j));
+        // float mag = getVectorMagnitude3D(subtractVectors3D(p_i, p_j)); // z coordinate is also used 
+        float mag = getVectorMagnitude2D(subtractVectors3D(p_i, p_j));    // z coordinate is ignored
         Position delta = subtractVectors3D(p_i, p_j);
         float scalar = (mag-INTER_DIST) / mag;
         MUL_VECTOR_3D_WITH_SCALAR(delta, scalar);
@@ -339,7 +371,8 @@ Position getNextDeltaPosition(uint8_t *copters_used) {
     MUL_VECTOR_3D_WITH_SCALAR(delta_final, -1.0f);
     
     // slace down the delta to a maximum of MAXIMUM_NEXT_DELTA
-    float mag = getVectorMagnitude(delta_final);
+    // float mag = getVectorMagnitude3D(delta_final);   // z coordinate is also used
+    float mag = getVectorMagnitude2D(delta_final);      // z coordinate is ignored 
     if (mag > MAXIMUM_NEXT_DELTA) {
         MUL_VECTOR_3D_WITH_SCALAR(delta_final, MAXIMUM_NEXT_DELTA / mag);
     }
@@ -392,18 +425,23 @@ static void sendPosition(xTimerHandle timer) {
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
-// static void calculateNextTimer(xTimerHandle timer){
-//     DEBUG_PRINT("===================================================\n");    
-//     uint8_t copters_used;
-//     Position delta = getNextDeltaPosition(&copters_used);
-//     DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
-// }
+static bool outOfBounds() {
+    return my_pos.x > MAX_X_BOUND || my_pos.x < MIN_X_BOUND 
+        || my_pos.y > MAX_Y_BOUND || my_pos.y < MIN_Y_BOUND 
+        || my_pos.z > MAX_Z_BOUND || my_pos.z < MIN_Z_BOUND;
+}
 
 static void stateTransition(xTimerHandle timer){
 
     if (isBatLow()) {
         DEBUG_PRINT("Battery low, stopping\n");
         terminateTrajectoryAndLand=1;
+    }
+
+    if (outOfBounds()) {
+        DEBUG_PRINT("Out of bounds, stopping\n");
+        crtpCommanderHighLevelLand(padZ, 1.0);
+        state = STATE_LANDING;
     }
     
     if(supervisorIsTumbled()) {
@@ -427,14 +465,14 @@ static void stateTransition(xTimerHandle timer){
         break;
         case STATE_WAIT_FOR_POSITION_LOCK:
         dt=now-position_lock_start_time;
-        if (hasLock() || dt>10000) {
+        if (hasLock() || dt > POSITION_LOCK_TIMEOUT) {
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
             // ledseqRun(&seq_lock);
             state = STATE_WAIT_FOR_TAKE_OFF;
         }
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
-            if (takeOffWhenReady || otherCoptersFlyingNumber() > 0 ) {
+            if (takeOffWhenReady || coptersReceivedNumber() > 0 ) {
                 takeOffWhenReady = false;
                 padX = getX();
                 padY = getY();
@@ -457,13 +495,26 @@ static void stateTransition(xTimerHandle timer){
         break;
         case STATE_HOVERING:
             dt = now - hovering_start_time ;
+            
             if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
                 DEBUG_PRINT("Landing...\n");
-                crtpCommanderHighLevelLand(padZ, 1.0);
+                crtpCommanderHighLevelLand(padZ, 3.0);
                 state = STATE_LANDING;
+                break;
+            }
+            
+            Position delta = getNextDeltaPosition();
+            uint8_t copters_used = coptersReceivedNumber();
+            DEBUG_PRINT("curr: %.2f %.2f %.2f copters used: %d --> Delta: %.2f %.2f %.2f\n", (double)my_pos.x,(double)my_pos.y,(double)my_pos.z, copters_used , (double)delta.x, (double)delta.y, (double)delta.z);
+            delta.z = 0.0f; // we don't want to move in z
+            crtpCommanderHighLevelGoTo(delta.x, delta.y, delta.z, 0.0,DELTA_DURATION,true);//relative to current position
+            state=STATE_GOING_TO_DELTA_POINT;
+            break;
+        case STATE_GOING_TO_DELTA_POINT:
+            if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+                state = STATE_HOVERING;
             }
             break;
-
         case STATE_LANDING:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
               DEBUG_PRINT("Landed. Feed me!\n");
@@ -471,7 +522,6 @@ static void stateTransition(xTimerHandle timer){
               state = STATE_IDLE;
             }
             break;
-        
         case STATE_CRASHED:
             crtpCommanderHighLevelStop();
             DEBUG_PRINT("Crashed,  seq_crash_running : %d\n",seq_crash_running);
