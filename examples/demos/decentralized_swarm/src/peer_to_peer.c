@@ -262,17 +262,29 @@ void printOtherPositions() {
     }
 }
 
+uint8_t otherCoptersFlyingNumber() {
+    //TODO: include a timestamp in order to discard crashed copters
+    //TODO: check if are landing
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
+        if (others_pos[i].x != FLT_MAX && others_pos[i].y != FLT_MAX && others_pos[i].y != FLT_MAX){
+            count++;
+        }
+    }
+    return count;
+}
+
 void p2pcallbackHandler(P2PPacket *p)
 {
     // Parse the data from the other crazyflie and print it
-    // uint8_t rssi = p->rssi;
+    uint8_t rssi = p->rssi;
     uint8_t received_id = p->data[0];
-    // uint8_t counter = p->data[1];
+    uint8_t counter = p->data[1];
 
     static Position pos_received;
     memcpy(&pos_received, &(p->data[2]), sizeof(Position));
     // DEBUG_PRINT("===================================================\n");
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+    DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
     // // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d \n", rssi, received_id, counter);
 
     // // Store the position of the other crazyflie
@@ -422,9 +434,7 @@ static void stateTransition(xTimerHandle timer){
         }
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
-            DEBUG_PRINT("Waiting for take off...\n");
-
-            if (takeOffWhenReady) {
+            if (takeOffWhenReady || otherCoptersFlyingNumber() > 0 ) {
                 takeOffWhenReady = false;
                 padX = getX();
                 padY = getY();
