@@ -32,6 +32,9 @@ bool peerLocalizationTellPosition(int id, positionMeasurement_t const *pos);
 // Returns true if we have a position value for the given radio ID.
 bool peerLocalizationIsIDActive(uint8_t id);
 
+// Returns true if we have a position value for the given index.Uncorrelated with radio ID
+bool peerLocalizationIsIDxActive(uint8_t idx);
+
 // Returns the position value for the given radio ID, or NULL if none exists.
 // Performs a linear search.
 peerLocalizationOtherPosition_t *peerLocalizationGetPositionByID(uint8_t id);
@@ -40,4 +43,6 @@ peerLocalizationOtherPosition_t *peerLocalizationGetPositionByID(uint8_t id);
 // efficient if iterating over all peers is needed.
 peerLocalizationOtherPosition_t *peerLocalizationGetPositionByIdx(uint8_t idx);
 
+//Returns the number of neighbors tracked.
+uint8_t peerLocalizationGetNumNeighbors();
 #endif // __PEER_LOCALIZATION_H__
