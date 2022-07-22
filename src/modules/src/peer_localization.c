@@ -52,10 +52,7 @@ bool peerLocalizationIsIDxActive(uint8_t idx)
 {
     uint32_t now = xTaskGetTickCount();
     uint32_t dt = now - other_positions[idx].pos.timestamp;
-    if (other_positions[idx].id != 0 && dt < PEER_LOCALIZATION_TIMEOUT_MS) {
-      return true;
-    }
-    return false;
+    return other_positions[idx].id != 0 && dt < PEER_LOCALIZATION_TIMEOUT_MS;   
 }
 
 peerLocalizationOtherPosition_t *peerLocalizationGetPositionByID(uint8_t cfid)

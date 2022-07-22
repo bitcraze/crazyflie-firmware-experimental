@@ -1,20 +1,21 @@
-#define TAKE_OFF_HEIGHT 0.6f
+#pragma once
+#define TAKE_OFF_HEIGHT 1.0f
 
-#define BROADCAST_FEQUENCY_HZ 15
-#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
-
-#define CALC_NEXT_FEQUENCY_HZ 3
-#define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)
-
-#define INTER_DIST 0.8f //distance between crazyflies
-#define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
 #define LED_CRASH                  LED_GREEN_R
 
 #define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
-#define WP_VEL_THRESHOLD          0.25f //velocity threshold to consider a waypoint reached
+#define WP_VEL_THRESHOLD          0.3f //velocity threshold to consider a waypoint reached
 
 #define  COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.4f //radius of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
+// P2P Interface
+#define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
+
+#define BROADCAST_FEQUENCY_HZ 15
+#define CALC_NEXT_FEQUENCY_HZ 3
+#define ALIVE_TIMEOUT_MS 1000 //ms after not receiving data from a copter ,it is considered dead
 
 // position lock settings
 #define LOCK_LENGTH 50
@@ -22,6 +23,8 @@
 #define POSITION_LOCK_TIMEOUT 10000
 
 // NEXT DELTA
+#define INTER_DIST 0.8f //distance between crazyflies
+
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 6.0f //sec duration to go to next delta
 
@@ -44,3 +47,7 @@
 
 #define MIN_Z_BOUND -0.4f
 #define MAX_Z_BOUND  1.5f
+
+//utils
+#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
+#define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)

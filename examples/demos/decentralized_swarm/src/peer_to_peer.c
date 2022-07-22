@@ -78,6 +78,7 @@ enum State {
     STATE_HOVERING,
     STATE_GOING_TO_DELTA_POINT,
     STATE_GOING_TO_PAD,
+    STATE_REGOING_TO_PAD,
     STATE_WAITING_AT_PAD,
     STATE_LANDING,
     STATE_CHECK_CHARGING,
@@ -114,6 +115,8 @@ static paramVarId_t paramIdLighthouseMethod;
 static paramVarId_t paramIdCollisionAvoidanceEnable;
 static paramVarId_t paramIdCollisionAvoidanceEllipsoidX;
 static paramVarId_t paramIdCollisionAvoidanceEllipsoidY;
+static paramVarId_t paramIdCollisionAvoidanceHorizon;
+static paramVarId_t paramIdCollisionAvoidanceMaxVel;
 
 static uint8_t my_id;
 
@@ -254,7 +257,6 @@ static bool hasLock() {
   return result;
 }
 
-
 static void initPacket(){
     p_reply.port=0x00;
     // Get the current address of the crazyflie and obtain
@@ -277,6 +279,8 @@ static void initLogIds(){
 static void initCollisionAvoidance(){
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidX, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
+    paramSetFloat(paramIdCollisionAvoidanceHorizon, COLLISION_AVOIDANCE_HORIZON);
+    paramSetFloat(paramIdCollisionAvoidanceMaxVel, COLLISION_AVOIDANCE_MAX_VELOCITY);
 }
 
 static bool outOfBounds() {
@@ -302,7 +306,7 @@ static bool reachedNextWaypoint(){
 // timers
 static void sendPosition(xTimerHandle timer) {
     // Send the position to the other crazyflies via P2P
-    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD )
+    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_REGOING_TO_PAD )
         return;
         
     static uint8_t counter=0;
@@ -439,10 +443,22 @@ static void stateTransition(xTimerHandle timer){
             break;
         case STATE_GOING_TO_DELTA_POINT:
             if (reachedNextWaypoint()) {
-                state = STATE_HOVERING;
+                if (terminateTrajectoryAndLand) {
+                    gotoNextWaypoint(padX,padY,padZ+GO_TO_PAD_HEIGHT,GO_TO_PAD_DURATION);
+                    state = STATE_GOING_TO_PAD;
+                }else{
+                    state = STATE_HOVERING;                    
+                }
             }
             break;
         case STATE_GOING_TO_PAD:
+            if (reachedNextWaypoint()) {
+                DEBUG_PRINT("Over pad,starting lowering\n");
+                crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
+                state = STATE_WAITING_AT_PAD;
+            }
+            break;
+        case STATE_REGOING_TO_PAD:
             if (reachedNextWaypoint()) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
                 crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
@@ -485,7 +501,7 @@ static void stateTransition(xTimerHandle timer){
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabilizing position\n");
                 gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
-                state = STATE_GOING_TO_PAD;
+                state = STATE_REGOING_TO_PAD;
             }
             break;
         case STATE_CRASHED:
@@ -525,7 +541,8 @@ void appMain()
     paramIdCollisionAvoidanceEnable = paramGetVarId("colAv", "enable");
     paramIdCollisionAvoidanceEllipsoidX = paramGetVarId("colAv", "ellipsoidX");
     paramIdCollisionAvoidanceEllipsoidY = paramGetVarId("colAv", "ellipsoidY");
-
+    paramIdCollisionAvoidanceHorizon = paramGetVarId("colAv", "horizon");
+    paramIdCollisionAvoidanceMaxVel = paramGetVarId("colAv", "maxSpeed");
 
     ledseqRegisterSequence(&seq_estim_stuck);    
     ledseqRegisterSequence(&seq_crash);
