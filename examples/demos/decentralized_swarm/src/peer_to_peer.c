@@ -48,7 +48,6 @@
 #include "ledseq.h"
 #include "timers.h"
 // #include "math3d.h" //TODO: import all functions and structs from math3d.h instead of mine
-#include "positions.h"
 #include "param.h"
 #include "crtp_commander_high_level.h"
 #include "sensors.h"
@@ -56,6 +55,9 @@
 #include "supervisor.h"
 #include "peer_localization.h"
 #include "settings.h"
+
+#include "p2p_interface.h"
+#include "positions.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -85,7 +87,6 @@ enum State {
 };
 
 static enum State state = STATE_IDLE;
-static uint8_t otherStates[MAX_ADDRESS];//array of states of the other drones
 
 static P2PPacket p_reply;
 
@@ -253,34 +254,6 @@ static bool hasLock() {
   return result;
 }
 
-static uint8_t getCopterState(uint8_t copter_id){
-    return otherStates[copter_id];
-}
-
-void p2pcallbackHandler(P2PPacket *p)
-{
-    // Parse the data from the other crazyflie and print it
-    // uint8_t rssi = p->rssi;
-    uint8_t received_id = p->data[0];
-    // uint8_t counter = p->data[1];
-    otherStates[received_id]=p->data[2];
-
-    positionMeasurement_t pos_measurement;
-    memcpy(&pos_measurement.pos, &(p->data[3]), sizeof(Position));
-    
-    // DEBUG_PRINT("===================================================\n");
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);    
-    
-    pos_measurement.source =  MeasurementSourceLighthouse;
-    pos_measurement.stdDev = 0.01f; //
-    peerLocalizationTellPosition(received_id,&pos_measurement);//TODO: if id is 0--> PROBLEM WITH THE LOGIC OF THE PEER LOCALIZATION (maybe add 1 to the id)
-}
-
-static void initOtherStates(){
-    for(int i=0;i<MAX_ADDRESS;i++){
-        otherStates[i] = 255;
-    }
-}
 
 static void initPacket(){
     p_reply.port=0x00;
@@ -503,14 +476,14 @@ static void stateTransition(xTimerHandle timer){
                 state = STATE_WAIT_FOR_TAKE_OFF;
                 } else {
                 DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT, 1.0);
+                crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.2f, 1.0);
                 state = STATE_REPOSITION_ON_PAD;
                 }
             }
             break;
         case STATE_REPOSITION_ON_PAD:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-                DEBUG_PRINT("Over pad, stabalizing position\n");
+                DEBUG_PRINT("Over pad, stabilizing position\n");
                 gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
                 state = STATE_GOING_TO_PAD;
             }
@@ -577,8 +550,6 @@ void appMain()
     xTimerStart(stateTransitionTimer, 20);
 
     isInit = true;
-
-    
 }
 
 
