@@ -15,12 +15,25 @@
 #include "peer_localization.h"
 #include "settings.h"
 
+/*
+    PACKET FORMAT:
+    [0]     --> id
+    [1]     --> counter
+    [2]     --> state
+    [3-14]  --> x,y,z
+    [15]    --> compressed Voltage    
+*/
 #define MAX_ADDRESS 10
+
+#define VOLTAGE_MAX 4.2f
+#define VOLTAGE_MIN 3.0f
 
 typedef struct packet_struct {
     uint8_t id;
     uint8_t counter;
     uint8_t state;
+    uint8_t battery_voltage; //normalized to 0-255 (0-3.3V) 
+
     uint32_t timestamp;
 
 } copter_t;
@@ -31,4 +44,9 @@ void p2pcallbackHandler(P2PPacket *p);
 
 void initOtherStates();
 
+bool isAlive(uint8_t copter_id);
+
+uint8_t compressVoltage(float voltage);
+
+float decompressVoltage(uint8_t voltage);
 #endif // P2P_INTERFACE_H

@@ -58,6 +58,8 @@
 
 #include "p2p_interface.h"
 #include "positions.h"
+#include "common.h"
+#include "param_log_interface.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -67,64 +69,21 @@ static xTimerHandle stateTransitionTimer;
 
 static bool isInit = false;
 
-// States of the state machine 
-enum State {
-    // Initialization
-    STATE_IDLE = 0,
-    STATE_WAIT_FOR_POSITION_LOCK,
-
-    STATE_WAIT_FOR_TAKE_OFF, // Charging
-    STATE_TAKING_OFF,
-    STATE_HOVERING,
-    STATE_GOING_TO_DELTA_POINT,
-    STATE_GOING_TO_PAD,
-    STATE_REGOING_TO_PAD,
-    STATE_WAITING_AT_PAD,
-    STATE_LANDING,
-    STATE_CHECK_CHARGING,
-    STATE_REPOSITION_ON_PAD,
-
-    STATE_CRASHED,
-};
-
 static enum State state = STATE_IDLE;
 
 static P2PPacket p_reply;
 
 //Landing to pad
-static float stabilizeEndTime;
+static uint32_t stabilizeEndTime;
 static float landingTimeCheckCharge;
-
-
-// Log and param ids
-static logVarId_t logIdStateEstimateX;
-static logVarId_t logIdStateEstimateY;
-static logVarId_t logIdStateEstimateZ;
-static logVarId_t logIdStateEstimateVx;
-static logVarId_t logIdStateEstimateVy;
-static logVarId_t logIdStateEstimateVz;
-static logVarId_t logIdKalmanVarPX;
-static logVarId_t logIdKalmanVarPY;
-static logVarId_t logIdKalmanVarPZ;
-static logVarId_t logIdPmState;
-static logVarId_t logIdlighthouseEstBs0Rt;
-static logVarId_t logIdlighthouseEstBs1Rt;
-static paramVarId_t paramIdStabilizerController;
-static paramVarId_t paramIdCommanderEnHighLevel;
-static paramVarId_t paramIdLighthouseMethod;
-static paramVarId_t paramIdCollisionAvoidanceEnable;
-static paramVarId_t paramIdCollisionAvoidanceEllipsoidX;
-static paramVarId_t paramIdCollisionAvoidanceEllipsoidY;
-static paramVarId_t paramIdCollisionAvoidanceHorizon;
-static paramVarId_t paramIdCollisionAvoidanceMaxVel;
 
 static uint8_t my_id;
 
 Position positions_to_go[]={
-    [0].x=+1 , [0].y=+1 ,[0].z=0.8,
-    [1].x=+1 , [1].y=-1 ,[1].z=0.8,
-    [2].x=-1 , [2].y=+1 ,[2].z=0.8,
-    [3].x=-1 , [3].y=-1 ,[3].z=0.8,
+    [0].x=+1 , [0].y=+1 ,[0].z = TAKE_OFF_HEIGHT,
+    [1].x=+1 , [1].y=-1 ,[1].z = TAKE_OFF_HEIGHT,
+    [2].x=-1 , [2].y=+1 ,[2].z = TAKE_OFF_HEIGHT,
+    [3].x=-1 , [3].y=-1 ,[3].z = TAKE_OFF_HEIGHT,
 
 };
 
@@ -181,24 +140,6 @@ static bool terminateTrajectoryAndLand = false;
 static uint32_t lockWriteIndex;
 
 Position offset = {0, 0, 0};
-
-// getting  parameters
-static float getX() { return (float) logGetFloat(logIdStateEstimateX); }
-static float getY() { return (float) logGetFloat(logIdStateEstimateY); }
-static float getZ() { return (float) logGetFloat(logIdStateEstimateZ); }
-static float getVx() { return (float) logGetFloat(logIdStateEstimateVx); }
-static float getVy() { return (float) logGetFloat(logIdStateEstimateVy); }
-static float getVz() { return (float) logGetFloat(logIdStateEstimateVz); }
-static float getVelMagnitude() { return sqrtf(getVx()*getVx() + getVy()*getVy() + getVz()*getVz()); }
-static float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
-static float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
-static float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
-static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
-static bool isCharging() { return logGetInt(logIdPmState) == charging; }
-static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
-static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
-static void enableCollisionAvoidance() { paramSetInt(paramIdCollisionAvoidanceEnable, 1); }
-
 static void resetLockData() {
     lockWriteIndex = 0;
     for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
@@ -267,21 +208,6 @@ static void initPacket(){
     p_reply.data[0]=my_id;
 }
 
-static void initLogIds(){
-    logIdStateEstimateX = logGetVarId("stateEstimate", "x");
-    logIdStateEstimateY = logGetVarId("stateEstimate", "y");
-    logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
-    logIdStateEstimateVx = logGetVarId("stateEstimate", "vx");
-    logIdStateEstimateVy = logGetVarId("stateEstimate", "vy");
-    logIdStateEstimateVz = logGetVarId("stateEstimate", "vz");
-}
-
-static void initCollisionAvoidance(){
-    paramSetFloat(paramIdCollisionAvoidanceEllipsoidX, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
-    paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
-    paramSetFloat(paramIdCollisionAvoidanceHorizon, COLLISION_AVOIDANCE_HORIZON);
-    paramSetFloat(paramIdCollisionAvoidanceMaxVel, COLLISION_AVOIDANCE_MAX_VELOCITY);
-}
 
 static bool outOfBounds() {
     return my_pos.x > MAX_X_BOUND || my_pos.x < MIN_X_BOUND 
@@ -306,6 +232,15 @@ static bool reachedNextWaypoint(){
 // timers
 static void sendPosition(xTimerHandle timer) {
     // Send the position to the other crazyflies via P2P
+
+    /*
+        PACKET FORMAT:
+        [0]     --> id
+        [1]     --> counter
+        [2]     --> state
+        [3-14]  --> x,y,z
+        [15]    --> compressed Voltage    
+    */
     if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_REGOING_TO_PAD )
         return;
         
@@ -317,6 +252,7 @@ static void sendPosition(xTimerHandle timer) {
     my_pos.z=getZ();
     memcpy(&p_reply.data[3], &my_pos, sizeof(Position));
     
+    // position stuck handling (while testing position broadcasting seem to be stuck after resetting the estimator)
     if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
         // DEBUG_PRINT("Same value detected\n");
         if (!seq_estim_stuck_running){
@@ -339,9 +275,11 @@ static void sendPosition(xTimerHandle timer) {
     
     p_reply.data[1] = counter++;
     p_reply.data[2] = (uint8_t) state;
+    p_reply.data[15] = compressVoltage( getVoltage() );
 
     //get current position and send it as the payload
-    p_reply.size=sizeof(Position)+3;//+3 for the id,counter and state
+    p_reply.size=sizeof(Position) + 4;//+4 for the id,counter,state and Voltage
+
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
@@ -444,7 +382,7 @@ static void stateTransition(xTimerHandle timer){
         case STATE_GOING_TO_DELTA_POINT:
             if (reachedNextWaypoint()) {
                 if (terminateTrajectoryAndLand) {
-                    gotoNextWaypoint(padX,padY,padZ+GO_TO_PAD_HEIGHT,GO_TO_PAD_DURATION);
+                    gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                     state = STATE_GOING_TO_PAD;
                 }else{
                     state = STATE_HOVERING;                    
@@ -459,9 +397,10 @@ static void stateTransition(xTimerHandle timer){
             }
             break;
         case STATE_REGOING_TO_PAD:
-            if (reachedNextWaypoint()) {
+            if (reachedNextWaypoint() || now > stabilizeEndTime) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
                 crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
+                stabilizeEndTime = now + STABILIZE_TIMEOUT;
                 state = STATE_WAITING_AT_PAD;
             }
             break;
@@ -501,6 +440,7 @@ static void stateTransition(xTimerHandle timer){
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabilizing position\n");
                 gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
+                stabilizeEndTime = now + 3000;
                 state = STATE_REGOING_TO_PAD;
             }
             break;
@@ -526,31 +466,15 @@ void appMain()
 
     DEBUG_PRINT("Waiting for activation ...\n");
     // Get log and param ids
-    logIdStateEstimateX = logGetVarId("stateEstimate", "x");
-    logIdStateEstimateY = logGetVarId("stateEstimate", "y");
-    logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
-    logIdKalmanVarPX = logGetVarId("kalman", "varPX");
-    logIdKalmanVarPY = logGetVarId("kalman", "varPY");
-    logIdKalmanVarPZ = logGetVarId("kalman", "varPZ");
-    logIdPmState = logGetVarId("pm", "state");
-    logIdlighthouseEstBs0Rt = logGetVarId("lighthouse", "estBs0Rt");
-    logIdlighthouseEstBs1Rt = logGetVarId("lighthouse", "estBs1Rt");
-    paramIdStabilizerController = paramGetVarId("stabilizer", "controller");
-    paramIdCommanderEnHighLevel = paramGetVarId("commander", "enHighLevel");
-    paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
-    paramIdCollisionAvoidanceEnable = paramGetVarId("colAv", "enable");
-    paramIdCollisionAvoidanceEllipsoidX = paramGetVarId("colAv", "ellipsoidX");
-    paramIdCollisionAvoidanceEllipsoidY = paramGetVarId("colAv", "ellipsoidY");
-    paramIdCollisionAvoidanceHorizon = paramGetVarId("colAv", "horizon");
-    paramIdCollisionAvoidanceMaxVel = paramGetVarId("colAv", "maxSpeed");
+    initParamLogInterface();
 
     ledseqRegisterSequence(&seq_estim_stuck);    
     ledseqRegisterSequence(&seq_crash);
 
     initPacket();
     initOtherStates();
-    initCollisionAvoidance();
 
+    initCollisionAvoidance();
     enableHighlevelCommander();
     
     // Register the callback function so that the CF can receive packets as well.

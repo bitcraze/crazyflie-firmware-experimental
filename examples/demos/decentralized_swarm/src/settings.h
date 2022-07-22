@@ -28,7 +28,7 @@
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 6.0f //sec duration to go to next delta
 
-#define HOVERING_TIME 8000 //ms
+#define HOVERING_TIME 18000 //ms
 #define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad
@@ -37,6 +37,7 @@
 #define LANDING_DURATION 3 //sec 
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
+#define STABILIZE_TIMEOUT 5000 //ms
 
 // BOUNDS DEFINITIONS
 #define MIN_X_BOUND -2.5f

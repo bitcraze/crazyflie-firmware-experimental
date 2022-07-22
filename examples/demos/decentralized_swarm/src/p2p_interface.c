@@ -12,12 +12,13 @@ void p2pcallbackHandler(P2PPacket *p)
     // Parse the data from the other crazyflie and print it
     // uint8_t rssi = p->rssi;
     uint8_t received_id = p->data[0];
-    uint8_t counter = p->data[1];
+    // uint8_t counter = p->data[1];
     uint32_t now_ms = T2M(xTaskGetTickCount());
 
     copters[received_id].id=received_id;
-    copters[received_id].counter=counter;
+    copters[received_id].counter=p->data[1];
     copters[received_id].state = p->data[2];
+    copters[received_id].battery_voltage = p->data[15];
     copters[received_id].timestamp=now_ms;
 
     positionMeasurement_t pos_measurement;
@@ -40,4 +41,12 @@ void initOtherStates(){
 bool isAlive(uint8_t copter_id){
     uint32_t dt = T2M(xTaskGetTickCount()) - copters[copter_id].timestamp;
     return dt < ALIVE_TIMEOUT_MS;
+}
+
+uint8_t compressVoltage(float voltage){
+    return (uint8_t)((voltage-VOLTAGE_MIN)/(VOLTAGE_MAX-VOLTAGE_MIN)*255);
+}
+
+float decompressVoltage(uint8_t voltage){
+    return (voltage/255.0f)*(VOLTAGE_MAX-VOLTAGE_MIN)+VOLTAGE_MIN;
 }
