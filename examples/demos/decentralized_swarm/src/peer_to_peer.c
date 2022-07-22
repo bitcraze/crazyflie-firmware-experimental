@@ -55,50 +55,10 @@
 #include "pm.h"
 #include "supervisor.h"
 #include "peer_localization.h"
-
+#include "settings.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
-
-#define TAKE_OFF_HEIGHT 0.6f
-
-#define BROADCAST_FEQUENCY_HZ 15
-#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
-
-#define CALC_NEXT_FEQUENCY_HZ 3
-#define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)
-
-#define INTER_DIST 0.8f //distance between crazyflies
-#define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
-#define LED_ESTIMATOR_STUCK        LED_GREEN_R
-#define LED_CRASH                  LED_GREEN_R
-
-// position lock settings
-#define LOCK_LENGTH 50
-#define LOCK_THRESHOLD 0.001f
-#define POSITION_LOCK_TIMEOUT 10000
-
-// NEXT DELTA
-#define MAXIMUM_NEXT_DELTA 0.2f
-#define DELTA_DURATION 3.0f //sec duration to go to next delta
-
-#define HOVERING_TIME 8000 //ms
-#define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
-
-//Landing to charging pad
-#define MAX_PAD_ERR 0.005
-#define LANDING_HEIGHT 0.12f
-#define GO_TO_PAD_DURATION 2.0f //sec duration to go to charging pad
-
-// BOUNDS DEFINITIONS
-#define MIN_X_BOUND -2.5f
-#define MAX_X_BOUND  1.0f
-
-#define MIN_Y_BOUND -2.0f
-#define MAX_Y_BOUND  2.0f
-
-#define MIN_Z_BOUND -0.4f
-#define MAX_Z_BOUND  1.5f
 
 static xTimerHandle sendPosTimer;
 static xTimerHandle stateTransitionTimer;
@@ -125,6 +85,7 @@ enum State {
 };
 
 static enum State state = STATE_IDLE;
+static uint8_t otherStates[MAX_ADDRESS];//array of states of the other drones
 
 static P2PPacket p_reply;
 
@@ -137,6 +98,9 @@ static float landingTimeCheckCharge;
 static logVarId_t logIdStateEstimateX;
 static logVarId_t logIdStateEstimateY;
 static logVarId_t logIdStateEstimateZ;
+static logVarId_t logIdStateEstimateVx;
+static logVarId_t logIdStateEstimateVy;
+static logVarId_t logIdStateEstimateVz;
 static logVarId_t logIdKalmanVarPX;
 static logVarId_t logIdKalmanVarPY;
 static logVarId_t logIdKalmanVarPZ;
@@ -146,12 +110,23 @@ static logVarId_t logIdlighthouseEstBs1Rt;
 static paramVarId_t paramIdStabilizerController;
 static paramVarId_t paramIdCommanderEnHighLevel;
 static paramVarId_t paramIdLighthouseMethod;
-static paramVarId_t paramIdCollisionAvoidance;
+static paramVarId_t paramIdCollisionAvoidanceEnable;
+static paramVarId_t paramIdCollisionAvoidanceEllipsoidX;
+static paramVarId_t paramIdCollisionAvoidanceEllipsoidY;
 
 static uint8_t my_id;
 
+Position positions_to_go[]={
+    [0].x=+1 , [0].y=+1 ,[0].z=0.8,
+    [1].x=+1 , [1].y=-1 ,[1].z=0.8,
+    [2].x=-1 , [2].y=+1 ,[2].z=0.8,
+    [3].x=-1 , [3].y=-1 ,[3].z=0.8,
+
+};
 
 static Position my_pos;
+static Position next_wp={0,0,0};
+
 static float previous[3];
 static float padX = 0.0;
 static float padY = 0.0;
@@ -207,6 +182,10 @@ Position offset = {0, 0, 0};
 static float getX() { return (float) logGetFloat(logIdStateEstimateX); }
 static float getY() { return (float) logGetFloat(logIdStateEstimateY); }
 static float getZ() { return (float) logGetFloat(logIdStateEstimateZ); }
+static float getVx() { return (float) logGetFloat(logIdStateEstimateVx); }
+static float getVy() { return (float) logGetFloat(logIdStateEstimateVy); }
+static float getVz() { return (float) logGetFloat(logIdStateEstimateVz); }
+static float getVelMagnitude() { return sqrtf(getVx()*getVx() + getVy()*getVy() + getVz()*getVz()); }
 static float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
 static float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
 static float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
@@ -214,7 +193,7 @@ static bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 static bool isCharging() { return logGetInt(logIdPmState) == charging; }
 static bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 static void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
-static void enableCollisionAvoidance() { paramSetInt(paramIdCollisionAvoidance, 1); }
+static void enableCollisionAvoidance() { paramSetInt(paramIdCollisionAvoidanceEnable, 1); }
 
 static void resetLockData() {
     lockWriteIndex = 0;
@@ -274,6 +253,9 @@ static bool hasLock() {
   return result;
 }
 
+static uint8_t getCopterState(uint8_t copter_id){
+    return otherStates[copter_id];
+}
 
 void p2pcallbackHandler(P2PPacket *p)
 {
@@ -281,9 +263,10 @@ void p2pcallbackHandler(P2PPacket *p)
     // uint8_t rssi = p->rssi;
     uint8_t received_id = p->data[0];
     // uint8_t counter = p->data[1];
+    otherStates[received_id]=p->data[2];
 
     positionMeasurement_t pos_measurement;
-    memcpy(&pos_measurement.pos, &(p->data[2]), sizeof(Position));
+    memcpy(&pos_measurement.pos, &(p->data[3]), sizeof(Position));
     
     // DEBUG_PRINT("===================================================\n");
     // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);    
@@ -291,6 +274,12 @@ void p2pcallbackHandler(P2PPacket *p)
     pos_measurement.source =  MeasurementSourceLighthouse;
     pos_measurement.stdDev = 0.01f; //
     peerLocalizationTellPosition(received_id,&pos_measurement);//TODO: if id is 0--> PROBLEM WITH THE LOGIC OF THE PEER LOCALIZATION (maybe add 1 to the id)
+}
+
+static void initOtherStates(){
+    for(int i=0;i<MAX_ADDRESS;i++){
+        otherStates[i] = 255;
+    }
 }
 
 static void initPacket(){
@@ -307,6 +296,14 @@ static void initLogIds(){
     logIdStateEstimateX = logGetVarId("stateEstimate", "x");
     logIdStateEstimateY = logGetVarId("stateEstimate", "y");
     logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
+    logIdStateEstimateVx = logGetVarId("stateEstimate", "vx");
+    logIdStateEstimateVy = logGetVarId("stateEstimate", "vy");
+    logIdStateEstimateVz = logGetVarId("stateEstimate", "vz");
+}
+
+static void initCollisionAvoidance(){
+    paramSetFloat(paramIdCollisionAvoidanceEllipsoidX, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
+    paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
 }
 
 static bool outOfBounds() {
@@ -315,10 +312,24 @@ static bool outOfBounds() {
         || my_pos.z > MAX_Z_BOUND || my_pos.z < MIN_Z_BOUND;
 }
 
+static void gotoNextWaypoint(float x,float y,float z,float duration){
+    next_wp.x = x;
+    next_wp.y = y;
+    next_wp.z = z;
+    const float yaw = 0.0f;
+    const bool relative = false;
+    crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
+
+}
+
+static bool reachedNextWaypoint(){
+    return DISTANCE3D(my_pos,next_wp) < WP_THRESHOLD  && getVelMagnitude() < WP_VEL_THRESHOLD; ;
+}
+
 // timers
 static void sendPosition(xTimerHandle timer) {
-
-    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_CRASHED )
+    // Send the position to the other crazyflies via P2P
+    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD )
         return;
         
     static uint8_t counter=0;
@@ -327,7 +338,7 @@ static void sendPosition(xTimerHandle timer) {
     my_pos.x=getX();
     my_pos.y=getY();
     my_pos.z=getZ();
-    memcpy(&p_reply.data[2], &my_pos, sizeof(Position));
+    memcpy(&p_reply.data[3], &my_pos, sizeof(Position));
     
     if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
         // DEBUG_PRINT("Same value detected\n");
@@ -336,7 +347,7 @@ static void sendPosition(xTimerHandle timer) {
             seq_estim_stuck_running=1;
         }
 
-        logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
+        // logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
         initLogIds();
         
     }else{
@@ -350,10 +361,10 @@ static void sendPosition(xTimerHandle timer) {
     previous[2]=my_pos.z;
     
     p_reply.data[1] = counter++;
-    
+    p_reply.data[2] = (uint8_t) state;
+
     //get current position and send it as the payload
-    // DEBUG_PRINT("MY POSITION: "); PRINT_POSITION_3D(my_pos);
-    p_reply.size=sizeof(Position)+2;//+2 for the id and counter
+    p_reply.size=sizeof(Position)+3;//+3 for the id,counter and state
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
@@ -424,34 +435,44 @@ static void stateTransition(xTimerHandle timer){
         case STATE_HOVERING:
             dt = now - hovering_start_time ;
             if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
-                crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
+                gotoNextWaypoint(padX,padY,padZ+GO_TO_PAD_HEIGHT,GO_TO_PAD_DURATION);
                 state = STATE_GOING_TO_PAD;
                 break;
             }
             
-            uint8_t otherId =  my_id == 4 ? 6 : 4;
-
-            if (my_id==9)
-                break;
-            
-            if (peerLocalizationIsIDActive(otherId)) {
-                peerLocalizationOtherPosition_t * togo = peerLocalizationGetPositionByID(otherId);
-                
-                crtpCommanderHighLevelGoTo((*togo).pos.x, (*togo).pos.y,(*togo).pos.z, 0.0,DELTA_DURATION,false);
-                state=STATE_GOING_TO_DELTA_POINT;
+            for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
+                uint8_t state=getCopterState(i);
+                if (state!=255 && state<STATE_HOVERING){
+                    break;
+                } 
             }
+
+            uint8_t curr_pos_id = getIdWithClosestDistance(my_pos,positions_to_go,4);
             
-                 
+            uint8_t other_pos_id;
+            if(curr_pos_id==0)
+                other_pos_id = 3;
+            else if (curr_pos_id==1)
+                other_pos_id = 2;
+            else if (curr_pos_id==2)
+                other_pos_id = 1;
+            else if (curr_pos_id==3)
+                other_pos_id = 0;
+            else
+                break;
+
+            gotoNextWaypoint((positions_to_go[other_pos_id]).x , (positions_to_go[other_pos_id]).y , (positions_to_go[other_pos_id]).z , DELTA_DURATION);
+            state=STATE_GOING_TO_DELTA_POINT;
             break;
         case STATE_GOING_TO_DELTA_POINT:
-            if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+            if (reachedNextWaypoint()) {
                 state = STATE_HOVERING;
             }
             break;
         case STATE_GOING_TO_PAD:
-            if (crtpCommanderHighLevelIsTrajectoryFinished()) {
-                DEBUG_PRINT("Over pad, stabalizing position\n");
-                stabilizeEndTime = now + 5000;
+            if (reachedNextWaypoint()) {
+                DEBUG_PRINT("Over pad,starting lowering\n");
+                crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
                 state = STATE_WAITING_AT_PAD;
             }
             break;
@@ -462,7 +483,7 @@ static void stateTransition(xTimerHandle timer){
                 }
 
                 DEBUG_PRINT("Landing...\n");
-                crtpCommanderHighLevelLand(padZ, 1.0);
+                crtpCommanderHighLevelLand(padZ, LANDING_DURATION);
                 state = STATE_LANDING;
             }
             break;
@@ -490,15 +511,14 @@ static void stateTransition(xTimerHandle timer){
         case STATE_REPOSITION_ON_PAD:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabalizing position\n");
-                crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, 1.5, false);
+                gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
                 state = STATE_GOING_TO_PAD;
             }
             break;
         case STATE_CRASHED:
             crtpCommanderHighLevelStop();
-            DEBUG_PRINT("Crashed,  seq_crash_running : %d\n",seq_crash_running);
-
             if (seq_crash_running!=1){
+                DEBUG_PRINT("Crashed, running crash sequence\n");
                 ledseqRun(&seq_crash);
                 seq_crash_running=1;
             }
@@ -529,13 +549,17 @@ void appMain()
     paramIdStabilizerController = paramGetVarId("stabilizer", "controller");
     paramIdCommanderEnHighLevel = paramGetVarId("commander", "enHighLevel");
     paramIdLighthouseMethod = paramGetVarId("lighthouse", "method");
-    paramIdCollisionAvoidance = paramGetVarId("colAv", "enable");
+    paramIdCollisionAvoidanceEnable = paramGetVarId("colAv", "enable");
+    paramIdCollisionAvoidanceEllipsoidX = paramGetVarId("colAv", "ellipsoidX");
+    paramIdCollisionAvoidanceEllipsoidY = paramGetVarId("colAv", "ellipsoidY");
 
 
     ledseqRegisterSequence(&seq_estim_stuck);    
     ledseqRegisterSequence(&seq_crash);
 
     initPacket();
+    initOtherStates();
+    initCollisionAvoidance();
 
     enableHighlevelCommander();
     

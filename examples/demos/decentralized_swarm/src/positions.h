@@ -11,6 +11,7 @@
 
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
+#define DISTANCE3D(a, b) sqrtf(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)) + ((a.z - b.z) * (a.z - b.z)))
 
 typedef struct Position_struct {
     float x;
@@ -51,4 +52,21 @@ float getVectorMagnitude3D(Position a) {
 
 float getVectorMagnitude2D(Position a) {
     return sqrt(a.x * a.x + a.y * a.y );
+}
+
+float getDistanceBetweenVectors3D(Position a, Position b) {
+    return getVectorMagnitude3D(subtractVectors3D(a, b));
+}
+
+uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t positions_len ){
+    float min_distance = FLT_MAX;
+    uint8_t min_id = 0;
+    for(uint8_t i = 0; i < positions_len; i++){
+        float distance = getDistanceBetweenVectors3D(p,positions[i]);
+        if(distance < min_distance){
+            min_distance = distance;
+            min_id = i;
+        }
+    }
+    return min_id;
 }
