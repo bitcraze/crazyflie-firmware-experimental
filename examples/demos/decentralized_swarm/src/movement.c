@@ -3,9 +3,10 @@
 
 #include "movement.h"
 
-static Position next_wp={0,0,0};
-float lockData[LOCK_LENGTH][3];
-uint32_t lockWriteIndex;
+static Position next_wp;
+static float lockData[LOCK_LENGTH][3];
+static uint32_t lockWriteIndex;
+static uint32_t timeOfReachingWaypointTimeout;
 
 void gotoNextWaypoint(float x,float y,float z,float duration){
     // This function will move the Crazyflie to the next waypoint via the high level commander.
@@ -17,11 +18,14 @@ void gotoNextWaypoint(float x,float y,float z,float duration){
     next_wp.z = z;
     const float yaw = 0.0f;
     const bool relative = false;
+    timeOfReachingWaypointTimeout = xTaskGetTickCount() + REACHED_WP_TIMEOUT ;
     crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
 }
 
 bool reachedNextWaypoint(Position my_pos){
-    return DISTANCE3D(my_pos,next_wp) < WP_THRESHOLD  && getVelMagnitude() < WP_VEL_THRESHOLD; ;
+    bool close_and_stabilized = DISTANCE3D(my_pos,next_wp) < WP_THRESHOLD  && getVelMagnitude() < WP_VEL_THRESHOLD;
+    bool time_out = xTaskGetTickCount() > timeOfReachingWaypointTimeout;
+    return close_and_stabilized || time_out;
 }
 
 bool outOfBounds(Position my_pos) {

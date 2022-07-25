@@ -1,6 +1,5 @@
 #include "positions.h"
 
-
 //The following functions are used to return a new Position struct
 //If you want to save the result of teh calculation, you can use macros
 Position addVectors3D(Position a, Position b) {
@@ -50,4 +49,15 @@ uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t posit
         }
     }
     return min_id;
+}
+
+Position getRandomPositionOnCircle() {
+    Position result;
+    float step = 2.0f * (float) M_PI / NUMBER_OF_RANDOM_POINTS_ON_CIRCLE;
+    float angle = (rand() % NUMBER_OF_RANDOM_POINTS_ON_CIRCLE) * step;
+    result.x = CIRCLE_RADIUS * (float) cos(angle);
+    result.y = CIRCLE_RADIUS * (float) sin(angle);
+    result.z = TAKE_OFF_HEIGHT;
+
+    return result;
 }

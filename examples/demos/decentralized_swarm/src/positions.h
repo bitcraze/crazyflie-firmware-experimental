@@ -6,6 +6,7 @@
 
 #include "FreeRTOS.h"
 #include "settings.h"
+#include "stdlib.h"
 
 // vector calculations
 #define ADD_VECTORS_3D(a, b) {a.x += b.x; a.y += b.y; a.z += b.z;}
@@ -42,4 +43,5 @@ float getDistanceBetweenVectors3D(Position a, Position b);
 //Returns the id of the closest position to the given position
 uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t positions_len );
 
+Position getRandomPositionOnCircle();
 #endif // POSITIONS_H

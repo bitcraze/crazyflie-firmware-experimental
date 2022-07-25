@@ -98,6 +98,7 @@ static float padZ = 0.0;
 static uint32_t now = 0;
 static uint32_t hovering_start_time = 0;
 static uint32_t position_lock_start_time = 0;
+static uint32_t random_time_for_next_event = 0;
 
 // LEDs Interface
 static bool seq_estim_stuck_running = false;
@@ -203,6 +204,43 @@ static void sendPosition(xTimerHandle timer) {
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
+static bool needExtraCopters(void) {
+    uint8_t flying_drones = peerLocalizationGetNumNeighbors();
+    bool need_extra_copters = flying_drones > 0 && flying_drones < DESIRED_FLYING_COPTERS;
+    return need_extra_copters;
+}
+
+static bool needLessCopters(void){
+    return peerLocalizationGetNumNeighbors() > DESIRED_FLYING_COPTERS;
+}
+
+static bool allFlyingCoptersHovering(void){
+    for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
+        uint8_t state=getCopterState(i);
+        if (state==255 || !peerLocalizationIsIDActive(i) ){// if not active
+            continue;
+        }
+
+        if (state > STATE_WAIT_FOR_TAKE_OFF  && state<STATE_GOING_TO_PAD){//TODO:maybe change STATE_WAIT_FOR_TAKE_OFF to STATE_PREPARING_FOR_TAKE_OFF
+            if (state!=STATE_HOVERING)
+                return false;
+        } 
+    }
+    return true;
+}
+
+static void startTakeOffSequence(){
+    takeOffWhenReady = false;
+    padX = getX();
+    padY = getY();
+    padZ = getZ();
+    DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ );
+    
+    terminateTrajectoryAndLand = false;
+    DEBUG_PRINT("Taking off...\n");
+    crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+}
+
 static void stateTransition(xTimerHandle timer){
     // In the following checks , sequence of checks is important 
     
@@ -210,9 +248,10 @@ static void stateTransition(xTimerHandle timer){
         state = STATE_CRASHED;
     }
     else if (outOfBounds(my_pos)) {
-        DEBUG_PRINT("Out of bounds, stopping\n");
-        crtpCommanderHighLevelLand(padZ, 1.0);
-        state = STATE_LANDING;
+        if (state != STATE_LANDING){
+            crtpCommanderHighLevelLand(padZ, SAFETY_LANDING_DURATION);
+            state = STATE_LANDING;
+        }
     }
     else if (isBatLow()) {
         DEBUG_PRINT("Battery low, stopping\n");
@@ -243,20 +282,35 @@ static void stateTransition(xTimerHandle timer){
         }
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
-            if (takeOffWhenReady || peerLocalizationGetNumNeighbors() > 0 ) {
-                takeOffWhenReady = false;
-                padX = getX();
-                padY = getY();
-                padZ = getZ();
-                DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
 
-                terminateTrajectoryAndLand = false;
-                DEBUG_PRINT("Taking off...\n");
-                crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+            if (takeOffWhenReady) {
+                startTakeOffSequence();
                 state = STATE_TAKING_OFF;
             }
+
+            if (needExtraCopters() && atLeastOneCopterHasFlown() ){// at least one copter is flying and  more copters needed
+                random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
+                state=STATE_PREPARING_FOR_TAKE_OFF;
+            }
+            
         break;
+        case STATE_PREPARING_FOR_TAKE_OFF:
+            if (!needExtraCopters()){ // another copter took off,no need to take off finally
+                state=STATE_WAIT_FOR_TAKE_OFF;
+            }
+            else if (now > random_time_for_next_event){
+                startTakeOffSequence();
+                state=STATE_TAKING_OFF;
+            }
+
+            break;  
         case STATE_TAKING_OFF:
+            if ( needLessCopters() ){// more than desired copters are flying,need to land
+                random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
+                state = STATE_PREPARING_FOR_LAND;
+                break;
+            }
+
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Hovering, waiting for command to start\n");
                 // ledseqStop(&seq_lock);
@@ -267,6 +321,7 @@ static void stateTransition(xTimerHandle timer){
                 hovering_start_time = now;
             }
             break;
+
         case STATE_HOVERING:
             dt = now - hovering_start_time ;
             if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
@@ -275,40 +330,34 @@ static void stateTransition(xTimerHandle timer){
                 break;
             }
             
-            for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
-                uint8_t state=getCopterState(i);
-                if (state!=255 && state<STATE_HOVERING){
-                    break;
-                } 
-            }
-
-            uint8_t curr_pos_id = getIdWithClosestDistance(my_pos,positions_to_go,4);
-            
-            uint8_t other_pos_id;
-            if(curr_pos_id==0)
-                other_pos_id = 3;
-            else if (curr_pos_id==1)
-                other_pos_id = 2;
-            else if (curr_pos_id==2)
-                other_pos_id = 1;
-            else if (curr_pos_id==3)
-                other_pos_id = 0;
-            else
+            if ( needLessCopters() ){
+                random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
+                state = STATE_PREPARING_FOR_LAND;
                 break;
+            }
 
-            gotoNextWaypoint((positions_to_go[other_pos_id]).x , (positions_to_go[other_pos_id]).y , (positions_to_go[other_pos_id]).z , DELTA_DURATION);
-            state=STATE_GOING_TO_DELTA_POINT;
-            break;
-        case STATE_GOING_TO_DELTA_POINT:
-            if (reachedNextWaypoint(my_pos)) {
-                if (terminateTrajectoryAndLand) {
-                    gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
-                    state = STATE_GOING_TO_PAD;
-                }else{
-                    state = STATE_HOVERING;                    
-                }
+            // wait for all flying copters to be hovering
+            if (allFlyingCoptersHovering()){
+                Position new_pos = getRandomPositionOnCircle();
+                gotoNextWaypoint(new_pos.x,new_pos.y,new_pos.z,DELTA_DURATION);
+
+                state = STATE_GOING_TO_RANDOM_POINT;
             }
             break;
+        case STATE_GOING_TO_RANDOM_POINT:
+            if (reachedNextWaypoint(my_pos)) {
+                state = STATE_HOVERING;                    
+            }
+            break;
+        case STATE_PREPARING_FOR_LAND:
+            if (!needLessCopters()){ // another copter landed , no need to land finally
+                state=STATE_HOVERING;
+            }
+            else if (now > random_time_for_next_event){
+                gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
+                state=STATE_GOING_TO_PAD;
+            } 
+
         case STATE_GOING_TO_PAD:
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
@@ -337,6 +386,11 @@ static void stateTransition(xTimerHandle timer){
             break;
         case STATE_LANDING:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
+                if( outOfBounds(my_pos) ){
+                    DEBUG_PRINT("Landed because of out of bounds, going to crashed state \n");
+                    state = STATE_CRASHED;
+                }
+
                 DEBUG_PRINT("Landed. Feed me!\n");
                 crtpCommanderHighLevelStop();
                 landingTimeCheckCharge = now + 3000;

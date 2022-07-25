@@ -49,4 +49,7 @@ bool isAlive(uint8_t copter_id);
 uint8_t compressVoltage(float voltage);
 
 float decompressVoltage(uint8_t voltage);
+
+bool atLeastOneCopterHasFlown(void);
+
 #endif // P2P_INTERFACE_H

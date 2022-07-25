@@ -50,3 +50,12 @@ uint8_t compressVoltage(float voltage){
 float decompressVoltage(uint8_t voltage){
     return (voltage/255.0f)*(VOLTAGE_MAX-VOLTAGE_MIN)+VOLTAGE_MIN;
 }
+
+bool atLeastOneCopterHasFlown(void){
+    for(int i=0;i<MAX_ADDRESS;i++){
+        if(copters[i].state != 255){
+            return true;
+        }
+    }
+    return false;
+}
