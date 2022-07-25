@@ -50,10 +50,10 @@
 // #include "math3d.h" //TODO: import all functions and structs from math3d.h instead of mine
 #include "param.h"
 #include "crtp_commander_high_level.h"
-// #include "sensors.h"
+#include "sensors.h"
 #include "pm.h"
 #include "supervisor.h"
-// #include "peer_localization.h"
+#include "peer_localization.h"
 #include "settings.h"
 
 #include "p2p_interface.h"
@@ -134,10 +134,69 @@ ledseqContext_t seq_crash = {
 };
 
 
+static float lockData[LOCK_LENGTH][3];
 static bool takeOffWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
+static uint32_t lockWriteIndex;
 
 Position offset = {0, 0, 0};
+static void resetLockData() {
+    lockWriteIndex = 0;
+    for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
+      lockData[i][0] = FLT_MAX;
+      lockData[i][1] = FLT_MAX;
+      lockData[i][2] = FLT_MAX;
+    }
+}
+
+static bool hasLock() {
+  bool result = false;
+
+  // Store current state
+  lockData[lockWriteIndex][0] = getVarPX();
+  lockData[lockWriteIndex][1] = getVarPY();
+  lockData[lockWriteIndex][2] = getVarPZ();
+
+  lockWriteIndex++;
+  if (lockWriteIndex >= LOCK_LENGTH) {
+    lockWriteIndex = 0;
+  }
+
+  // Check if we have a lock
+  int count = 0;
+
+  float lXMax = FLT_MIN;
+  float lYMax = FLT_MIN;
+  float lZMax = FLT_MIN;
+
+  float lXMin = FLT_MAX;
+  float lYMin = FLT_MAX;
+  float lZMin = FLT_MAX;
+
+  for (int i = 0; i < LOCK_LENGTH; i++) {
+    if (lockData[i][0] != FLT_MAX) {
+      count++;
+
+      lXMax = fmaxf(lXMax, lockData[i][0]);
+      lYMax = fmaxf(lYMax, lockData[i][1]);
+      lZMax = fmaxf(lZMax, lockData[i][2]);
+
+      lXMin = fminf(lXMax, lockData[i][0]);
+      lYMin = fminf(lYMin, lockData[i][1]);
+      lZMin = fminf(lZMin, lockData[i][2]);
+    }
+  }
+
+  result =
+    (count >= LOCK_LENGTH) &&
+    ((lXMax - lXMin) < LOCK_THRESHOLD) &&
+    ((lYMax - lYMin) < LOCK_THRESHOLD) &&
+    ((lZMax - lZMin) < LOCK_THRESHOLD &&
+    isLighthouseAvailable() &&  // Make sure we have a deck and the Lighthouses are powered
+    sensorsAreCalibrated());
+
+  return result;
+}
 
 static void initPacket(){
     p_reply.port=0x00;
@@ -147,6 +206,47 @@ static void initPacket(){
     uint64_t address = configblockGetRadioAddress();
     my_id =(uint8_t)((address) & 0x00000000ff);
     p_reply.data[0]=my_id;
+}
+
+Position getNextDeltaPosition() {
+    Position p_i = my_pos;
+    
+    Position delta_final={0,0,0};
+
+    for (int j = 0; j < MAX_ADDRESS; j++) {
+        if (!peerLocalizationIsIDActive(j) ) {
+            continue;
+        }
+        
+        peerLocalizationOtherPosition_t *pj_pos = peerLocalizationGetPositionByID(j);
+        Position p_j = {pj_pos->pos.x, pj_pos->pos.y, pj_pos->pos.z};
+
+        PRINT_POSITION_3D(p_j);
+        // float mag = getVectorMagnitude3D(subtractVectors3D(p_i, p_j)); // z coordinate is also used 
+        float mag = getVectorMagnitude2D(subtractVectors3D(p_i, p_j));    // z coordinate is ignored
+        Position delta = subtractVectors3D(p_i, p_j);
+        float scalar = (mag-INTER_DIST) / mag;
+        MUL_VECTOR_3D_WITH_SCALAR(delta, scalar);
+        ADD_VECTORS_3D(delta_final, delta);
+    }
+
+    MUL_VECTOR_3D_WITH_SCALAR(delta_final, -1.0f);
+    
+    // slace down the delta to a maximum of MAXIMUM_NEXT_DELTA
+    // float mag = getVectorMagnitude3D(delta_final);   // z coordinate is also used
+    float mag = getVectorMagnitude2D(delta_final);      // z coordinate is ignored 
+    if (mag > MAXIMUM_NEXT_DELTA) {
+        MUL_VECTOR_3D_WITH_SCALAR(delta_final, MAXIMUM_NEXT_DELTA / mag);
+    }
+
+
+    return delta_final;
+}
+
+static bool outOfBounds() {
+    return my_pos.x > MAX_X_BOUND || my_pos.x < MIN_X_BOUND 
+        || my_pos.y > MAX_Y_BOUND || my_pos.y < MIN_Y_BOUND 
+        || my_pos.z > MAX_Z_BOUND || my_pos.z < MIN_Z_BOUND;
 }
 
 // timers
@@ -209,7 +309,7 @@ static void stateTransition(xTimerHandle timer){
     if(supervisorIsTumbled()) {
         state = STATE_CRASHED;
     }
-    else if (outOfBounds(my_pos)) {
+    else if (outOfBounds()) {
         DEBUG_PRINT("Out of bounds, stopping\n");
         crtpCommanderHighLevelLand(padZ, 1.0);
         state = STATE_LANDING;
@@ -275,40 +375,11 @@ static void stateTransition(xTimerHandle timer){
                 break;
             }
             
-            for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
-                uint8_t state=getCopterState(i);
-                if (state!=255 && state<STATE_HOVERING){
-                    break;
-                } 
-            }
-
-            uint8_t curr_pos_id = getIdWithClosestDistance(my_pos,positions_to_go,4);
-            
-            uint8_t other_pos_id;
-            if(curr_pos_id==0)
-                other_pos_id = 3;
-            else if (curr_pos_id==1)
-                other_pos_id = 2;
-            else if (curr_pos_id==2)
-                other_pos_id = 1;
-            else if (curr_pos_id==3)
-                other_pos_id = 0;
-            else
-                break;
-
-            gotoNextWaypoint((positions_to_go[other_pos_id]).x , (positions_to_go[other_pos_id]).y , (positions_to_go[other_pos_id]).z , DELTA_DURATION);
-            state=STATE_GOING_TO_DELTA_POINT;
-            break;
-        case STATE_GOING_TO_DELTA_POINT:
-            if (reachedNextWaypoint(my_pos)) {
-                if (terminateTrajectoryAndLand) {
-                    gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
-                    state = STATE_GOING_TO_PAD;
-                }else{
-                    state = STATE_HOVERING;                    
-                }
-            }
-            break;
+            Position delta = getNextDeltaPosition();
+            const bool relative = true;
+            const float yaw = 0.0;
+            const float duration = 0.2;
+            crtpCommanderHighLevelGoTo(delta.x,delta.y,delta.z,yaw,duration,relative);
         case STATE_GOING_TO_PAD:
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
