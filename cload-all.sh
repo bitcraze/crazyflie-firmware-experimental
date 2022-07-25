@@ -11,8 +11,8 @@ make -j 12
 # CLOAD_CMDS="-w radio://0/20/2M/E7E7E7E701" make cload
 printf "${YELLOW}Flashing CF 02${COLOR_RESET}\n"
 CLOAD_CMDS="-w radio://0/20/2M/E7E7E7E702" make cload
-# printf "${YELLOW}Flashing CF 03${COLOR_RESET}\n"
-# CLOAD_CMDS="-w radio://0/20/2M/E7E7E7E703" make cload
+printf "${YELLOW}Flashing CF 03${COLOR_RESET}\n"
+CLOAD_CMDS="-w radio://0/20/2M/E7E7E7E703" make cload
 printf "${YELLOW}Flashing CF 04${COLOR_RESET}\n"
 CLOAD_CMDS="-w radio://0/20/2M/E7E7E7E704" make cload
 # printf "${YELLOW}Flashing CF 05${COLOR_RESET}\n"

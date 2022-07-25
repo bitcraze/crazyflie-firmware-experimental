@@ -6,3 +6,5 @@ obj-y += lib/
 obj-y += modules/
 obj-y += platform/
 obj-y += utils/
+
+obj-y += ../examples/demos/decentralized_swarm/
