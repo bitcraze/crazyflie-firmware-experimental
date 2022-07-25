@@ -1,5 +1,4 @@
 obj-y += peer_to_peer.o
-obj-y += p2p_interface.o
-obj-y += positions.o
-obj-y += param_log_interface.o
-obj-y += movement.o
+# obj-y += sniffer.o
+
+obj-y += common_files/

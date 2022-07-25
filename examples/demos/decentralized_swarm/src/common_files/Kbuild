@@ -1,0 +1,4 @@
+obj-y += p2p_interface.o
+obj-y += positions.o
+obj-y += param_log_interface.o
+obj-y += movement.o

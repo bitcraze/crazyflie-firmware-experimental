@@ -60,7 +60,7 @@ INCLUDES += -I$(LIB)/STM32_USB_OTG_Driver/inc
 INCLUDES += -I$(LIB)/STM32F4xx_StdPeriph_Driver/inc
 INCLUDES += -I$(LIB)/vl53l1 -I$(LIB)/vl53l1/core/inc
 INCLUDES += -I$(KBUILD_OUTPUT)/include/generated
-
+INCLUDES += -I$(PWD)/examples/demos/decentralized_swarm/src/common_files
 # Here we tell Kbuild where to look for Kbuild files which will tell the
 # buildsystem which sources to build
 objs-y += src
@@ -73,6 +73,10 @@ MEM_SIZE_FLASH_K = 1008
 MEM_SIZE_RAM_K = 128
 MEM_SIZE_CCM_K = 64
 
+#
+# To include header files from other directories
+#
+# EXTRA_CFLAGS += -I$(PWD)/examples/demos/decentralized_swarm/src/common_files
 
 #
 # Make sure Kbuild use our config that hinders some configs from being enabled
