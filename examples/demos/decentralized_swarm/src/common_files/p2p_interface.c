@@ -67,7 +67,7 @@ void printOtherCopters(void){
                 DEBUG_PRINT("Copter %d is not active\n",i);
             }else{
                 peerLocalizationOtherPosition_t *pos= peerLocalizationGetPositionByID(i);
-                DEBUG_PRINT("Copter %d : %.2f , %.2f , %.2f --> %d \n",i,(double)pos->pos.x,(double)pos->pos.y,(double)pos->pos.z,copters[i].state);
+                DEBUG_PRINT("Copter %d : %.2f , %.2f , %.2f --> %d with latest counter %d \n",i,(double)pos->pos.x,(double)pos->pos.y,(double)pos->pos.z,copters[i].state,copters[i].counter);
             }
         }
     }

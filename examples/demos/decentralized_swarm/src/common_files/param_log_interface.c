@@ -46,7 +46,14 @@ float getVoltage() { return logGetFloat(logIdVBat); }
 bool isCharging() { return logGetInt(logIdPmState) == charging; }
 bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
-void enableCollisionAvoidance() { paramSetInt(paramIdCollisionAvoidanceEnable, 1); }
+void enableCollisionAvoidance() { 
+    static bool enabled = false;
+    if (!enabled) {
+        DEBUG_PRINT("Enabling Collision Avoidance\n");
+        paramSetInt(paramIdCollisionAvoidanceEnable, 1);
+        enabled = true;
+    }
+}
 
 void initCollisionAvoidance(){
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidX, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);

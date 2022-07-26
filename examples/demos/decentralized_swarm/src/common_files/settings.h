@@ -9,7 +9,7 @@
 #define CIRCLE_RADIUS 1.0f
 
 // Randomizing takeoff times
-#define TAKE_OFF_TIME_MAX 2000
+#define TAKE_OFF_TIME_MAX 3000
 #define TAKE_OFF_TIME_MIN 500
 
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
@@ -17,7 +17,7 @@
 
 // Go to next waypoint
 #define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
-#define WP_VEL_THRESHOLD          0.3f //velocity threshold to consider a waypoint reached
+#define WP_VEL_THRESHOLD          0.4f //velocity threshold to consider a waypoint reached
 #define REACHED_WP_TIMEOUT        8000 //ms 
 
 // Collision avoidance
@@ -66,18 +66,19 @@
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 5000 //ms
+#define REACHED_CHARGING_PAD_TIMEOUT 10000 //ms
 
 // BOUNDS DEFINITIONS
-#define SAFETY_LANDING_DURATION 3 //sec
+#define SAFETY_LANDING_DURATION 6 //sec
 
 #define MIN_X_BOUND -2.5f
-#define MAX_X_BOUND  2.0f
+#define MAX_X_BOUND  2.5f
 
 #define MIN_Y_BOUND -2.5f
-#define MAX_Y_BOUND  2.0f
+#define MAX_Y_BOUND  2.5f
 
 #define MIN_Z_BOUND -0.3f
-#define MAX_Z_BOUND  1.5f
+#define MAX_Z_BOUND  2.0f
 
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)

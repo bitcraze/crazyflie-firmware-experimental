@@ -28,6 +28,7 @@
 
 #include "choose_app.h"
 #ifdef BUILD_PILOT_APP
+
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -260,15 +261,17 @@ static void stateTransition(xTimerHandle timer){
     if(supervisorIsTumbled()) {
         state = STATE_CRASHED;
     }
-    else if (outOfBounds(my_pos)) {
-        if (state != STATE_LANDING){
-            crtpCommanderHighLevelLand(padZ, SAFETY_LANDING_DURATION);
-            state = STATE_LANDING;
-        }
-    }
+    // else if (outOfBounds(my_pos)) {
+    //     if (state != STATE_LANDING){
+    //         crtpCommanderHighLevelLand(padZ, SAFETY_LANDING_DURATION);
+    //         state = STATE_LANDING;
+    //     }
+    // }
     else if (isBatLow()) {
-        DEBUG_PRINT("Battery low, stopping\n");
-        terminateTrajectoryAndLand=1;
+        if (terminateTrajectoryAndLand!=1){
+            DEBUG_PRINT("Battery low, stopping\n");
+            terminateTrajectoryAndLand=1;
+        }
     }
 
     now = xTaskGetTickCount();
@@ -302,12 +305,14 @@ static void stateTransition(xTimerHandle timer){
             if (takeOffWhenReady) {
                 startTakeOffSequence();
                 state = STATE_TAKING_OFF;
+                break;
             }
 
             if (needExtraCopters() && atLeastOneCopterHasFlown() ){// at least one copter is flying and  more copters needed
                 random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
                 DEBUG_PRINT("Preparing for take off...\n");
                 state=STATE_PREPARING_FOR_TAKE_OFF;
+                break;
             }
             
         break;
@@ -335,9 +340,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Hovering, waiting for command to start\n");
                 // ledseqStop(&seq_lock);
                 state = STATE_HOVERING;
-                DEBUG_PRINT("Enabling Collision Avoidance\n");
                 enableCollisionAvoidance();
-
                 hovering_start_time = now;
             }
             break;
@@ -345,7 +348,8 @@ static void stateTransition(xTimerHandle timer){
         case STATE_HOVERING:
             dt = now - hovering_start_time ;
             if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
-                gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
+                DEBUG_PRINT("Going to pad...\n");
+                gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                 state = STATE_GOING_TO_PAD;
                 break;
             }
@@ -375,14 +379,14 @@ static void stateTransition(xTimerHandle timer){
         case STATE_PREPARING_FOR_LAND:
             if (!needLessCopters()){ // another copter landed , no need to land finally
                 DEBUG_PRINT("Another copter landed, no need to land finally\n");
-                state=STATE_HOVERING;
+                state = STATE_HOVERING;
             }
             else if (now > random_time_for_next_event){
                 DEBUG_PRINT("Going to pad...\n");
-                gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
-                state=STATE_GOING_TO_PAD;
+                gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
+                state = STATE_GOING_TO_PAD;
             } 
-
+            break;
         case STATE_GOING_TO_PAD:
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
@@ -426,12 +430,12 @@ static void stateTransition(xTimerHandle timer){
             if (now > landingTimeCheckCharge) {
                 DEBUG_PRINT("isCharging: %d\n", isCharging());
                 if (isCharging()) {
-                // ledseqRun(&seq_lock);
-                state = STATE_WAIT_FOR_TAKE_OFF;
+                    // ledseqRun(&seq_lock);
+                    state = STATE_WAIT_FOR_TAKE_OFF;
                 } else {
-                DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.2f, 1.0);
-                state = STATE_REPOSITION_ON_PAD;
+                    DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
+                    crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.2f, 1.0);
+                    state = STATE_REPOSITION_ON_PAD;
                 }
             }
             break;

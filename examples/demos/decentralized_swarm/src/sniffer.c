@@ -55,14 +55,18 @@
 #include "p2p_interface.h"
 extern copter_t copters[MAX_ADDRESS];
 static copter_t prev_copters[MAX_ADDRESS];
+static bool prev_copters_active[MAX_ADDRESS];
 
 void update_copter_list(void)
 {   
     bool printed_bar = false;
     for (int i = 0; i < MAX_ADDRESS; i++)
-    {
-        
-        if( prev_copters[i].state != copters[i].state ){
+    {   
+        bool isAlive = peerLocalizationIsIDActive(i);
+        bool changed_activity = prev_copters_active[i]!=isAlive;
+        bool changed_state = prev_copters[i].state != copters[i].state; 
+         
+        if(  changed_state || changed_activity ){
             if (!printed_bar){
                 DEBUG_PRINT("========================================================\n");
                 printed_bar = true;
@@ -70,6 +74,7 @@ void update_copter_list(void)
             // DEBUG_PRINT("Copter %d state changed to %d\n", i, copters[i].state);
             printOtherCopters();
             prev_copters[i] = copters[i];
+            prev_copters_active[i] = isAlive; 
         }    
     }
 }

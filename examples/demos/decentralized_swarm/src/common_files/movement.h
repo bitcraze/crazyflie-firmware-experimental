@@ -12,6 +12,8 @@
 
 void gotoNextWaypoint(float x,float y,float z,float duration);
 
+void gotoChargingPad(float x,float y,float z,float duration);
+
 bool reachedNextWaypoint(Position my_pos);
 
 bool outOfBounds(Position my_pos);

@@ -7,7 +7,7 @@
 #include "log.h"
 #include "pm.h"
 #include "settings.h"
-
+#include "debug.h"
 
 float getX();
 float getY();

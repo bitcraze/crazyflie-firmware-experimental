@@ -8,23 +8,41 @@ static float lockData[LOCK_LENGTH][3];
 static uint32_t lockWriteIndex;
 static uint32_t timeOfReachingWaypointTimeout;
 
+static void gotoFunction(float x,float y,float z,float duration,uint32_t reach_wp_timeout){
+  next_wp.x = x;
+  next_wp.y = y;
+  next_wp.z = z;
+  const float yaw = 0.0f;
+  const bool relative = false;
+
+  timeOfReachingWaypointTimeout = xTaskGetTickCount() + reach_wp_timeout ;
+  
+  crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
+}
+
 void gotoNextWaypoint(float x,float y,float z,float duration){
     // This function will move the Crazyflie to the next waypoint via the high level commander.
     // It is used as a function because it works with the reachedNextWaypoint() since  
     // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
     
-    next_wp.x = x;
-    next_wp.y = y;
-    next_wp.z = z;
-    const float yaw = 0.0f;
-    const bool relative = false;
-    timeOfReachingWaypointTimeout = xTaskGetTickCount() + REACHED_WP_TIMEOUT ;
-    crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
+    gotoFunction(x,y,z,duration,REACHED_WP_TIMEOUT);
+}
+
+void gotoChargingPad(float x,float y,float z,float duration){
+    // This function will move the Crazyflie to the next waypoint via the high level commander.
+    // It is used as a function because it works with the reachedNextWaypoint() since  
+    // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
+    
+    gotoFunction(x,y,z,duration,REACHED_CHARGING_PAD_TIMEOUT);
 }
 
 bool reachedNextWaypoint(Position my_pos){
     bool close_and_stabilized = DISTANCE3D(my_pos,next_wp) < WP_THRESHOLD  && getVelMagnitude() < WP_VEL_THRESHOLD;
     bool time_out = xTaskGetTickCount() > timeOfReachingWaypointTimeout;
+    if (time_out){
+      DEBUG_PRINT("Warning: Time out while waiting for reaching waypoint!\n");
+    }
+
     return close_and_stabilized || time_out;
 }
 
@@ -96,4 +114,5 @@ bool hasLock() {
 bool chargedForTakeoff() {
   return getVoltage() > CHARGED_FOR_TAKEOFF_VOLTAGE;
 }
+
 #endif // MOVEMENT_H
