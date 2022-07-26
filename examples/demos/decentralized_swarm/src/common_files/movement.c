@@ -115,4 +115,19 @@ bool chargedForTakeoff() {
   return getVoltage() > CHARGED_FOR_TAKEOFF_VOLTAGE;
 }
 
+bool noCopterFlyingAbove(Position my_pos) {
+  for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
+    
+    if (peerLocalizationIsIDActive(i)) {  
+      Position other_pos = OTHER_PEER_LOCALIZATION_POS_TO_POSITION( peerLocalizationGetPositionByID(i) );
+
+      if ( DISTANCE2D(my_pos, other_pos) < COPTER_FLYING_ABOVE_THRESHOLD) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 #endif // MOVEMENT_H

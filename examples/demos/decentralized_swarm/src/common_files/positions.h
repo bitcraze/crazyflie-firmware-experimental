@@ -8,6 +8,9 @@
 #include "settings.h"
 #include "stdlib.h"
 
+//Transform a peerLocalizationOtherPosition_t to Position
+#define OTHER_PEER_LOCALIZATION_POS_TO_POSITION(other) (Position){other->pos.x, other->pos.y, other->pos.z}
+
 // vector calculations
 #define ADD_VECTORS_3D(a, b) {a.x += b.x; a.y += b.y; a.z += b.z;}
 #define SUB_VECTORS_3D(a, b) {a.x -= b.x; a.y -= b.y; a.z -= b.z;}
@@ -18,7 +21,7 @@
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
 #define DISTANCE3D(a, b) sqrtf(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)) + ((a.z - b.z) * (a.z - b.z)))
-
+#define DISTANCE2D(a, b) sqrtf(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)))
 typedef struct Position_struct {
     float x;
     float y;

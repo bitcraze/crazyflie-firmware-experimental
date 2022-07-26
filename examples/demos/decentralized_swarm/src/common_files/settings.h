@@ -1,12 +1,12 @@
 #pragma once
 #define TAKE_OFF_HEIGHT 1.0f
-#define DESIRED_FLYING_COPTERS 2
+#define DESIRED_FLYING_COPTERS 3
 
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 3.8f
 
 // RANDOM POSITIONS ON CIRCLE
-#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  4
-#define CIRCLE_RADIUS 1.0f
+#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  8
+#define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
 #define TAKE_OFF_TIME_MAX 3000
@@ -18,10 +18,11 @@
 // Go to next waypoint
 #define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
 #define WP_VEL_THRESHOLD          0.4f //velocity threshold to consider a waypoint reached
-#define REACHED_WP_TIMEOUT        8000 //ms 
+#define REACHED_WP_TIMEOUT        7000 //ms 
+#define COPTER_FLYING_ABOVE_THRESHOLD 0.3f //radius of cylinder that defines if a copter is flying above
 
 // Collision avoidance
-#define  COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.4f //radius of the ellipsoid used to avoid collisions
+#define  COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
 

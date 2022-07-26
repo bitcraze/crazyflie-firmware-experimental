@@ -432,9 +432,9 @@ static void stateTransition(xTimerHandle timer){
                 if (isCharging()) {
                     // ledseqRun(&seq_lock);
                     state = STATE_WAIT_FOR_TAKE_OFF;
-                } else {
+                } else if ( noCopterFlyingAbove() ){
                     DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                    crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.2f, 1.0);
+                    crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT , 1.0);
                     state = STATE_REPOSITION_ON_PAD;
                 }
             }

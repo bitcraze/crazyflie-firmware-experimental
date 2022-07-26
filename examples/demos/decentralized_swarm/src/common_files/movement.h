@@ -7,7 +7,7 @@
 #include "param_log_interface.h"
 #include "sensors.h"
 #include "param_log_interface.h"
-
+#include "peer_localization.h"
 
 
 void gotoNextWaypoint(float x,float y,float z,float duration);
@@ -23,3 +23,5 @@ void resetLockData();
 bool hasLock();
 
 bool chargedForTakeoff();
+
+bool noCopterFlyingAbove();
