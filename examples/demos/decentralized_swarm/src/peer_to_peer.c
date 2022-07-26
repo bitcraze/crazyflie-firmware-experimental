@@ -26,7 +26,8 @@
  *  communication. Two crazyflies need this program in order to send and receive.
  */
 
-
+#include "choose_app.h"
+#ifdef BUILD_PILOT_APP
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -503,3 +504,5 @@ PARAM_GROUP_STOP(app)
 LOG_GROUP_START(app)
   LOG_ADD(LOG_UINT8, state, &state)
 LOG_GROUP_STOP(app)
+
+#endif // BUILD_PILOT_APP

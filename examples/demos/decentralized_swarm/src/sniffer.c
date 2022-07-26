@@ -26,6 +26,8 @@
  *  communication. Two crazyflies need this program in order to send and receive.
  */
 
+#include "choose_app.h"
+#ifdef BUILD_SNIFFER_APP
 
 #include <string.h>
 #include <stdint.h>
@@ -88,3 +90,4 @@ void appMain()
     }
 }
 
+#endif // BUILD_SNIFFER_APP
