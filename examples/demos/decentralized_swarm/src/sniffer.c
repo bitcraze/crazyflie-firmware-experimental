@@ -48,187 +48,43 @@
 
 
 #define DEBUG_MODULE "P2P"
-#include "debug.h"
+// #include "debug.h"
 
-#define BROADCAST_FEQUENCY_HZ 2
-#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
-#define INTER_DIST 0.6f
-#define MAX_ADDRESS 9 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
+#include "p2p_interface.h"
+extern copter_t copters[MAX_ADDRESS];
+static copter_t prev_copters[MAX_ADDRESS];
 
-#define ADD_VECTORS_3D(a, b) {a.x += b.x; a.y += b.y; a.z += b.z;}
-#define SUB_VECTORS_3D(a, b) {a.x -= b.x; a.y -= b.y; a.z -= b.z;}
-#define MUL_VECTORS_3D(a, b) {a.x *= b.x; a.y *= b.y; a.z *= b.z;}
-#define MUL_VECTOR_3D_WITH_SCALAR(v, scalar) {v.x *= scalar; v.y *= scalar; v.z *= scalar;}
-#define PRINT_POSITION_3D(pos) {DEBUG_PRINT("(%f , %f , %f)\n", (double) pos.x, (double) pos.y, (double) pos.z);}
-
-typedef struct Position_struct {
-    float x;
-    float y;
-    float z;
-} Position;
-
-// Log and param ids
-static logVarId_t logIdStateEstimateX;
-static logVarId_t logIdStateEstimateY;
-static logVarId_t logIdStateEstimateZ;
-
-static uint8_t my_id;
-
-static Position others_pos[MAX_ADDRESS];
-static uint32_t others_timestamp[MAX_ADDRESS]={0};
-
-// Getting current position
-// static float getX() { return ( rand() % 200)/(-1.585f) ;}//logGetFloat(logIdStateEstimateX); }
-// static float getY() { return ( rand() % 200)/(1.585f) ;}//logGetFloat(logIdStateEstimateY); }
-// static float getZ() { return ( rand() % 200)/(-1.585f) ;}//logGetFloat(logIdStateEstimateZ); }
-
-// static float getX() { return (float) logGetFloat(logIdStateEstimateX)/1.0f; }
-// static float getY() { return (float) logGetFloat(logIdStateEstimateY)/1.0f; }
-// static float getZ() { return (float) logGetFloat(logIdStateEstimateZ)/1.0f; }
-
-
-
-//The following functions are used to return a new Position struct
-//If you want to save the result of teh calculation, you can use macros
-Position addVectors3D(Position a, Position b) {
-    Position result;
-    result.x = a.x + b.x;
-    result.y = a.y + b.y;
-    result.z = a.z + b.z;
-    return result;
-}
-
-Position subtractVectors3D(Position a, Position b) {
-    Position result;
-    result.x = a.x - b.x;
-    result.y = a.y - b.y;
-    result.z = a.z - b.z;
-    return result;
-}
-
-Position multiplyVectorWithScalar(Position a, float scalar) {
-    Position result;
-    result.x = a.x * scalar;
-    result.y = a.y * scalar;
-    result.z = a.z * scalar;
-    return result;
-}
-
-float getVectorMagnitude(Position a) {
-    return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
-}
-
-
-static void initializeOtherPositions() {
-    for (int i = 0; i < MAX_ADDRESS; i++) {
-        others_pos[i].x = FLT_MAX;
-        others_pos[i].x = FLT_MAX;
-        others_pos[i].y = FLT_MAX;
-    }
-}
-
-// Position getNextDeltaPosition() {
-//     Position p_i = {getX(), getY(), getZ()};
-
-//     Position delta_final={0,0,0};
-//     for (int j = 0; j < MAX_ADDRESS; j++) {
-//         if (others_pos[j].x == FLT_MAX || others_pos[j].y == FLT_MAX || others_pos[j].y == FLT_MAX){
-//             continue;
-//         }
-
-//         Position p_j = others_pos[j];
-//         float mag = getVectorMagnitude(subtractVectors3D(p_i, p_j));
-//         Position delta = subtractVectors3D(p_i, p_j);
-//         float scalar = (mag-INTER_DIST) / mag;
-//         MUL_VECTOR_3D_WITH_SCALAR(delta, scalar);
-//         ADD_VECTORS_3D(delta_final, delta);
-//     }
-
-//     MUL_VECTOR_3D_WITH_SCALAR(delta_final, -1.0f);
-    
-//     return delta_final;
-// }
-
-void printOtherPositions() {
-    for (int i = 0; i < MAX_ADDRESS; i++) {
-        if (others_pos[i].x == FLT_MAX || others_pos[i].y == FLT_MAX || others_pos[i].y == FLT_MAX){
-            continue;
-        }
-        DEBUG_PRINT("CF %d: %.2f %.2f %.2f timestamp: %lu\n", i, (double)others_pos[i].x, (double)others_pos[i].y,(double) others_pos[i].z,others_timestamp[i]);
+void update_copter_list(void)
+{   
+    bool printed_bar = false;
+    for (int i = 0; i < MAX_ADDRESS; i++)
+    {
         
+        if( prev_copters[i].state != copters[i].state ){
+            if (!printed_bar){
+                DEBUG_PRINT("========================================================\n");
+                printed_bar = true;
+            }
+            // DEBUG_PRINT("Copter %d state changed to %d\n", i, copters[i].state);
+            printOtherCopters();
+            prev_copters[i] = copters[i];
+        }    
     }
-}
-
-
-void p2pcallbackHandler(P2PPacket *p)
-{
-    // Parse the data from the other crazyflie and print it
-    uint8_t rssi = p->rssi;
-    uint8_t other_id = p->data[0];
-    uint8_t counter = p->data[1];
-
-    static Position pos_received;
-    memcpy(&pos_received, &(p->data[2]), sizeof(Position));
-    DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, other_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d \n", rssi, other_id, counter);
-
 }
 
 void appMain()
 {
-    DEBUG_PRINT("Waiting for activation ...\n");
-    // Get log and param ids
-    logIdStateEstimateX = logGetVarId("stateEstimate", "x");
-    logIdStateEstimateY = logGetVarId("stateEstimate", "y");
-    logIdStateEstimateZ = logGetVarId("stateEstimate", "z");
-
-    initializeOtherPositions();
-
-    // Initialize the p2p packet 
-    static P2PPacket p_reply;
-    p_reply.port=0x00;
+    DEBUG_PRINT("Running Decentralized swarm sniffer ...\n");
     
-    // Get the current address of the crazyflie and obtain
-    //   the last two digits and send it as the first byte
-    //   of the payload
-    uint64_t address = configblockGetRadioAddress();
-    my_id =(uint8_t)((address) & 0x00000000ff);
-    p_reply.data[0]=my_id;
-    
+   initOtherStates();
     
     // Register the callback function so that the CF can receive packets as well.
     p2pRegisterCB(p2pcallbackHandler);
 
-    
-    // uint8_t counter = 0;
-    // Position delta;
     while(1) {
-
-        vTaskDelay(M2T(BROADCAST_PERIOD_MS));
-        
-        // p_reply.data[1] = counter++;
-        
-        // Position my_pos;
-
-        // //get current position and send it as the payload
-        // my_pos.x=getX();
-        // my_pos.y=getY();
-        // my_pos.z=getZ();
-
-        // DEBUG_PRINT("MY POSITION: "); PRINT_POSITION_3D(my_pos);
-
-
-        // memcpy(&p_reply.data[2], &my_pos, sizeof(Position));
-
-        // DEBUG_PRINT("Sending POSITION: ");
-        // for (int i = 2; i < 2+12; i++) {
-        //     DEBUG_PRINT("%d ", p_reply.data[i]);
-        // }
-        // DEBUG_PRINT("\n");
-
-        // p_reply.size=sizeof(Position)+2;//+2 for the id and counter
-
-        // radiolinkSendP2PPacketBroadcast(&p_reply);
+        vTaskDelay(M2T(SNIFFER_PRINT_PERIOD_MS));
+        // printOtherCopters();
+        update_copter_list();
     }
 }
 

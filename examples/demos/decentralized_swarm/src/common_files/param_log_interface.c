@@ -23,6 +23,13 @@ static paramVarId_t paramIdCollisionAvoidanceEllipsoidY;
 static paramVarId_t paramIdCollisionAvoidanceHorizon;
 static paramVarId_t paramIdCollisionAvoidanceMaxVel;
 
+static paramVarId_t paramIdCollisionAvoidanceBBoxMaxX;
+static paramVarId_t paramIdCollisionAvoidanceBBoxMaxY;
+static paramVarId_t paramIdCollisionAvoidanceBBoxMaxZ;
+static paramVarId_t paramIdCollisionAvoidanceBBoxMinX;
+static paramVarId_t paramIdCollisionAvoidanceBBoxMinY;
+static paramVarId_t paramIdCollisionAvoidanceBBoxMinZ;
+
 // getting  parameters
 float getX() { return (float) logGetFloat(logIdStateEstimateX); }
 float getY() { return (float) logGetFloat(logIdStateEstimateY); }
@@ -46,6 +53,14 @@ void initCollisionAvoidance(){
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
     paramSetFloat(paramIdCollisionAvoidanceHorizon, COLLISION_AVOIDANCE_HORIZON);
     paramSetFloat(paramIdCollisionAvoidanceMaxVel, COLLISION_AVOIDANCE_MAX_VELOCITY);
+    
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMaxX, COLLISION_AVOIDANCE_BBOX_MAX_X);
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMaxY, COLLISION_AVOIDANCE_BBOX_MAX_Y);
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMaxZ, COLLISION_AVOIDANCE_BBOX_MAX_Z);
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMinX, COLLISION_AVOIDANCE_BBOX_MIN_X);
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMinY, COLLISION_AVOIDANCE_BBOX_MIN_Y);
+    paramSetFloat(paramIdCollisionAvoidanceBBoxMinZ, COLLISION_AVOIDANCE_BBOX_MIN_Z);
+
 }
 
 void initLogIds(){
@@ -77,5 +92,12 @@ void initParamLogInterface(){
     paramIdCollisionAvoidanceEllipsoidY = paramGetVarId("colAv", "ellipsoidY");
     paramIdCollisionAvoidanceHorizon = paramGetVarId("colAv", "horizon");
     paramIdCollisionAvoidanceMaxVel = paramGetVarId("colAv", "maxSpeed");
+    paramIdCollisionAvoidanceBBoxMaxX = paramGetVarId("colAv", "bboxMaxX");
+    paramIdCollisionAvoidanceBBoxMaxY = paramGetVarId("colAv", "bboxMaxY");
+    paramIdCollisionAvoidanceBBoxMaxZ = paramGetVarId("colAv", "bboxMaxZ");
+    paramIdCollisionAvoidanceBBoxMinX = paramGetVarId("colAv", "bboxMinX");
+    paramIdCollisionAvoidanceBBoxMinY = paramGetVarId("colAv", "bboxMinY");
+    paramIdCollisionAvoidanceBBoxMinZ = paramGetVarId("colAv", "bboxMinZ");
+     
     initLogIds();
 }

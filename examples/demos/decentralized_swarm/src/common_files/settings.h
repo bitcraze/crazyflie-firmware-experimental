@@ -23,11 +23,24 @@
 #define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
 
+#define COLLISION_AVOIDANCE_BBOX_MIN_X  -2.0f
+#define COLLISION_AVOIDANCE_BBOX_MAX_X   2.0f
+
+#define COLLISION_AVOIDANCE_BBOX_MIN_Y  -2.0f
+#define COLLISION_AVOIDANCE_BBOX_MAX_Y   2.0f
+
+#define COLLISION_AVOIDANCE_BBOX_MIN_Z   0.1f
+#define COLLISION_AVOIDANCE_BBOX_MAX_Z   2.0f
+
+
 // P2P Interface
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 
-#define BROADCAST_FEQUENCY_HZ 20
-#define CALC_NEXT_FEQUENCY_HZ 3
+#define BROADCAST_FREQUENCY_HZ 15
+#define CALC_NEXT_FREQUENCY_HZ 3
+
+#define SNIFFER_PRINT_FREQUENCY_HZ 5
+
 #define ALIVE_TIMEOUT_MS 1000 //ms after not receiving data from a copter ,it is considered dead
 
 // position lock settings
@@ -65,5 +78,6 @@
 #define MAX_Z_BOUND  1.5f
 
 //utils
-#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FEQUENCY_HZ)
-#define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FEQUENCY_HZ)
+#define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
+#define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)
+#define SNIFFER_PRINT_PERIOD_MS (1000 / SNIFFER_PRINT_FREQUENCY_HZ)

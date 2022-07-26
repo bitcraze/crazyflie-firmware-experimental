@@ -204,14 +204,26 @@ static void sendPosition(xTimerHandle timer) {
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
-static bool needExtraCopters(void) {
+static bool selfIsFlying(void){
+    return state>STATE_PREPARING_FOR_TAKE_OFF && state<STATE_GOING_TO_PAD;
+}
+
+static uint8_t flying_copters_number(){
+    //Number of flying copters including the current one (if it is flying)
     uint8_t flying_drones = peerLocalizationGetNumNeighbors();
-    bool need_extra_copters = flying_drones > 0 && flying_drones < DESIRED_FLYING_COPTERS;
-    return need_extra_copters;
+    if (selfIsFlying())
+        flying_drones++;
+
+    return flying_drones;
+}
+
+static bool needExtraCopters(void) {
+    uint8_t flying_drones = flying_copters_number();
+    return flying_drones >= 0 && flying_drones < DESIRED_FLYING_COPTERS;
 }
 
 static bool needLessCopters(void){
-    return peerLocalizationGetNumNeighbors() > DESIRED_FLYING_COPTERS;
+    return flying_copters_number() > DESIRED_FLYING_COPTERS;
 }
 
 static bool allFlyingCoptersHovering(void){
@@ -222,7 +234,7 @@ static bool allFlyingCoptersHovering(void){
         }
 
         if (state > STATE_WAIT_FOR_TAKE_OFF  && state<STATE_GOING_TO_PAD){//TODO:maybe change STATE_WAIT_FOR_TAKE_OFF to STATE_PREPARING_FOR_TAKE_OFF
-            if (state!=STATE_HOVERING)
+            if (state!=STATE_HOVERING && state!=STATE_GOING_TO_RANDOM_POINT )
                 return false;
         } 
     }
@@ -290,15 +302,18 @@ static void stateTransition(xTimerHandle timer){
 
             if (needExtraCopters() && atLeastOneCopterHasFlown() ){// at least one copter is flying and  more copters needed
                 random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
+                DEBUG_PRINT("Preparing for take off...\n");
                 state=STATE_PREPARING_FOR_TAKE_OFF;
             }
             
         break;
         case STATE_PREPARING_FOR_TAKE_OFF:
             if (!needExtraCopters()){ // another copter took off,no need to take off finally
+                DEBUG_PRINT("Another copter took off, no need to take off finally\n");
                 state=STATE_WAIT_FOR_TAKE_OFF;
             }
             else if (now > random_time_for_next_event){
+                DEBUG_PRINT("Taking off...\n");
                 startTakeOffSequence();
                 state=STATE_TAKING_OFF;
             }
@@ -306,6 +321,7 @@ static void stateTransition(xTimerHandle timer){
             break;  
         case STATE_TAKING_OFF:
             if ( needLessCopters() ){// more than desired copters are flying,need to land
+                DEBUG_PRINT("More copters than desired are flying while taking off, need to land\n");
                 random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
                 state = STATE_PREPARING_FOR_LAND;
                 break;
@@ -331,6 +347,7 @@ static void stateTransition(xTimerHandle timer){
             }
             
             if ( needLessCopters() ){
+                DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
                 random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
                 state = STATE_PREPARING_FOR_LAND;
                 break;
@@ -338,6 +355,7 @@ static void stateTransition(xTimerHandle timer){
 
             // wait for all flying copters to be hovering
             if (allFlyingCoptersHovering()){
+                DEBUG_PRINT("All copters are hovering, going to next Waypoint\n");
                 Position new_pos = getRandomPositionOnCircle();
                 gotoNextWaypoint(new_pos.x,new_pos.y,new_pos.z,DELTA_DURATION);
 
@@ -346,14 +364,17 @@ static void stateTransition(xTimerHandle timer){
             break;
         case STATE_GOING_TO_RANDOM_POINT:
             if (reachedNextWaypoint(my_pos)) {
+                DEBUG_PRINT("Reached next waypoint\n");
                 state = STATE_HOVERING;                    
             }
             break;
         case STATE_PREPARING_FOR_LAND:
             if (!needLessCopters()){ // another copter landed , no need to land finally
+                DEBUG_PRINT("Another copter landed, no need to land finally\n");
                 state=STATE_HOVERING;
             }
             else if (now > random_time_for_next_event){
+                DEBUG_PRINT("Going to pad...\n");
                 gotoNextWaypoint(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                 state=STATE_GOING_TO_PAD;
             } 

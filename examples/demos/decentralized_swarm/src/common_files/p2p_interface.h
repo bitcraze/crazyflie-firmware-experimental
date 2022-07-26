@@ -14,6 +14,7 @@
 #include "radiolink.h"
 #include "peer_localization.h"
 #include "settings.h"
+#include "debug.h"
 
 /*
     PACKET FORMAT:
@@ -50,6 +51,8 @@ uint8_t compressVoltage(float voltage);
 
 float decompressVoltage(uint8_t voltage);
 
+//Returns true if at least one copter has flown (doesn't mean that it is alive)
 bool atLeastOneCopterHasFlown(void);
 
+void printOtherCopters(void);
 #endif // P2P_INTERFACE_H
