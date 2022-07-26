@@ -72,7 +72,6 @@ void initLogIds(){
     logIdStateEstimateVz = logGetVarId("stateEstimate", "vz");
 }
 
-
 void initParamLogInterface(){
     logIdStateEstimateX = logGetVarId("stateEstimate", "x");
     logIdStateEstimateY = logGetVarId("stateEstimate", "y");

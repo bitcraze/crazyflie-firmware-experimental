@@ -93,5 +93,7 @@ bool hasLock() {
   return result;
 }
 
-
+bool chargedForTakeoff() {
+  return getVoltage() > CHARGED_FOR_TAKEOFF_VOLTAGE;
+}
 #endif // MOVEMENT_H

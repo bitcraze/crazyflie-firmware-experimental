@@ -6,6 +6,7 @@
 #include "crtp_commander_high_level.h"
 #include "param_log_interface.h"
 #include "sensors.h"
+#include "param_log_interface.h"
 
 
 
@@ -18,3 +19,5 @@ bool outOfBounds(Position my_pos);
 void resetLockData();
 
 bool hasLock();
+
+bool chargedForTakeoff();

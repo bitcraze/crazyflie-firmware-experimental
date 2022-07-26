@@ -294,6 +294,9 @@ static void stateTransition(xTimerHandle timer){
         }
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
+            if (!chargedForTakeoff()){
+                break;
+            }
 
             if (takeOffWhenReady) {
                 startTakeOffSequence();
