@@ -137,10 +137,9 @@ ledseqContext_t seq_crash = {
 };
 
 
-static bool takeOffWhenReady = false;
-static bool terminateTrajectoryAndLand = false;
 
-Position offset = {0, 0, 0};
+
+// Position offset = {0, 0, 0};
 
 static void initPacket(){
     p_reply.port=0x00;
@@ -244,13 +243,13 @@ static bool allFlyingCoptersHovering(void){
 }
 
 static void startTakeOffSequence(){
-    takeOffWhenReady = false;
+    setTakeOffWhenReady(false);
     padX = getX();
     padY = getY();
     padZ = getZ();
     DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ );
     
-    terminateTrajectoryAndLand = false;
+    setTerminateTrajectoryAndLand(false);
     DEBUG_PRINT("Taking off...\n");
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
@@ -268,9 +267,9 @@ static void stateTransition(xTimerHandle timer){
     //     }
     // }
     else if (isBatLow()) {
-        if (terminateTrajectoryAndLand!=1){
+        if (!getTerminateTrajectoryAndLand()){
             DEBUG_PRINT("Battery low, stopping\n");
-            terminateTrajectoryAndLand=1;
+            setTerminateTrajectoryAndLand(true);
         }
     }
 
@@ -302,7 +301,7 @@ static void stateTransition(xTimerHandle timer){
                 break;
             }
 
-            if (takeOffWhenReady) {
+            if (getTakeOffWhenReady()) {
                 startTakeOffSequence();
                 state = STATE_TAKING_OFF;
                 break;
@@ -347,7 +346,7 @@ static void stateTransition(xTimerHandle timer){
 
         case STATE_HOVERING:
             dt = now - hovering_start_time ;
-            if (terminateTrajectoryAndLand || dt > HOVERING_TIME) {
+            if (getTerminateTrajectoryAndLand() || dt > HOVERING_TIME) {
                 DEBUG_PRINT("Going to pad...\n");
                 gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                 state = STATE_GOING_TO_PAD;
@@ -496,14 +495,6 @@ void appMain()
     isInit = true;
 }
 
-
-PARAM_GROUP_START(app)
-  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
-  PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
-  PARAM_ADD(PARAM_FLOAT, offsx, &offset.x)
-  PARAM_ADD(PARAM_FLOAT, offsy, &offset.y)
-  PARAM_ADD(PARAM_FLOAT, offsz, &offset.z)
-PARAM_GROUP_STOP(app)
 
 LOG_GROUP_START(app)
   LOG_ADD(LOG_UINT8, state, &state)

@@ -31,3 +31,9 @@ void initCollisionAvoidance();
 void initLogIds();
 
 void initParamLogInterface();
+
+void setTerminateTrajectoryAndLand(bool value);
+void setTakeOffWhenReady(bool value);
+
+bool getTerminateTrajectoryAndLand();
+bool getTakeOffWhenReady();

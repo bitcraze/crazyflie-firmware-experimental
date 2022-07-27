@@ -1,5 +1,9 @@
 #include "param_log_interface.h"
 
+//App parameters
+static bool takeOffWhenReady = false;
+static bool terminateTrajectoryAndLand = false;
+
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
 static logVarId_t logIdStateEstimateY;
@@ -45,6 +49,13 @@ bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
 float getVoltage() { return logGetFloat(logIdVBat); }
 bool isCharging() { return logGetInt(logIdPmState) == charging; }
 bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
+
+void setTerminateTrajectoryAndLand(bool value) { terminateTrajectoryAndLand = value; }
+void setTakeOffWhenReady(bool value) { takeOffWhenReady = value; }
+
+bool getTerminateTrajectoryAndLand() { return terminateTrajectoryAndLand; }
+bool getTakeOffWhenReady() { return takeOffWhenReady; }
+
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 void enableCollisionAvoidance() { 
     static bool enabled = false;
@@ -107,3 +118,8 @@ void initParamLogInterface(){
      
     initLogIds();
 }
+
+PARAM_GROUP_START(app)
+  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
+  PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
+PARAM_GROUP_STOP(app)
