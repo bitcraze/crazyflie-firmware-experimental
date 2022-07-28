@@ -163,17 +163,30 @@ static void sendPosition(xTimerHandle timer) {
         [15]    --> compressed Voltage 
         [16]    --> terminateApp 
     */
-    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD )
+   bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
+    if ( landed && !getTerminateApp() ){
+        // if landed and not in the process of terminating the app 
+        // then abort sending P2P packet
         return;
+    }
         
     static uint8_t counter=0;
     initPacket();
-
+    
+    //sampling position
     my_pos.x=getX();
     my_pos.y=getY();
     my_pos.z=getZ();
-    memcpy(&p_reply.data[3], &my_pos, sizeof(Position));
-    
+
+    if (!landed) {
+        memcpy(&p_reply.data[3], &my_pos, sizeof(Position));
+    }else{
+        // copter is landed but need to transmit the terminating signal to the others
+        // without taking the position of the copter into account
+        Position null_pos={10.0f,10.0f,10.0f};//TODO: make a parameter for the 10.0f
+        memcpy(&p_reply.data[3], &null_pos, sizeof(Position));
+    }
+
     // position stuck handling (while testing position broadcasting seem to be stuck after resetting the estimator)
     if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
         // DEBUG_PRINT("Same value detected\n");
@@ -471,6 +484,11 @@ static void stateTransition(xTimerHandle timer){
                 ledseqRun(&seq_crash);
                 seq_crash_running=1;
             }
+
+            if (getTerminateApp() && flying_copters_number()==0){
+                setTerminateApp(false);
+            }
+
         break;
         
         default:
