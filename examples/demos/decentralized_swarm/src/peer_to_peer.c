@@ -163,7 +163,7 @@ static void sendPosition(xTimerHandle timer) {
         [15]    --> compressed Voltage 
         [16]    --> terminateApp 
     */
-    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_REGOING_TO_PAD )
+    if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD )
         return;
         
     static uint8_t counter=0;
@@ -390,17 +390,18 @@ static void stateTransition(xTimerHandle timer){
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
                 crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
-                state = STATE_WAITING_AT_PAD;
-            }
-            break;
-        case STATE_REGOING_TO_PAD:
-            if (reachedNextWaypoint(my_pos) || now > stabilizeEndTime) {
-                DEBUG_PRINT("Over pad,starting lowering\n");
-                crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
                 stabilizeEndTime = now + STABILIZE_TIMEOUT;
                 state = STATE_WAITING_AT_PAD;
             }
             break;
+        // case STATE_REGOING_TO_PAD:
+        //     if (reachedNextWaypoint(my_pos) || now > stabilizeEndTime) {
+        //         DEBUG_PRINT("Over pad,starting lowering\n");
+        //         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
+        //         stabilizeEndTime = now + STABILIZE_TIMEOUT;
+        //         state = STATE_WAITING_AT_PAD;
+        //     }
+        //     break;
         case STATE_WAITING_AT_PAD:
             if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
                 if (now > stabilizeEndTime) {
@@ -448,8 +449,8 @@ static void stateTransition(xTimerHandle timer){
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabilizing position\n");
                 gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
-                stabilizeEndTime = now + 3000;
-                state = STATE_REGOING_TO_PAD;
+                stabilizeEndTime = now + STABILIZE_TIMEOUT;
+                state = STATE_WAITING_AT_PAD;
             }
             break;
         case STATE_APP_TERMINATION:
