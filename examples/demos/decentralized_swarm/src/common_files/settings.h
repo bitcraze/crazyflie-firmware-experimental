@@ -1,7 +1,8 @@
 #pragma once
+
+// Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
 #define DESIRED_FLYING_COPTERS 3
-
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 3.8f
 
 // RANDOM POSITIONS ON CIRCLE
@@ -61,8 +62,8 @@
 #define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad
-#define MAX_PAD_ERR 0.005
-#define LANDING_HEIGHT 0.08f
+#define MAX_PAD_ERR 0.01
+#define LANDING_HEIGHT 0.12f
 #define LANDING_DURATION 3 //sec 
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad

@@ -10,6 +10,7 @@
 
 #include "estimator_kalman.h"
 
+#include "common.h"
 #include "positions.h"
 #include "radiolink.h"
 #include "peer_localization.h"

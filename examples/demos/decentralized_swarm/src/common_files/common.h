@@ -21,4 +21,5 @@ enum State {
     STATE_APP_TERMINATION,
     
     STATE_CRASHED,
+    STATE_UNKNOWN = 255,
 };

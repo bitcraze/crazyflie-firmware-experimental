@@ -29,7 +29,7 @@
 #include "choose_app.h"
 #ifdef BUILD_PILOT_APP
 
-#define CONFIG_PARAM_SILENT_UPDATES //don't know if it actually affects the setting
+// #define CONFIG_PARAM_SILENT_UPDATES //don't know if it actually affects the setting
 
 #include <string.h>
 #include <stdint.h>
@@ -74,7 +74,8 @@ static xTimerHandle stateTransitionTimer;
 
 static bool isInit = false;
 
-static enum State state = STATE_IDLE;
+//the state of the copter
+enum State state = STATE_IDLE;
 
 static P2PPacket p_reply;
 
@@ -163,6 +164,7 @@ static void sendPosition(xTimerHandle timer) {
         [15]    --> compressed Voltage 
         [16]    --> terminateApp 
     */
+   
    bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
     if ( landed && !getTerminateApp() ){
         // if landed and not in the process of terminating the app 
@@ -209,7 +211,7 @@ static void sendPosition(xTimerHandle timer) {
     previous[2]=my_pos.z;
     
     p_reply.data[1] = counter++;
-    p_reply.data[2] = (uint8_t) state;
+    p_reply.data[2] = (uint8_t) ( landed ? STATE_UNKNOWN : state );
     p_reply.data[15] = compressVoltage( getVoltage() );
     
     p_reply.data[16] = getTerminateApp() ? 1 : 0;
@@ -245,7 +247,7 @@ static bool needLessCopters(void){
 static bool allFlyingCoptersHovering(void){
     for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
         uint8_t state=getCopterState(i);
-        if (state==255 || !peerLocalizationIsIDActive(i) ){// if not active
+        if (state == STATE_UNKNOWN || !peerLocalizationIsIDActive(i) ){// if not active
             continue;
         }
 
@@ -282,8 +284,9 @@ static void stateTransition(xTimerHandle timer){
     //     }
     // }
     else if (isBatLow() || getTerminateApp() ) {
+        
         if (!getTerminateTrajectoryAndLand()){
-            DEBUG_PRINT("Battery low, stopping\n");
+            DEBUG_PRINT(isBatLow()? "Battery low, stopping\n" : "Terminate app, stopping\n");
             setTerminateTrajectoryAndLand(true);
         }
     }
@@ -314,11 +317,10 @@ static void stateTransition(xTimerHandle timer){
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
             if (!chargedForTakeoff()){
-                
+                //do nothing, wait for the battery to be charged
             }
             else if (getTerminateApp()){
                 state = STATE_APP_TERMINATION;
-                
             }
             else if (getTakeOffWhenReady()) {
                 startTakeOffSequence();

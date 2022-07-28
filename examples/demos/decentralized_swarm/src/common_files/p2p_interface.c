@@ -1,5 +1,7 @@
 #include "p2p_interface.h"
 
+extern enum  State state;
+
 copter_t copters[MAX_ADDRESS];
 // uint8_t otherStates[MAX_ADDRESS];//array of states of the other drones
 
@@ -25,7 +27,7 @@ void p2pcallbackHandler(P2PPacket *p)
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
-        if (!getTerminateApp()){
+        if (!getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK ){
             setTerminateApp(true);
         }
     }
@@ -43,7 +45,7 @@ void p2pcallbackHandler(P2PPacket *p)
 
 void initOtherStates(){
     for(int i=0;i<MAX_ADDRESS;i++){
-        copters[i].state = 255;
+        copters[i].state = STATE_UNKNOWN;
     }
 }
 
@@ -62,7 +64,7 @@ float decompressVoltage(uint8_t voltage){
 
 bool atLeastOneCopterHasFlown(void){
     for(int i=0;i<MAX_ADDRESS;i++){
-        if(copters[i].state != 255){
+        if(copters[i].state != STATE_UNKNOWN){
             return true;
         }
     }
@@ -71,7 +73,7 @@ bool atLeastOneCopterHasFlown(void){
 
 void printOtherCopters(void){
     for(int i=0;i<MAX_ADDRESS;i++){
-        if (copters[i].state != 255){
+        if (copters[i].state != STATE_UNKNOWN){
             if (!peerLocalizationIsIDActive(i)){
                 DEBUG_PRINT("Copter %d is not active\n",i);
             }else{

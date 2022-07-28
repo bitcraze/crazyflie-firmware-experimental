@@ -18,6 +18,8 @@ CRAZYFLIE_BASE := ../../..
 # To include header files from other directories
 #
 EXTRA_CFLAGS += -I$(PWD)/src/common_files
+EXTRA_CFLAGS += -DCONFIG_PARAM_SILENT_UPDATES
+
 
 #
 # We override the default OOT_CONFIG here, we could also name our config
