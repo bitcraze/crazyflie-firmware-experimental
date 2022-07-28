@@ -34,6 +34,8 @@ void initParamLogInterface();
 
 void setTerminateTrajectoryAndLand(bool value);
 void setTakeOffWhenReady(bool value);
+void setTerminateApp(bool value);
 
 bool getTerminateTrajectoryAndLand();
 bool getTakeOffWhenReady();
+bool getTerminateApp();

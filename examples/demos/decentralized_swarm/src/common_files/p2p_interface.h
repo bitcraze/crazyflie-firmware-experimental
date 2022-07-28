@@ -15,6 +15,7 @@
 #include "peer_localization.h"
 #include "settings.h"
 #include "debug.h"
+#include "param_log_interface.h"
 
 /*
     PACKET FORMAT:
@@ -34,6 +35,7 @@ typedef struct packet_struct {
     uint8_t counter;
     uint8_t state;
     uint8_t battery_voltage; //normalized to 0-255 (0-3.3V) 
+    bool terminateApp;
 
     uint32_t timestamp;
 
@@ -55,4 +57,6 @@ float decompressVoltage(uint8_t voltage);
 bool atLeastOneCopterHasFlown(void);
 
 void printOtherCopters(void);
+
+uint8_t otherCoptersActiveNumber(void);
 #endif // P2P_INTERFACE_H

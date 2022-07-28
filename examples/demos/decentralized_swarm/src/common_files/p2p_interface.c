@@ -19,7 +19,16 @@ void p2pcallbackHandler(P2PPacket *p)
     copters[received_id].counter=p->data[1];
     copters[received_id].state = p->data[2];
     copters[received_id].battery_voltage = p->data[15];
+    copters[received_id].terminateApp = p->data[16] == 1;
+
     copters[received_id].timestamp=now_ms;
+
+    if (copters[received_id].terminateApp){
+        DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
+        if (!getTerminateApp()){
+            setTerminateApp(true);
+        }
+    }
 
     positionMeasurement_t pos_measurement;
     memcpy(&pos_measurement.pos, &(p->data[3]), sizeof(Position));
@@ -71,4 +80,15 @@ void printOtherCopters(void){
             }
         }
     }
+}
+
+uint8_t otherCoptersActiveNumber(void){
+    uint8_t nr=0;
+    for(int i=0;i<MAX_ADDRESS;i++){
+        // if they are active and not requesting to terminate the application
+        if (peerLocalizationIsIDActive(i) && !copters[i].terminateApp ){
+            nr++;
+        }
+    }
+    return nr;
 }

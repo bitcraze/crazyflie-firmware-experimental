@@ -3,6 +3,7 @@
 //App parameters
 static bool takeOffWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
+static bool terminateApp = false;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -50,11 +51,15 @@ float getVoltage() { return logGetFloat(logIdVBat); }
 bool isCharging() { return logGetInt(logIdPmState) == charging; }
 bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 
+//App Parameters setters
 void setTerminateTrajectoryAndLand(bool value) { terminateTrajectoryAndLand = value; }
 void setTakeOffWhenReady(bool value) { takeOffWhenReady = value; }
+void setTerminateApp(bool value) { terminateApp = value; }
 
+//App Parameters getters
 bool getTerminateTrajectoryAndLand() { return terminateTrajectoryAndLand; }
 bool getTakeOffWhenReady() { return takeOffWhenReady; }
+bool getTerminateApp() { return terminateApp; }
 
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 void enableCollisionAvoidance() { 
@@ -122,4 +127,5 @@ void initParamLogInterface(){
 PARAM_GROUP_START(app)
   PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
   PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
+  PARAM_ADD(PARAM_UINT8, terminateApp, &terminateApp)
 PARAM_GROUP_STOP(app)

@@ -29,6 +29,8 @@
 #include "choose_app.h"
 #ifdef BUILD_PILOT_APP
 
+#define CONFIG_PARAM_SILENT_UPDATES //don't know if it actually affects the setting
+
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -136,9 +138,6 @@ ledseqContext_t seq_crash = {
   .led = LED_CRASH,
 };
 
-
-
-
 // Position offset = {0, 0, 0};
 
 static void initPacket(){
@@ -161,7 +160,8 @@ static void sendPosition(xTimerHandle timer) {
         [1]     --> counter
         [2]     --> state
         [3-14]  --> x,y,z
-        [15]    --> compressed Voltage    
+        [15]    --> compressed Voltage 
+        [16]    --> terminateApp 
     */
     if (state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_REGOING_TO_PAD )
         return;
@@ -198,20 +198,22 @@ static void sendPosition(xTimerHandle timer) {
     p_reply.data[1] = counter++;
     p_reply.data[2] = (uint8_t) state;
     p_reply.data[15] = compressVoltage( getVoltage() );
+    
+    p_reply.data[16] = getTerminateApp() ? 1 : 0;
 
     //get current position and send it as the payload
-    p_reply.size=sizeof(Position) + 4;//+4 for the id,counter,state and Voltage
+    p_reply.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
 
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
 static bool selfIsFlying(void){
-    return state>STATE_PREPARING_FOR_TAKE_OFF && state<STATE_GOING_TO_PAD;
+    return state>STATE_PREPARING_FOR_TAKE_OFF && state<STATE_GOING_TO_PAD && !getTerminateApp();
 }
 
 static uint8_t flying_copters_number(){
     //Number of flying copters including the current one (if it is flying)
-    uint8_t flying_drones = peerLocalizationGetNumNeighbors();
+    uint8_t flying_drones = otherCoptersActiveNumber();
     if (selfIsFlying())
         flying_drones++;
 
@@ -266,7 +268,7 @@ static void stateTransition(xTimerHandle timer){
     //         state = STATE_LANDING;
     //     }
     // }
-    else if (isBatLow()) {
+    else if (isBatLow() || getTerminateApp() ) {
         if (!getTerminateTrajectoryAndLand()){
             DEBUG_PRINT("Battery low, stopping\n");
             setTerminateTrajectoryAndLand(true);
@@ -293,11 +295,17 @@ static void stateTransition(xTimerHandle timer){
         if (hasLock() || dt > POSITION_LOCK_TIMEOUT) {
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
             // ledseqRun(&seq_lock);
+            setTerminateApp(false);
             state = STATE_WAIT_FOR_TAKE_OFF;
         }
         break;
         case STATE_WAIT_FOR_TAKE_OFF:
             if (!chargedForTakeoff()){
+                break;
+            }
+
+            if (getTerminateApp()){
+                state = STATE_APP_TERMINATION;
                 break;
             }
 
@@ -316,7 +324,10 @@ static void stateTransition(xTimerHandle timer){
             
         break;
         case STATE_PREPARING_FOR_TAKE_OFF:
-            if (!needExtraCopters()){ // another copter took off,no need to take off finally
+            if (getTerminateApp()){
+                state = STATE_APP_TERMINATION;
+            }
+            else if (!needExtraCopters()){ // another copter took off,no need to take off finally
                 DEBUG_PRINT("Another copter took off, no need to take off finally\n");
                 state=STATE_WAIT_FOR_TAKE_OFF;
             }
@@ -430,7 +441,11 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("isCharging: %d\n", isCharging());
                 if (isCharging()) {
                     // ledseqRun(&seq_lock);
-                    state = STATE_WAIT_FOR_TAKE_OFF;
+                    if (getTerminateApp()){
+                        state = STATE_APP_TERMINATION;
+                    }else{
+                        state = STATE_WAIT_FOR_TAKE_OFF;
+                    }
                 } else if ( noCopterFlyingAbove() ){
                     DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
                     crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT , 1.0);
@@ -445,6 +460,17 @@ static void stateTransition(xTimerHandle timer){
                 stabilizeEndTime = now + 3000;
                 state = STATE_REGOING_TO_PAD;
             }
+            break;
+        case STATE_APP_TERMINATION:
+            if (flying_copters_number()==0){
+                DEBUG_PRINT("All copters terminated, exiting\n");
+                initOtherStates();
+
+                setTerminateTrajectoryAndLand(false);
+                setTerminateApp(false);
+                state = STATE_IDLE;
+            }
+
             break;
         case STATE_CRASHED:
             crtpCommanderHighLevelStop();
