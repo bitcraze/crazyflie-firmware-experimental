@@ -5,7 +5,7 @@
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 3.8f
 
 // RANDOM POSITIONS ON CIRCLE
-#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  8
+#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  4
 #define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
@@ -62,7 +62,7 @@
 
 //Landing to charging pad
 #define MAX_PAD_ERR 0.005
-#define LANDING_HEIGHT 0.12f
+#define LANDING_HEIGHT 0.08f
 #define LANDING_DURATION 3 //sec 
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
