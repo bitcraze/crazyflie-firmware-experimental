@@ -261,9 +261,22 @@ static bool allFlyingCoptersHovering(void){
 
 static void startTakeOffSequence(){
     setTakeOffWhenReady(false);
-    padX = getX();
-    padY = getY();
-    padZ = getZ();
+
+    //take multiple samples for the pad position
+    Position pad_sampler={0.0f,0.0f,0.0f};
+
+    for(uint8_t i=0; i < NUMBER_OF_PAD_SAMPLES;i++){
+        pad_sampler.x+=getX();
+        pad_sampler.y+=getY();
+        pad_sampler.z+=getZ();
+        vTaskDelay(50); // check if it interferes with the other tasks
+    }
+    MUL_VECTOR_3D_WITH_SCALAR(pad_sampler,1.0f/NUMBER_OF_PAD_SAMPLES);
+
+    padX = pad_sampler.x;
+    padY = pad_sampler.y;
+    padZ = pad_sampler.z;
+
     DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ );
     
     setTerminateTrajectoryAndLand(false);
@@ -409,14 +422,6 @@ static void stateTransition(xTimerHandle timer){
                 state = STATE_WAITING_AT_PAD;
             }
             break;
-        // case STATE_REGOING_TO_PAD:
-        //     if (reachedNextWaypoint(my_pos) || now > stabilizeEndTime) {
-        //         DEBUG_PRINT("Over pad,starting lowering\n");
-        //         crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
-        //         stabilizeEndTime = now + STABILIZE_TIMEOUT;
-        //         state = STATE_WAITING_AT_PAD;
-        //     }
-        //     break;
         case STATE_WAITING_AT_PAD:
             if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
                 if (now > stabilizeEndTime) {
