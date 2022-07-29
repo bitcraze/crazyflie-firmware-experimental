@@ -10,7 +10,12 @@ uint8_t getCopterState(uint8_t copter_id){
 }
 
 void p2pcallbackHandler(P2PPacket *p)
-{
+{   
+    #ifdef BUILD_PILOT_APP
+        if (p->port==0x01){ // If packet is only for the sniffer
+            return;
+        }
+    #endif
     // Parse the data from the other crazyflie and print it
     // uint8_t rssi = p->rssi;
     uint8_t received_id = p->data[0];

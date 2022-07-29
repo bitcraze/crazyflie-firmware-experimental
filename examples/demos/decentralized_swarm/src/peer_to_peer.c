@@ -71,6 +71,7 @@
 
 static xTimerHandle sendPosTimer;
 static xTimerHandle stateTransitionTimer;
+static xTimerHandle copterStatusTimer; // used to inform the GUI about the copter status
 
 static bool isInit = false;
 
@@ -78,6 +79,7 @@ static bool isInit = false;
 enum State state = STATE_IDLE;
 
 static P2PPacket p_reply;
+static P2PPacket p_copter_status;
 
 //Landing to pad
 static uint32_t stabilizeEndTime;
@@ -149,6 +151,11 @@ static void initPacket(){
     uint64_t address = configblockGetRadioAddress();
     my_id =(uint8_t)((address) & 0x00000000ff);
     p_reply.data[0]=my_id;
+
+
+    //copter_status for GUI (different port to indicate the it's only for GUI update when landed)
+    p_copter_status.port=0x01;
+    p_copter_status.data[0]=my_id;
 }
 
 // timers
@@ -214,7 +221,7 @@ static void sendPosition(xTimerHandle timer) {
     p_reply.data[2] = (uint8_t) ( landed ? STATE_UNKNOWN : state );
     p_reply.data[15] = compressVoltage( getVoltage() );
     
-    p_reply.data[16] = getTerminateApp() ? 1 : 0;
+    p_reply.data[16] = (getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK ) ? 1 : 0;
 
     //get current position and send it as the payload
     p_reply.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
@@ -503,6 +510,42 @@ static void stateTransition(xTimerHandle timer){
     }
 }
 
+static void copterStatusTransmit(xTimerHandle timer){
+    /*
+        PACKET FORMAT:
+        [0]     --> id
+        [1]     --> counter 
+        [2]     --> state
+        [3-14]  --> x,y,z (not needed)
+        [15]    --> compressed Voltage 
+        [16]    --> terminateApp 
+    */
+
+    static uint8_t counter=0;
+    // initPacket();
+
+    bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
+    if ( landed && !getTerminateApp() ){//if the other time doesn't send anything
+        //sampling position
+        my_pos.x=getX();
+        my_pos.y=getY();
+        my_pos.z=getZ();
+
+        p_copter_status.data[1] = counter++;
+        p_copter_status.data[2] = (uint8_t) ( state );
+        p_copter_status.data[15] = compressVoltage( getVoltage() );
+
+        p_copter_status.data[16] = getTerminateApp() ? 1 : 0;
+
+        //get current position and send it as the payload
+        p_copter_status.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
+
+        radiolinkSendP2PPacketBroadcast(&p_copter_status);
+    }
+}
+
+
+
 void appMain()
 {
     if (isInit) {
@@ -534,6 +577,9 @@ void appMain()
 
     stateTransitionTimer = xTimerCreate("AppTimer", M2T(CALC_NEXT_PERIOD_MS), pdTRUE, NULL, stateTransition);
     xTimerStart(stateTransitionTimer, 20);
+
+    copterStatusTimer = xTimerCreate("CopterStatusTimer", M2T(COPTER_STATUS_PERIOD_MS), pdTRUE, NULL, copterStatusTransmit);
+    xTimerStart(copterStatusTimer, 20);
 
     isInit = true;
 }

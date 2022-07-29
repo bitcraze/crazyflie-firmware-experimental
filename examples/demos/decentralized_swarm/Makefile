@@ -18,6 +18,11 @@ CRAZYFLIE_BASE := ../../..
 # To include header files from other directories
 #
 EXTRA_CFLAGS += -I$(PWD)/src/common_files
+
+#
+# Setting  CONFIG_PARAM_SILENT_UPDATES will prevent the firmware from sending 
+# an update message to the client which is only useful when there is communication between them
+#  
 EXTRA_CFLAGS += -DCONFIG_PARAM_SILENT_UPDATES
 
 
