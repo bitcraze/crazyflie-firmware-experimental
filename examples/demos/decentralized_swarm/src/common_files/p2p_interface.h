@@ -60,4 +60,7 @@ bool atLeastOneCopterHasFlown(void);
 void printOtherCopters(void);
 
 uint8_t otherCoptersActiveNumber(void);
+
+bool isCopterIdActive(uint8_t copter_id);
+
 #endif // P2P_INTERFACE_H

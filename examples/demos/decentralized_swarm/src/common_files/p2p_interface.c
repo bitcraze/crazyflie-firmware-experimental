@@ -94,3 +94,9 @@ uint8_t otherCoptersActiveNumber(void){
     }
     return nr;
 }
+
+bool isCopterIdActive(uint8_t copter_id){
+    uint32_t now = T2M(xTaskGetTickCount());
+    uint32_t dt = now - copters[copter_id].timestamp;
+    return dt < ALIVE_TIMEOUT_MS;
+}
