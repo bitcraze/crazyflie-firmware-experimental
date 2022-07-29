@@ -11,6 +11,8 @@ import threading
 import time
 from common import *
 
+from sniffer_interface import snifferThread
+
 def _from_rgb(r,g,b):
     """
     Translates an rgb tuple of int to a tkinter friendly color code
@@ -156,6 +158,8 @@ class ButtonsFrame(ttk.Frame):
         print("Terminate")
         self._send_command("terminate")
 
+sniffer_thread = snifferThread()
+sniffer_thread.start()
 
 context = zmq.Context()
 
@@ -222,6 +226,11 @@ def receive_thread():
 cfs[0].set_uptime(300000)
 cfs[0].set_flighttime(140000)
 
-threading.Thread(target=receive_thread, daemon=True).start()
+receiving_thread = threading.Thread(target=receive_thread, daemon=True)
+receiving_thread.start()
 
 root.mainloop()
+
+#Terminate the sniffer thread
+sniffer_thread.stop_sniffer()
+sniffer_thread.join()

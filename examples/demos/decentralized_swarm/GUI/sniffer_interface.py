@@ -1,9 +1,8 @@
-from csv import Sniffer
+import threading
 import time
 from typing import List
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.log import LogConfig
-from click import command
 
 from colorama import Fore
 import cflib.crtp
@@ -97,7 +96,7 @@ class SnifferInterface:
         #     print("{}: {}".format(i, data['id_{}.voltage'.format(i)]))
         #     print("-----------------------")
 
-        print(data)
+        # print(data)
         for i,cop in enumerate(self.copters):
             cop.state = data['id_{}.state'.format(i+1)]
             cop.voltage = data['id_{}.voltage'.format(i+1)]
@@ -122,7 +121,6 @@ class SnifferInterface:
             print(Fore.RED + "Error sending report: {}".format(e),Fore.RESET)
             
     def monitor(self):
-        while True:
             self.send_report()
             
             self.check_for_commands()
@@ -151,12 +149,52 @@ class SnifferInterface:
     
     def take_off(self):
         self.cf.param.set_value('app.takeoff', 1)
-        
+
+    def disconnect(self):
+        self.cf.close_link()    
 
     def terminate(self):
         self.cf.param.set_value('app.terminateApp', 1)
 
-if __name__ == "__main__":
+
+class snifferThread(threading.Thread):
+    def __init__(self, *args, **kwargs):
+        super(snifferThread, self).__init__(*args, **kwargs)
+        self.daemon = True
+
+        self._stop_thread = threading.Event()
+    
+    def stop_sniffer(self):
+        self._stop_thread.set()
+ 
+    def stopped(self):
+        return self._stop_thread.isSet()
+
+    def run(self):
+        cflib.crtp.init_drivers(enable_debug_driver=False)
+
+        context = zmq.Context()
+
+        pub_socket = context.socket(zmq.PUSH)
+        pub_socket.bind("tcp://*:5555")
+
+        sub_socket = context.socket(zmq.PULL)
+        # report_socket.connect("tcp://bitcrazeDemo:5556")
+        sub_socket.connect("tcp://127.0.0.1:5556")
+        sub_socket.setsockopt(zmq.RCVTIMEO, 1000)
+
+        uri='usb://0'
+        sniffer = SnifferInterface(uri,report_socket=pub_socket,command_socket = sub_socket)
+        
+        while True:
+            if self.stopped():
+                print(Fore.RED + "Sniffer thread stopped",Fore.RESET)
+                sniffer.disconnect()
+                break
+                
+            sniffer.monitor()
+
+def sniffer_interface_main():
     cflib.crtp.init_drivers(enable_debug_driver=False)
 
     context = zmq.Context()
@@ -172,4 +210,8 @@ if __name__ == "__main__":
     uri='usb://0'
     sniffer = SnifferInterface(uri,report_socket=pub_socket,command_socket = sub_socket)
 
-    sniffer.monitor()
+    while True:
+        sniffer.monitor()
+
+if __name__ == "__main__":
+    sniffer_interface_main()
