@@ -197,6 +197,7 @@ void appMain()
 #define add_copter_log(i)   LOG_GROUP_START(id_##i)\
                             LOG_ADD(LOG_UINT8, state, &copters[i].state)\
                             LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\
+                            LOG_ADD(LOG_UINT8, counter, &copters[i].counter)\
                             LOG_GROUP_STOP(id_i)
 
 add_copter_log(1)

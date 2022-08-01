@@ -16,6 +16,7 @@ class Copter():
     def __init__(self):
         self.state = 255
         self.voltage = 0.0
+        self.counter = 0
 
     def get_voltage(self):
         return self._decompress_voltage(self.voltage)
@@ -30,6 +31,8 @@ class SnifferInterface:
     
     def __init__(self, uri, report_socket:zmq.Socket=None,command_socket:zmq.Socket=None):
         self.uri = uri
+        self.copters :List[Copter] = None
+
         self.cf = Crazyflie(rw_cache='./cache')
 
         self.cf.fully_connected.add_callback(self._connected)
@@ -48,7 +51,7 @@ class SnifferInterface:
         self.command_socket = command_socket
 
         self._console_buffer = ""
-        
+
     def _console_incoming(self, console_text):
         # print each message in one line 
         if console_text[-1] != '\n':
@@ -75,6 +78,7 @@ class SnifferInterface:
 
     def _disconnected(self, link_uri):
         print(Fore.RED + "Disconnected from {}".format(link_uri))
+        self.connection_successful = False
     
     def _connection_failed(self, link_uri, msg):
         print(Fore.RED + "Connection to {} failed: {}".format(link_uri, msg),Fore.RESET)
@@ -82,6 +86,7 @@ class SnifferInterface:
     
     def _connection_lost(self, link_uri, msg):
         print(Fore.RED + "Connection to {} lost: {}".format(link_uri, msg))
+        self.connection_successful = False
 
     def _setup_logging(self):
         # print("Setting up logging")
@@ -89,6 +94,9 @@ class SnifferInterface:
         for i in range(MAX_COPTERS):
             self._log_conf.add_variable('id_{}.state'.format(i+1), 'uint8_t')
             self._log_conf.add_variable('id_{}.voltage'.format(i+1), 'uint8_t')
+            #the maximum block size is 26 bytes, so the counter for the cf with id 9 is not included 
+            if i !=8:
+                self._log_conf.add_variable('id_{}.counter'.format(i+1), 'uint8_t')
         
         self.cf.log.add_config(self._log_conf)
         self._log_conf.data_received_cb.add_callback(self.log_data)
@@ -105,6 +113,7 @@ class SnifferInterface:
         for i,cop in enumerate(self.copters):
             cop.state = data['id_{}.state'.format(i+1)]
             cop.voltage = data['id_{}.voltage'.format(i+1)]
+            cop.counter = data['id_{}.counter'.format(i+1)] if i !=8 else -1
     
     def send_report(self):
         if self.report_socket is None or self.connection_successful is None:
@@ -119,6 +128,7 @@ class SnifferInterface:
                         'id': i+1,
                         'state': cop.state,
                         'battery': cop.get_voltage(),
+                        'counter': cop.counter
                     }
                     report.append(data)
 

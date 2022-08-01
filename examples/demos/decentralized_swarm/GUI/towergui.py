@@ -15,6 +15,8 @@ from common import *
 from sniffer_interface import snifferThread
 from queue import Queue
 
+COPTER_ALIVE_TIMEOUT = 2 #sec
+
 def _from_rgb(r,g,b):
     """
     Translates an rgb tuple of int to a tkinter friendly color code
@@ -29,11 +31,32 @@ def showError():
 class Crazyflie(ttk.Frame):
     def __init__(self, parent, ident):
         ttk.Frame.__init__(self, parent)
+        self.ident = ident
+        self.gui_setup()
 
+        self.prev_counter = None
+    
+    def gui_setup(self):
         self['padding'] = 15        
 
-        self._name = Label(self, text="Crazyflie #{}".format(ident))
-        self._name.grid(row=0, column=0)
+        self._name_frame = ttk.Frame(self)
+        self._name_frame.grid(row=0, column=0,sticky="ew")
+
+        self._name_frame.columnconfigure(0, weight=1)
+        # self._name_frame.columnconfigure(1, weight=4)
+        self._name_frame.columnconfigure(2, weight=1)
+        # self._name_frame.columnconfigure(3, weight=1)
+
+
+        self._name = Label(self._name_frame, text="Crazyflie #{}".format(self.ident))
+        self._name.grid(row=0, column=1)
+
+        #set label and align to the right
+        self._led = ttk.Label(self._name_frame, text="  ",background="grey")
+        self._led.grid(row=0, column=3)
+        
+        ttk.Label(self._name_frame, text="").grid(row=0, column=0)
+        ttk.Label(self._name_frame, text="").grid(row=0, column=2)
 
         self._status = Label(self, text="IDLE", fg='grey',
                              font=("ubuntu", 33), width=15)
@@ -54,6 +77,17 @@ class Crazyflie(ttk.Frame):
             self._battery_frame, orient=HORIZONTAL)
         self._battery_bar['value'] = 50
         self._battery_bar.grid(row=0, column=1, sticky="ew")
+
+    def set_led(self, color):
+        self._led['background'] = color
+        self._led['foreground'] = color
+        #wait for 1 second before changing the color
+        dt=1 #time in seconds to wait before changing the color
+        threading.Timer(dt, self.reset_led, None).start()
+    
+    def reset_led(self):
+        self._led['background'] = "grey"
+        self._led['foreground'] = "grey"
 
     def set_state(self, state):
         if state in state_dict:
@@ -90,6 +124,17 @@ class Crazyflie(ttk.Frame):
             self._flight_time_label['fg'] = "grey"
         else:
             self._flight_time_label['fg'] = "black"
+
+    def is_updated(self, counter):
+        if self.prev_counter is None:
+            self.prev_counter = counter
+            return True
+        
+        if counter != self.prev_counter:
+            self.prev_counter = counter
+            return True
+        else:
+            return False
 
 class ButtonsFrame(ttk.Frame):
     WIDTH = 40
@@ -175,7 +220,7 @@ for i in range(MAX_COPTERS):
     cfs.append(cf)
 
     cf.set_state("error")
-    cf.set_battery(3.0+(i/10.0))
+    cf.set_battery(0.0)
 
 buttons = ButtonsFrame(content,command_socket)
 
@@ -214,13 +259,19 @@ def receive_thread():
                 id = data['id'] -1 
                 cfs[id].set_battery(data['battery'])
                 cfs[id].set_state(data['state'])
+                
+                if cfs[id].is_updated(data['counter']):
+                    print(Fore.GREEN+"Updated: {}".format(id+1),Fore.RESET)
+                    cfs[id].set_led("green")
+
                 last_updated[id] = time.time()
 
         except zmq.error.Again:
             pass
 
         for i in range(len(cfs)):
-            if last_updated[i] < (time.time()-2):
+            dt = time.time()-last_updated[i]
+            if dt > COPTER_ALIVE_TIMEOUT:
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
 
