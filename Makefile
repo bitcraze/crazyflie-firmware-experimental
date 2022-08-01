@@ -73,10 +73,6 @@ MEM_SIZE_FLASH_K = 1008
 MEM_SIZE_RAM_K = 128
 MEM_SIZE_CCM_K = 64
 
-#
-# To include header files from other directories
-#
-# EXTRA_CFLAGS += -I$(PWD)/examples/demos/decentralized_swarm/src/common_files
 
 #
 # Make sure Kbuild use our config that hinders some configs from being enabled

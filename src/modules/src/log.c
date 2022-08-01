@@ -968,12 +968,6 @@ static void logReset(void)
     logOps[i].variable = NULL;
 }
 
-void logResetAll(void)
-{
-  logReset();
-  crtpReset();
-}
-
 /* Public API to access log TOC from within the copter */
 static logVarId_t invalidVarId = 0xffffu;
 

@@ -1,2 +1,4 @@
 bin/*
 cf2.*
+flash-sniffer.sh
+STM32F405.svd

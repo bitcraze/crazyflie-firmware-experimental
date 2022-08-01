@@ -21,18 +21,10 @@ static void gotoFunction(float x,float y,float z,float duration,uint32_t reach_w
 }
 
 void gotoNextWaypoint(float x,float y,float z,float duration){
-    // This function will move the Crazyflie to the next waypoint via the high level commander.
-    // It is used as a function because it works with the reachedNextWaypoint() since  
-    // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
-    
     gotoFunction(x,y,z,duration,REACHED_WP_TIMEOUT);
 }
 
 void gotoChargingPad(float x,float y,float z,float duration){
-    // This function will move the Crazyflie to the next waypoint via the high level commander.
-    // It is used as a function because it works with the reachedNextWaypoint() since  
-    // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
-    
     gotoFunction(x,y,z,duration,REACHED_CHARGING_PAD_TIMEOUT);
 }
 

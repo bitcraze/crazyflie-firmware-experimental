@@ -115,8 +115,6 @@ int logGetInt(logVarId_t varid);
  */
 unsigned int logGetUint(logVarId_t varid);
 
-void logResetAll(void);
-
 /* Basic log structure */
 struct log_s {
   uint8_t type;
