@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import tkinter as tk
 import tkinter
+import tkinter.messagebox
 from tkinter import *
 import tkinter.ttk as ttk
 from colorama import Fore
@@ -12,6 +13,7 @@ import time
 from common import *
 
 from sniffer_interface import snifferThread
+from queue import Queue
 
 def _from_rgb(r,g,b):
     """
@@ -20,12 +22,15 @@ def _from_rgb(r,g,b):
     rgb=(r,g,b)
     return "#%02x%02x%02x" % rgb
 
+def showError():
+    #Shows the error message in the GUI through a queue that is handled by the main thread
+    q.put(( tkinter.messagebox.showerror,("Error Detected.",  "Unsuccessful connection with sniffer. Please try again."),{}))
 
 class Crazyflie(ttk.Frame):
     def __init__(self, parent, ident):
         ttk.Frame.__init__(self, parent)
 
-        self['padding'] = 10
+        self['padding'] = 15        
 
         self._name = Label(self, text="Crazyflie #{}".format(ident))
         self._name.grid(row=0, column=0)
@@ -50,30 +55,11 @@ class Crazyflie(ttk.Frame):
         self._battery_bar['value'] = 50
         self._battery_bar.grid(row=0, column=1, sticky="ew")
 
-        self._time_frame = ttk.Frame(self)
-        self._time_frame.grid(row=4, column=0)
-
-        up_time = Label(self._time_frame, text="Up time: ",
-                        fg="grey", font=("ubuntu", 20))
-        up_time.grid(row=0, column=0)
-
-        self._up_time_label = Label(
-            self._time_frame, text="0:00:00", font=("ubuntu", 20))
-        self._up_time_label.grid(row=0, column=1)
-
-        flight_time = Label(
-            self._time_frame, text="Flight time: ", fg="grey", font=("ubuntu", 20))
-        flight_time.grid(row=1, column=0)
-
-        self._flight_time_label = Label(
-            self._time_frame, text="0:00:00", font=("ubuntu", 20))
-        self._flight_time_label.grid(row=1, column=1)
-
     def set_state(self, state):
         if state in state_dict:
             self._status.config(text=state_dict[state][0], fg=state_dict[state][1])
         else:
-            self._status.config(text="ERROR", fg="purple")
+            self._status.config(text="ERROR", fg="grey")
             # print("Error, state", state, "not handled")
 
     def set_battery(self, voltage):
@@ -193,6 +179,20 @@ for i in range(MAX_COPTERS):
 
 buttons = ButtonsFrame(content,command_socket)
 
+q = Queue()
+
+def tkloop():
+    #Used in order to show the error message in the GUI if connection with the sniffer fails
+    try:
+        while True:
+            f, a, k = q.get_nowait()
+            f(*a, **k)
+            root.destroy()
+            return
+    except Exception as e:
+        pass
+
+    root.after(100, tkloop)
 
 
 def receive_thread():
@@ -200,12 +200,16 @@ def receive_thread():
     while True:
         try:
             report = report_socket.recv_json()
-            # print(report)
+            
+            if report[0] == "connection_failed":
+                print(Fore.RED,"Connection with sniffer failed!",Fore.RESET)
+                showError()
+                break
 
+            print("===================================================================================")
             for i,data in enumerate(report):
                 # print(report['id'],type(report['id']))
                 # -1 because index starts at 0 and all flying copters have adrreses >=
-                
                 print(data)
                 id = data['id'] -1 
                 cfs[id].set_battery(data['battery'])
@@ -219,16 +223,12 @@ def receive_thread():
             if last_updated[i] < (time.time()-2):
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
-                cfs[i].set_uptime(0)
-                cfs[i].set_flighttime(0)
 
-
-cfs[0].set_uptime(300000)
-cfs[0].set_flighttime(140000)
 
 receiving_thread = threading.Thread(target=receive_thread, daemon=True)
 receiving_thread.start()
 
+tkloop()
 root.mainloop()
 
 #Terminate the sniffer thread

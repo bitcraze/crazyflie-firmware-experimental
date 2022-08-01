@@ -31,13 +31,16 @@ class SnifferInterface:
     def __init__(self, uri, report_socket:zmq.Socket=None,command_socket:zmq.Socket=None):
         self.uri = uri
         self.cf = Crazyflie(rw_cache='./cache')
-        self.cf.open_link(uri)
 
         self.cf.fully_connected.add_callback(self._connected)
         self.cf.disconnected.add_callback(self._disconnected)
         self.cf.connection_failed.add_callback(self._connection_failed)
         self.cf.connection_lost.add_callback(self._connection_lost)
         # self.cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+
+        self.connection_successful = None
+
+        self.cf.open_link(uri)
 
         self._initialize_copters()
 
@@ -67,13 +70,15 @@ class SnifferInterface:
     
     def _connected(self, link_uri):
         print(Fore.GREEN + "Connected to {}".format(link_uri),Fore.RESET)
+        self.connection_successful = True
         self._setup_logging()
 
     def _disconnected(self, link_uri):
         print(Fore.RED + "Disconnected from {}".format(link_uri))
     
     def _connection_failed(self, link_uri, msg):
-        print(Fore.RED + "Connection to {} failed: {}".format(link_uri, msg))
+        print(Fore.RED + "Connection to {} failed: {}".format(link_uri, msg),Fore.RESET)
+        self.connection_successful = False
     
     def _connection_lost(self, link_uri, msg):
         print(Fore.RED + "Connection to {} lost: {}".format(link_uri, msg))
@@ -106,13 +111,16 @@ class SnifferInterface:
             return
 
         report=[]
-        for i,cop in enumerate(self.copters) :
-                data = {
-                    'id': i+1,
-                    'state': cop.state,
-                    'battery': cop.get_voltage(),
-                }
-                report.append(data)
+        if not self.connection_successful :
+            report.append("connection_failed")
+        else:
+            for i,cop in enumerate(self.copters) :
+                    data = {
+                        'id': i+1,
+                        'state': cop.state,
+                        'battery': cop.get_voltage(),
+                    }
+                    report.append(data)
 
         
         try:
