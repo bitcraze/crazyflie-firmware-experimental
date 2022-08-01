@@ -12,7 +12,7 @@ uint8_t getCopterState(uint8_t copter_id){
 void p2pcallbackHandler(P2PPacket *p)
 {   
     #ifdef BUILD_PILOT_APP
-        if (p->port==0x01){ // If packet is only for the sniffer
+        if (p->port==0x01){ // If packet is only for the sniffer,ignore it
             return;
         }
     #endif
@@ -32,7 +32,7 @@ void p2pcallbackHandler(P2PPacket *p)
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
-        if (!getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK ){
+        if (!getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK && state!=STATE_SNIFFING){
             setTerminateApp(true);
         }
     }
@@ -93,7 +93,7 @@ uint8_t otherCoptersActiveNumber(void){
     uint8_t nr=0;
     for(int i=0;i<MAX_ADDRESS;i++){
         // if they are active and not requesting to terminate the application
-        if (peerLocalizationIsIDActive(i) && !copters[i].terminateApp ){
+        if (isCopterIdActive(i) && !copters[i].terminateApp ){
             nr++;
         }
     }

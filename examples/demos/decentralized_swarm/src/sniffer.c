@@ -56,7 +56,7 @@
 #include "param_log_interface.h"
 #include "common.h"
 
-enum State state=STATE_IDLE;
+enum State state=STATE_SNIFFING;
 
 extern copter_t copters[MAX_ADDRESS];
 static copter_t prev_copters[MAX_ADDRESS];

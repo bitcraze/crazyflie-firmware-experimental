@@ -107,7 +107,7 @@ class SnifferInterface:
             cop.voltage = data['id_{}.voltage'.format(i+1)]
     
     def send_report(self):
-        if self.report_socket is None:
+        if self.report_socket is None or self.connection_successful is None:
             return
 
         report=[]
