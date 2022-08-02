@@ -22,44 +22,35 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * peer_to_peer.c - App layer application of simple demonstartion peer to peer
- *  communication. Two crazyflies need this program in order to send and receive.
+ * pilot.c - App for each copter of the Decentralized Swarm
  */
 
 #include "choose_app.h"
 #ifdef BUILD_PILOT_APP
 
-// #define CONFIG_PARAM_SILENT_UPDATES //don't know if it actually affects the setting
-
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#include "app.h"
+#include <math.h>
+#include <stdlib.h>
 
 #include "FreeRTOS.h"
 #include "task.h"
-
+#include "app.h"
 #include "radiolink.h"
 #include "configblock.h"
-
 #include "log.h"
 #include "float.h"
-#include <math.h>
-#include <stdlib.h>
 #include "estimator_kalman.h"
 #include "ledseq.h"
 #include "timers.h"
 // #include "math3d.h" //TODO: import all functions and structs from math3d.h instead of mine
 #include "param.h"
 #include "crtp_commander_high_level.h"
-// #include "sensors.h"
 #include "pm.h"
 #include "supervisor.h"
-// #include "peer_localization.h"
 #include "settings.h"
-
 #include "p2p_interface.h"
 #include "positions.h"
 #include "common.h"
@@ -88,10 +79,10 @@ static float landingTimeCheckCharge;
 static uint8_t my_id;
 
 Position positions_to_go[]={
-    [0].x=+1 , [0].y=+1 ,[0].z = TAKE_OFF_HEIGHT,
-    [1].x=+1 , [1].y=-1 ,[1].z = TAKE_OFF_HEIGHT,
-    [2].x=-1 , [2].y=+1 ,[2].z = TAKE_OFF_HEIGHT,
-    [3].x=-1 , [3].y=-1 ,[3].z = TAKE_OFF_HEIGHT,
+    [0].x = +1 , [0].y = +1 ,[0].z = TAKE_OFF_HEIGHT,
+    [1].x = +1 , [1].y = -1 ,[1].z = TAKE_OFF_HEIGHT,
+    [2].x = -1 , [2].y = +1 ,[2].z = TAKE_OFF_HEIGHT,
+    [3].x = -1 , [3].y = -1 ,[3].z = TAKE_OFF_HEIGHT,
 
 };
 
@@ -149,13 +140,13 @@ static void initPacket(){
     //   the last two digits and send it as the first byte
     //   of the payload
     uint64_t address = configblockGetRadioAddress();
-    my_id =(uint8_t)((address) & 0x00000000ff);
-    p_reply.data[0]=my_id;
+    my_id = (uint8_t)((address) & 0x00000000ff);
+    p_reply.data[0] = my_id;
 
 
     //copter_status for GUI (different port to indicate the it's only for GUI update when landed)
-    p_copter_status.port=0x01;
-    p_copter_status.data[0]=my_id;
+    p_copter_status.port = 0x01;
+    p_copter_status.data[0] = my_id;
 }
 
 // timers
@@ -189,7 +180,7 @@ static void sendPosition(xTimerHandle timer) {
 
     if (!landed) {
         memcpy(&p_reply.data[3], &my_pos, sizeof(Position));
-    }else{
+    } else {
         // copter is landed but need to transmit the terminating signal to the others
         // without taking the position of the copter into account
         Position null_pos={10.0f,10.0f,10.0f};//TODO: make a parameter for the 10.0f
@@ -197,11 +188,11 @@ static void sendPosition(xTimerHandle timer) {
     }
 
     // position stuck handling (while testing position broadcasting seem to be stuck after resetting the estimator)
-    if (previous[0]==my_pos.x && previous[1]==my_pos.y && previous[2]==my_pos.z) {
+    if (previous[0] == my_pos.x && previous[1] == my_pos.y && previous[2] == my_pos.z) {
         // DEBUG_PRINT("Same value detected\n");
         if (!seq_estim_stuck_running){
             ledseqRun(&seq_estim_stuck);
-            seq_estim_stuck_running=1;
+            seq_estim_stuck_running = 1;
         }
 
         // logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
@@ -210,27 +201,27 @@ static void sendPosition(xTimerHandle timer) {
     }else{
         if (seq_estim_stuck_running)            
             ledseqStop(&seq_estim_stuck);
-        seq_estim_stuck_running=0;
+        seq_estim_stuck_running = 0;
     }
     
-    previous[0]=my_pos.x;
-    previous[1]=my_pos.y;
-    previous[2]=my_pos.z;
+    previous[0] = my_pos.x;
+    previous[1] = my_pos.y;
+    previous[2] = my_pos.z;
     
     p_reply.data[1] = counter++;
     p_reply.data[2] = (uint8_t) ( landed ? STATE_UNKNOWN : state );
     p_reply.data[15] = compressVoltage( getVoltage() );
     
-    p_reply.data[16] = (getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK ) ? 1 : 0;
+    p_reply.data[16] = (getTerminateApp() && state != STATE_WAIT_FOR_POSITION_LOCK ) ? 1 : 0;
 
     //get current position and send it as the payload
-    p_reply.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
+    p_reply.size = sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
 
     radiolinkSendP2PPacketBroadcast(&p_reply);
 }
 
 static bool selfIsFlying(void){
-    return state>STATE_PREPARING_FOR_TAKE_OFF && state<STATE_GOING_TO_PAD && !getTerminateApp();
+    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD && !getTerminateApp();
 }
 
 static uint8_t flying_copters_number(){
@@ -253,7 +244,7 @@ static bool needLessCopters(void){
 
 static bool allFlyingCoptersHovering(void){
     for (uint8_t i = 0; i < MAX_ADDRESS; i++) {
-        uint8_t state=getCopterState(i);
+        uint8_t state = getCopterState(i);
         if (state == STATE_UNKNOWN || !peerLocalizationIsIDActive(i) ){// if not active
             continue;
         }
@@ -270,15 +261,15 @@ static void startTakeOffSequence(){
     setTakeOffWhenReady(false);
 
     //take multiple samples for the pad position
-    Position pad_sampler={0.0f,0.0f,0.0f};
+    Position pad_sampler = {0.0f,0.0f,0.0f};
 
-    for(uint8_t i=0; i < NUMBER_OF_PAD_SAMPLES;i++){
-        pad_sampler.x+=getX();
-        pad_sampler.y+=getY();
-        pad_sampler.z+=getZ();
+    for(uint8_t i = 0; i < NUMBER_OF_PAD_SAMPLES;i++){
+        pad_sampler.x += getX();
+        pad_sampler.y += getY();
+        pad_sampler.z += getZ();
         vTaskDelay(50); // check if it interferes with the other tasks
     }
-    MUL_VECTOR_3D_WITH_SCALAR(pad_sampler,1.0f/NUMBER_OF_PAD_SAMPLES);
+    MUL_VECTOR_3D_WITH_SCALAR(pad_sampler, 1.0f / NUMBER_OF_PAD_SAMPLES);
 
     padX = pad_sampler.x;
     padY = pad_sampler.y;
@@ -311,16 +302,16 @@ static void stateTransition(xTimerHandle timer){
         }
     }
 
-    now = xTaskGetTickCount();
+    now = T2M( xTaskGetTickCount() );
     uint32_t dt;
     switch(state) {
         case STATE_IDLE:
-        DEBUG_PRINT("Let's go! Waiting for position lock...\n");
+        DEBUG_PRINT ("Let's go! Waiting for position lock...\n");
         //reseting
         resetLockData();
         if (seq_crash_running == 1){
             ledseqStop(&seq_crash);
-            seq_crash_running=0;
+            seq_crash_running = 0;
         }
         
         position_lock_start_time = now;
@@ -349,7 +340,7 @@ static void stateTransition(xTimerHandle timer){
             else if (needExtraCopters() && atLeastOneCopterHasFlown() ){// at least one copter is flying and  more copters needed
                 random_time_for_next_event = now + (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
                 DEBUG_PRINT("Preparing for take off...\n");
-                state=STATE_PREPARING_FOR_TAKE_OFF;
+                state = STATE_PREPARING_FOR_TAKE_OFF;
             }
             
             break;
@@ -359,12 +350,12 @@ static void stateTransition(xTimerHandle timer){
             }
             else if (!needExtraCopters()){ // another copter took off,no need to take off finally
                 DEBUG_PRINT("Another copter took off, no need to take off finally\n");
-                state=STATE_WAIT_FOR_TAKE_OFF;
+                state = STATE_WAIT_FOR_TAKE_OFF;
             }
             else if (now > random_time_for_next_event){
                 DEBUG_PRINT("Taking off...\n");
                 startTakeOffSequence();
-                state=STATE_TAKING_OFF;
+                state = STATE_TAKING_OFF;
             }
 
             break;  
@@ -493,13 +484,13 @@ static void stateTransition(xTimerHandle timer){
             break;
         case STATE_CRASHED:
             crtpCommanderHighLevelStop();
-            if (seq_crash_running!=1){
+            if (seq_crash_running != 1){
                 DEBUG_PRINT("Crashed, running crash sequence\n");
                 ledseqRun(&seq_crash);
-                seq_crash_running=1;
+                seq_crash_running = 1;
             }
 
-            if (getTerminateApp() && flying_copters_number()==0){
+            if (getTerminateApp() && flying_copters_number() == 0){
                 setTerminateApp(false);
             }
 
@@ -521,15 +512,15 @@ static void copterStatusTransmit(xTimerHandle timer){
         [16]    --> terminateApp 
     */
 
-    static uint8_t counter=0;
+    static uint8_t counter = 0;
     // initPacket();
 
     bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
     if ( landed && !getTerminateApp() ){//if the other time doesn't send anything
         //sampling position
-        my_pos.x=getX();
-        my_pos.y=getY();
-        my_pos.z=getZ();
+        my_pos.x = getX();
+        my_pos.y = getY();
+        my_pos.z = getZ();
 
         p_copter_status.data[1] = counter++;
         p_copter_status.data[2] = (uint8_t) ( state );
@@ -538,7 +529,7 @@ static void copterStatusTransmit(xTimerHandle timer){
         p_copter_status.data[16] = getTerminateApp() ? 1 : 0;
 
         //get current position and send it as the payload
-        p_copter_status.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
+        p_copter_status.size = sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
 
         radiolinkSendP2PPacketBroadcast(&p_copter_status);
     }
@@ -568,9 +559,9 @@ void appMain()
     // Register the callback function so that the CF can receive packets as well.
     p2pRegisterCB(p2pcallbackHandler);
     
-    previous[0]=0.0f;
-    previous[1]=0.0f;
-    previous[2]=0.0f;
+    previous[0] = 0.0f;
+    previous[1] = 0.0f;
+    previous[2] = 0.0f;
 
     sendPosTimer = xTimerCreate("SendPosTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, sendPosition);
     xTimerStart(sendPosTimer, 20);

@@ -1,5 +1,29 @@
-#ifndef  MOVEMENT_H
-#define  MOVEMENT_H
+/**
+ * ,---------,       ____  _ __
+ * |  ,-^-,  |      / __ )(_) /_______________ _____  ___
+ * | (  O  ) |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
+ * | / ,--´  |    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
+ *    +------`   /_____/_/\__/\___/_/   \__,_/ /___/\___/
+ *
+ * Crazyflie control firmware
+ *
+ * Copyright (C) 2022 Bitcraze AB
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, in version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * movement.c - Movement functions for the pilot
+ * 
+ */
 
 #include "movement.h"
 
@@ -8,29 +32,29 @@ static float lockData[LOCK_LENGTH][3];
 static uint32_t lockWriteIndex;
 static uint32_t timeOfReachingWaypointTimeout;
 
-static void gotoFunction(float x,float y,float z,float duration,uint32_t reach_wp_timeout){
+static void goToWayPointPositionBased(float x,float y,float z,float duration,uint32_t reach_wp_timeout){
   next_wp.x = x;
   next_wp.y = y;
   next_wp.z = z;
   const float yaw = 0.0f;
   const bool relative = false;
 
-  timeOfReachingWaypointTimeout = xTaskGetTickCount() + reach_wp_timeout ;
+  timeOfReachingWaypointTimeout = T2M(xTaskGetTickCount()) + reach_wp_timeout ;
   
   crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
 }
 
 void gotoNextWaypoint(float x,float y,float z,float duration){
-    gotoFunction(x,y,z,duration,REACHED_WP_TIMEOUT);
+    goToWayPointPositionBased(x,y,z,duration,REACHED_WP_TIMEOUT);
 }
 
 void gotoChargingPad(float x,float y,float z,float duration){
-    gotoFunction(x,y,z,duration,REACHED_CHARGING_PAD_TIMEOUT);
+    goToWayPointPositionBased(x,y,z,duration,REACHED_CHARGING_PAD_TIMEOUT);
 }
 
 bool reachedNextWaypoint(Position my_pos){
     bool close_and_stabilized = DISTANCE3D(my_pos,next_wp) < WP_THRESHOLD  && getVelMagnitude() < WP_VEL_THRESHOLD;
-    bool time_out = xTaskGetTickCount() > timeOfReachingWaypointTimeout;
+    bool time_out = T2M(xTaskGetTickCount()) > timeOfReachingWaypointTimeout;
     if (time_out){
       DEBUG_PRINT("Warning: Time out while waiting for reaching waypoint!\n");
     }
@@ -121,5 +145,3 @@ bool noCopterFlyingAbove(Position my_pos) {
 
   return true;
 }
-
-#endif // MOVEMENT_H

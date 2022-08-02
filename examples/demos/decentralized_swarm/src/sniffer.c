@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2019 Bitcraze AB
+ * Copyright (C) 2022 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  *
- * peer_to_peer.c - App layer application of simple demonstartion peer to peer
- *  communication. Two crazyflies need this program in order to send and receive.
+ * sniffer.c - Sniffer for swarm and GUI communication
  */
 
 #include "choose_app.h"
@@ -33,32 +32,28 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
-
-#include "app.h"
-
-#include "FreeRTOS.h"
-#include "task.h"
-
-#include "radiolink.h"
-#include "configblock.h"
-
-#include "log.h"
-#include "float.h"
 #include <math.h>
 #include <stdlib.h>
+
+#include "app.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "radiolink.h"
+#include "configblock.h"
+#include "log.h"
+#include "float.h"
 #include "estimator_kalman.h"
 
 
 #define DEBUG_MODULE "P2P"
-// #include "debug.h"
 
 #include "p2p_interface.h"
 #include "param_log_interface.h"
 #include "common.h"
 
-enum State state=STATE_SNIFFING;
+enum State state = STATE_SNIFFING;
 
-extern copter_t copters[MAX_ADDRESS];
+extern copter_t copters[MAX_ADDRESS]; //TODO:instead of extern, use a function that returns a pointer to the array
 static copter_t prev_copters[MAX_ADDRESS];
 static bool prev_copters_active[MAX_ADDRESS];
 static P2PPacket p_reply;
@@ -69,7 +64,7 @@ void update_copter_list(void)
     for (int i = 0; i < MAX_ADDRESS; i++)
     {   
         bool isAlive = peerLocalizationIsIDActive(i);
-        bool changed_activity = prev_copters_active[i]!=isAlive;
+        bool changed_activity = prev_copters_active[i] != isAlive;
         bool changed_state = prev_copters[i].state != copters[i].state; 
          
         if(  changed_state || changed_activity ){
@@ -96,20 +91,18 @@ void update_copter_list(void)
 */
 
 static void initPacket(){
-    p_reply.port=0x00;
+    p_reply.port = 0x00;
     // Get the current address of the crazyflie and obtain
     //   the last two digits and send it as the first byte
     //   of the payload
     uint64_t address = configblockGetRadioAddress();
-    uint8_t my_id =(uint8_t)((address) & 0x00000000ff);
-    p_reply.data[0]=my_id;
+    uint8_t my_id = (uint8_t)((address) & 0x00000000ff);
+    p_reply.data[0] = my_id;
 
-    p_reply.size=sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
+    p_reply.size = sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
     Position pos = {20,20,20}; //Set the position to a non valid value to indicate that the copter is not interfering with the collision avoidance
     memcpy(&p_reply.data[3], &pos, sizeof(Position));
     p_reply.data[15] = 0;
-
-
 }
 
 static void prepare_packet(){
@@ -187,9 +180,7 @@ void appMain()
             }else{
                 sendTerminatePacket();
             }
-
         }
-
     }
 }
 
@@ -209,7 +200,5 @@ add_copter_log(6)
 add_copter_log(7)
 add_copter_log(8)
 add_copter_log(9)
-
-
 
 #endif // BUILD_SNIFFER_APP

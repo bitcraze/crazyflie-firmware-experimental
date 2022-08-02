@@ -1,3 +1,30 @@
+/**
+ * ,---------,       ____  _ __
+ * |  ,-^-,  |      / __ )(_) /_______________ _____  ___
+ * | (  O  ) |     / __  / / __/ ___/ ___/ __ `/_  / / _ \
+ * | / ,--´  |    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
+ *    +------`   /_____/_/\__/\___/_/   \__,_/ /___/\___/
+ *
+ * Crazyflie control firmware
+ *
+ * Copyright (C) 2022 Bitcraze AB
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, in version 3.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *
+ * p2p_interface.c
+ * Peer to peer interface communication.
+ */
+
 #include "p2p_interface.h"
 
 extern enum  State state;
@@ -12,7 +39,7 @@ uint8_t getCopterState(uint8_t copter_id){
 void p2pcallbackHandler(P2PPacket *p)
 {   
     #ifdef BUILD_PILOT_APP
-        if (p->port==0x01){ // If packet is only for the sniffer,ignore it
+        if (p->port == 0x01){ // If packet is only for the sniffer,ignore it
             return;
         }
     #endif
@@ -22,13 +49,13 @@ void p2pcallbackHandler(P2PPacket *p)
     // uint8_t counter = p->data[1];
     uint32_t now_ms = T2M(xTaskGetTickCount());
 
-    copters[received_id].id=received_id;
-    copters[received_id].counter=p->data[1];
+    copters[received_id].id = received_id;
+    copters[received_id].counter = p->data[1];
     copters[received_id].state = p->data[2];
     copters[received_id].battery_voltage = p->data[15];
     copters[received_id].terminateApp = p->data[16] == 1;
 
-    copters[received_id].timestamp=now_ms;
+    copters[received_id].timestamp = now_ms;
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
@@ -60,15 +87,15 @@ bool isAlive(uint8_t copter_id){
 }
 
 uint8_t compressVoltage(float voltage){
-    return (uint8_t)((voltage-VOLTAGE_MIN)/(VOLTAGE_MAX-VOLTAGE_MIN)*255);
+    return (uint8_t) ((voltage - VOLTAGE_MIN) / (VOLTAGE_MAX - VOLTAGE_MIN) * 255);
 }
 
 float decompressVoltage(uint8_t voltage){
-    return (voltage/255.0f)*(VOLTAGE_MAX-VOLTAGE_MIN)+VOLTAGE_MIN;
+    return (voltage / 255.0f) * (VOLTAGE_MAX - VOLTAGE_MIN) + VOLTAGE_MIN;
 }
 
 bool atLeastOneCopterHasFlown(void){
-    for(int i=0;i<MAX_ADDRESS;i++){
+    for(int i = 0; i < MAX_ADDRESS; i++){
         if(copters[i].state != STATE_UNKNOWN){
             return true;
         }
@@ -77,12 +104,12 @@ bool atLeastOneCopterHasFlown(void){
 }
 
 void printOtherCopters(void){
-    for(int i=0;i<MAX_ADDRESS;i++){
+    for(int i = 0; i<MAX_ADDRESS; i++){
         if (copters[i].state != STATE_UNKNOWN){
             if (!peerLocalizationIsIDActive(i)){
                 DEBUG_PRINT("Copter %d is not active\n",i);
             }else{
-                peerLocalizationOtherPosition_t *pos= peerLocalizationGetPositionByID(i);
+                peerLocalizationOtherPosition_t *pos = peerLocalizationGetPositionByID(i);
                 DEBUG_PRINT("Copter %d : %.2f , %.2f , %.2f --> %d with latest counter %d \n",i,(double)pos->pos.x,(double)pos->pos.y,(double)pos->pos.z,copters[i].state,copters[i].counter);
             }
         }
@@ -91,7 +118,7 @@ void printOtherCopters(void){
 
 uint8_t otherCoptersActiveNumber(void){
     uint8_t nr=0;
-    for(int i=0;i<MAX_ADDRESS;i++){
+    for(int i = 0; i < MAX_ADDRESS; i++){
         // if they are active and not requesting to terminate the application
         if (isCopterIdActive(i) && !copters[i].terminateApp ){
             nr++;
