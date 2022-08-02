@@ -37,3 +37,6 @@ Further information bout the collision avoidance algorithm can be found on the o
 ## Limitations
 
 Since P2P communication happens asynchronously on the radio, this example does not work well when connecting a PC to the Crazyflies via the Radio.This is a fundamental limitation of the current P2P implementation.You should only connect the Crazyflies to start and terminate the swarm but the suggested way of interaction with the swarm is through the sniffer and GUI.
+
+## Limitations
+In case a reset of the copters is needed, the script `power_reset.py` can be used to power reset all the copters automatically.
