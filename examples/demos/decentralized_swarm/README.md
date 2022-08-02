@@ -29,6 +29,13 @@ If you want to build the pilot app for the swarm copters the `BUILD_PILOT_APP` f
 ./cload-all.sh
 ```
 
+
+If you want to use the GUI for monitoring the state of each copter and controlling the swarm ,the python libraries in requirements.txt must be installed by running the following command:
+```
+pip install -r requirements.txt
+```
+
+and then executing the script `towergui.py` in the folder GUI.
 ## Resources
 You can find on Bitcraze's website the [API documentation for P2P](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/p2p_api/) as well as the [App layer API guide](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/userguides/app_layer/)
 
