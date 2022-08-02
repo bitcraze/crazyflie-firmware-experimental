@@ -272,8 +272,7 @@ def receive_thread():
                 if cfs[id].is_updated(data['counter']):
                     print(Fore.GREEN+"Updated: {}".format(id+1), Fore.RESET)
                     cfs[id].set_led("green")
-
-                last_updated[id] = time.time()
+                    last_updated[id] = time.time()
 
         except zmq.error.Again:
             pass
