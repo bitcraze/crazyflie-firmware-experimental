@@ -4,6 +4,7 @@
 #include "task.h"
 #include "peer_localization.h"
 
+#define PEER_LOCALIZATION_TIMEOUT_MS 400 // ms TODO: make configurable
 
 void peerLocalizationInit()
 {
@@ -37,11 +38,21 @@ bool peerLocalizationTellPosition(int cfid, positionMeasurement_t const *pos)
 bool peerLocalizationIsIDActive(uint8_t cfid)
 {
   for (uint8_t i = 0; i < PEER_LOCALIZATION_MAX_NEIGHBORS; ++i) {
-    if (other_positions[i].id == cfid) {
+    uint32_t now = xTaskGetTickCount();
+    uint32_t dt = now - other_positions[i].pos.timestamp;
+
+    if (other_positions[i].id == cfid && dt < PEER_LOCALIZATION_TIMEOUT_MS) {
       return true;
     }
   }
   return false;
+}
+
+bool peerLocalizationIsIDxActive(uint8_t idx)
+{
+    uint32_t now = xTaskGetTickCount();
+    uint32_t dt = now - other_positions[idx].pos.timestamp;
+    return other_positions[idx].id != 0 && dt < PEER_LOCALIZATION_TIMEOUT_MS;   
 }
 
 peerLocalizationOtherPosition_t *peerLocalizationGetPositionByID(uint8_t cfid)
@@ -61,4 +72,16 @@ peerLocalizationOtherPosition_t *peerLocalizationGetPositionByIdx(uint8_t idx)
     return &other_positions[idx];
   }
   return NULL;
+}
+
+
+uint8_t peerLocalizationGetNumNeighbors()
+{
+  uint8_t num_neighbors = 0;
+  for (uint8_t i = 0; i < PEER_LOCALIZATION_MAX_NEIGHBORS; ++i) {
+    if (peerLocalizationIsIDxActive(i)) {
+      num_neighbors++;
+    }
+  }
+  return num_neighbors;
 }
