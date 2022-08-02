@@ -279,7 +279,7 @@ def receive_thread():
 
         for i in range(len(cfs)):
             dt = time.time()-last_updated[i]
-            if dt > COPTER_ALIVE_TIMEOUT:
+            if dt > COPTER_ALIVE_TIMEOUT and i!=8:#index 8--> id 9 is not transmitting its counter
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
 
