@@ -33,7 +33,7 @@
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
 // RANDOM POSITIONS ON CIRCLE
-#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  4
+#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  6
 #define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
@@ -86,7 +86,7 @@
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 4.0f //sec duration to go to next delta
 
-#define HOVERING_TIME 18000 //ms
+#define HOVERING_TIME 18*1000 //ms
 #define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad
