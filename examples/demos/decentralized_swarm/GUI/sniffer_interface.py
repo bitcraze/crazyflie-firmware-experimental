@@ -28,7 +28,8 @@ class Copter():
 class SnifferInterface:
     REPORT_FREQUENCY=2 #Hz
     LOG_FREQUENCY = 4 #Hz 
-    
+    LOG_ACTIONS_FREQUENCY = 2 #Hz
+
     def __init__(self, uri, report_socket:zmq.Socket=None,command_socket:zmq.Socket=None):
         self.uri = uri
         self.copters :List[Copter] = None
@@ -39,7 +40,7 @@ class SnifferInterface:
         self.cf.disconnected.add_callback(self._disconnected)
         self.cf.connection_failed.add_callback(self._connection_failed)
         self.cf.connection_lost.add_callback(self._connection_lost)
-        # self.cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
+        self.cf.console.receivedChar.add_callback(self._console_incoming) #print debug messages from Crazyflie
 
         self.connection_successful = None
 
@@ -52,6 +53,8 @@ class SnifferInterface:
 
         self._console_buffer = ""
 
+        self.action = None
+
     def _console_incoming(self, console_text):
         # print each message in one line 
         if console_text[-1] != '\n':
@@ -62,7 +65,6 @@ class SnifferInterface:
             print(Fore.YELLOW+"CF {} DEBUG:".format( self.uri[-2:] ),self._console_buffer, Fore.RESET)
 
             self._console_buffer = ""
-
 
     def _initialize_copters(self)-> List[Copter]:
         copters=[]
@@ -101,7 +103,15 @@ class SnifferInterface:
         self.cf.log.add_config(self._log_conf)
         self._log_conf.data_received_cb.add_callback(self.log_data)
         self._log_conf.start()
-    
+
+        self._log_actions_conf = LogConfig(name='Actions', period_in_ms=1/self.LOG_ACTIONS_FREQUENCY*1000)
+        self._log_actions_conf.add_variable('snifferActions.takeoff', 'uint8_t')
+        self._log_actions_conf.add_variable('snifferActions.terminate', 'uint8_t')
+        self.cf.log.add_config(self._log_actions_conf)
+        self._log_actions_conf.data_received_cb.add_callback(self.log_actions)
+        time.sleep(0.1) #sleep to provide time for the other log
+        self._log_actions_conf.start()
+
     def log_data(self, timestamp, data, logconf):
         # print("==========================")
         # for i in range(MAX_COPTERS):
@@ -115,6 +125,18 @@ class SnifferInterface:
             cop.voltage = data['id_{}.voltage'.format(i+1)]
             cop.counter = data['id_{}.counter'.format(i+1)] if i !=8 else -1
     
+    def log_actions(self, timestamp, data, logconf):
+        # print("==========================")
+        # print("{}: {}".format("takeoff", data['snifferActions.takeoff']))
+        # print("{}: {}".format("terminateApp", data['snifferActions.terminate']))
+           
+        if int( data['snifferActions.takeoff'] ) == 1:
+            self.action = "TAKE OFF"
+        elif int ( data['snifferActions.terminate'] ) ==1 :
+            self.action = "TERMINATE"
+        else:
+            self.action = "NONE"
+
     def send_report(self):
         if self.report_socket is None or self.connection_successful is None:
             return
@@ -132,6 +154,12 @@ class SnifferInterface:
                     }
                     report.append(data)
 
+            actions_data = {
+                'id': "action",
+                'action': self.action
+            }
+        
+            report.append(actions_data)
         
         try:
             self.report_socket.send_json(report, zmq.NOBLOCK)

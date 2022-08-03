@@ -165,7 +165,7 @@ class ButtonsFrame(ttk.Frame):
         takeoff_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
 
         # land button
-        land_button = tk.Button(buttons_frame, text="LAND", command=self.terminate,
+        land_button = tk.Button(buttons_frame, text="NONE", command=self.terminate,
                                 width=self.WIDTH, height=self.HEIGHT,
                                 background=_from_rgb(240, 20, 11),
                                 activebackground=_from_rgb(212, 20, 11),
@@ -174,7 +174,7 @@ class ButtonsFrame(ttk.Frame):
         land_button.grid(row=0, column=1, padx=self.PADX, pady=self.PADY)
 
         # insert buttons frame in the content
-        buttons_frame.grid(row=3, column=0, columnspan=3)
+        buttons_frame.grid(row=3+1, column=0, columnspan=3)
 
     def _send_command(self, command):
         command_obj = {
@@ -193,6 +193,33 @@ class ButtonsFrame(ttk.Frame):
     def terminate(self):
         print("Terminate")
         self._send_command("terminate")
+
+class SnifferActionFrame(ttk.Frame):
+    PADX = 40
+
+    def __init__(self, parent, interface_socket: zmq.Socket=None):
+        ttk.Frame.__init__(self, parent)
+
+        #Sniffer actions frame
+        sniffer_actions_frame = ttk.Frame(parent)
+        sniffer_actions_frame.grid(row=0, column=2)
+
+        #Command Label
+        command_label_descr = ttk.Label(sniffer_actions_frame, text="SNIFFER COMMAND:",padding=(0,0,0,0))
+        command_label_descr.grid(row=0, column=0, sticky="ew")
+
+        self.command_label = ttk.Label(sniffer_actions_frame, text="TAKE OFF",anchor=tk.CENTER , padding=(self.PADX,0,0,0))
+        self.command_label.grid(row=0, column=1, sticky="e")
+
+    def update(self, command):
+        self.command_label['text'] = command
+        color_map = {
+            "NONE": "grey",
+            "TAKE OFF": "green",
+            "TERMINATE": "red",
+        }
+        self.command_label['foreground'] = color_map[command]
+
 
 
 sniffer_thread = snifferThread()
@@ -216,10 +243,11 @@ content.grid(column=0, row=0)
 root.columnconfigure(0, weight=1)
 root.rowconfigure(0, weight=1)
 
-cfs: List[Crazyflie] = []
+snifferActions = SnifferActionFrame(content)
 
+cfs: List[Crazyflie] = []
 for i in range(MAX_COPTERS):
-    r = int(i/3)
+    r = int(i/3)+1
     c = int(i % 3)
     # +1 to avoid 0 which is reserved for the sniffer
     cf = Crazyflie(content, i+1)
@@ -262,17 +290,19 @@ def receive_thread():
             print(
                 "===================================================================================")
             for i, data in enumerate(report):
-                # print(report['id'],type(report['id']))
-                # -1 because index starts at 0 and all flying copters have adrreses >=
-                print(data)
-                id = data['id'] - 1
-                cfs[id].set_battery(data['battery'])
-                cfs[id].set_state(data['state'])
+                if data['id']=="action":
+                    snifferActions.update(data['action'])
+                else:
+                    # -1 because index starts at 0 and all flying copters have adrreses >=
+                    print(data)
+                    id = data['id'] - 1
+                    cfs[id].set_battery(data['battery'])
+                    cfs[id].set_state(data['state'])
 
-                if cfs[id].is_updated(data['counter']):
-                    print(Fore.GREEN+"Updated: {}".format(id+1), Fore.RESET)
-                    cfs[id].set_led("green")
-                    last_updated[id] = time.time()
+                    if cfs[id].is_updated(data['counter']):
+                        print(Fore.GREEN+"Updated: {}".format(id+1), Fore.RESET)
+                        cfs[id].set_led("green")
+                        last_updated[id] = time.time()
 
         except zmq.error.Again:
             pass

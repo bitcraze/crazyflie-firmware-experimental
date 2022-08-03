@@ -440,7 +440,7 @@ static void stateTransition(xTimerHandle timer){
                 else{
                     DEBUG_PRINT("Landed. Feed me!\n");
                     crtpCommanderHighLevelStop();
-                    landingTimeCheckCharge = now + 3000;
+                    landingTimeCheckCharge = now + 4000;
                     state = STATE_CHECK_CHARGING;
                 }
             }

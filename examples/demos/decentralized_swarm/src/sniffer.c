@@ -54,6 +54,10 @@
 enum State state = STATE_SNIFFING;
 
 extern copter_t copters[MAX_ADDRESS]; //TODO:instead of extern, use a function that returns a pointer to the array
+
+extern bool takeOffWhenReady;
+extern bool terminateApp;
+
 static copter_t prev_copters[MAX_ADDRESS];
 static bool prev_copters_active[MAX_ADDRESS];
 static P2PPacket p_reply;
@@ -195,6 +199,12 @@ void appMain()
 }
 
 //LOGS
+LOG_GROUP_START(snifferActions)
+LOG_ADD(LOG_UINT8, takeoff, &takeOffWhenReady )
+LOG_ADD(LOG_UINT8, terminate,&terminateApp)
+LOG_GROUP_STOP(snifferActions)
+
+
 #define add_copter_log(i)   LOG_GROUP_START(id_##i)\
                             LOG_ADD(LOG_UINT8, state, &copters[i].state)\
                             LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\

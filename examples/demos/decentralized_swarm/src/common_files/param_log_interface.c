@@ -28,9 +28,9 @@
 #include "param_log_interface.h"
 
 //App parameters
-static bool takeOffWhenReady = false;
+bool takeOffWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
-static bool terminateApp = false;
+bool terminateApp = false;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
