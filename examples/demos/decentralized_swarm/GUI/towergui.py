@@ -39,6 +39,8 @@ class Crazyflie(ttk.Frame):
         self.gui_setup()
 
         self.prev_counter = None
+        self.last_time_wait_for_takeoff = 0
+        self.wait_for_takeoff_already_shown = False
 
     def gui_setup(self):
         self['padding'] = 15
@@ -93,13 +95,30 @@ class Crazyflie(ttk.Frame):
         self._led['background'] = "grey"
         self._led['foreground'] = "grey"
 
+    def wait_take_off_check(self, new_text):
+        """
+        This function checks if the copter enters in the wait_for_takeoff state.
+        If it does, it starts counting from that time in order to handle the state 
+        of the take off button.
+        """
+        if new_text != self._status['text']:
+            if new_text == "WAIT TAKE OFF" and not self.wait_for_takeoff_already_shown:
+                self.wait_for_takeoff_already_shown = True
+                self.last_time_wait_for_takeoff = time.time()
+            else:
+                self.wait_for_takeoff_already_shown = False        
+
     def set_state(self, state):
         if state in state_dict:
-            self._status.config(
-                text=state_dict[state][0], fg=state_dict[state][1])
+            new_text = state_dict[state][0]
+            self.wait_take_off_check(new_text)
+            self._status.config(text=new_text, fg=state_dict[state][1])
         else:
             self._status.config(text="ERROR", fg="grey")
             # print("Error, state", state, "not handled")
+
+    def get_state(self):
+        return self._status['text']
 
     def set_battery(self, voltage):
         self._battery_voltage['text'] = "{:.2f}V".format(voltage)
@@ -157,21 +176,21 @@ class ButtonsFrame(ttk.Frame):
         buttons_frame = ttk.Frame(parent)
 
         # Take off button
-        takeoff_button = tk.Button(buttons_frame, text="TAKE OFF", command=self.take_off,
+        self.takeoff_button = tk.Button(buttons_frame, text="TAKE OFF", command=self.take_off,
                                    width=self.WIDTH, height=self.HEIGHT,
                                    background=_from_rgb(93, 227, 9),
                                    activebackground=_from_rgb(93, 215, 9),
                                    activeforeground="#000")
-        takeoff_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
+        self.takeoff_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
 
-        # land button
-        land_button = tk.Button(buttons_frame, text="NONE", command=self.terminate,
+        # terminate button
+        self.terminate_button = tk.Button(buttons_frame, text="TERMINATE", command=self.terminate,
                                 width=self.WIDTH, height=self.HEIGHT,
                                 background=_from_rgb(240, 20, 11),
                                 activebackground=_from_rgb(212, 20, 11),
                                 activeforeground="#000")
 
-        land_button.grid(row=0, column=1, padx=self.PADX, pady=self.PADY)
+        self.terminate_button.grid(row=0, column=1, padx=self.PADX, pady=self.PADY)
 
         # insert buttons frame in the content
         buttons_frame.grid(row=3+1, column=0, columnspan=3)
@@ -272,6 +291,17 @@ def tkloop():
             return
     except Exception:
         pass
+
+    #Take off button state check
+    for i,cf in enumerate(cfs):
+        state = cf.get_state()
+        now = time.time()
+        #If at least one copter waits for take off for more than a threshold, the take off button is enabled
+        if state == "WAIT TAKE OFF" and now-cf.last_time_wait_for_takeoff > 2:
+            buttons.takeoff_button['state'] = 'normal'
+            break
+        else:
+            buttons.takeoff_button['state'] = 'disabled'
 
     root.after(100, tkloop)
 
