@@ -250,7 +250,9 @@ static bool allFlyingCoptersHovering(void){
         }
 
         if (state > STATE_WAIT_FOR_TAKE_OFF  && state<STATE_GOING_TO_PAD){//TODO:maybe change STATE_WAIT_FOR_TAKE_OFF to STATE_PREPARING_FOR_TAKE_OFF
-            if (state!=STATE_HOVERING && state!=STATE_GOING_TO_RANDOM_POINT )
+            if (state!=STATE_HOVERING && state!=STATE_GOING_TO_RANDOM_POINT 
+                && state != STATE_GOING_TO_TRAJECTORY_START 
+                && state != STATE_EXECUTING_TRAJECTORY)
                 return false;
         } 
     }
@@ -388,12 +390,40 @@ static void stateTransition(xTimerHandle timer){
             }
             else if (allFlyingCoptersHovering()){ // wait for all flying copters to be hovering
                 DEBUG_PRINT("All copters are hovering, going to next Waypoint\n");
-                Position new_pos = getRandomPositionOnCircle();
-                gotoNextWaypoint(new_pos.x,new_pos.y,new_pos.z,DELTA_DURATION);
-
-                state = STATE_GOING_TO_RANDOM_POINT;
+                
+                if ( my_id == SPECIAL_ID){
+                    uint8_t random_number = rand() % (uint8_t) SPECIAL_TRAJ_PROB_LENGTH;
+                    DEBUG_PRINT("SPECIAL_TRAJ_PROB_LENGTH %d\n", (uint8_t) SPECIAL_TRAJ_PROB_LENGTH);
+                    DEBUG_PRINT("Random number: %d\n", random_number);
+                    if(random_number == 0){
+                        DEBUG_PRINT("Special trajectory\n");
+                        Position new_pos = getTrajectoryStart();
+                        gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, DELTA_DURATION);
+                        state = STATE_GOING_TO_TRAJECTORY_START;
+                    }
+                }
+                else
+                {
+                    DEBUG_PRINT("Normal new waypoint on circle\n");
+                    Position new_pos = getRandomPositionOnCircle();
+                    gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, DELTA_DURATION);
+                    state = STATE_GOING_TO_RANDOM_POINT;
+                }
             }
 
+            break;
+        case STATE_GOING_TO_TRAJECTORY_START:
+            if (reachedNextWaypoint(my_pos)) {
+                DEBUG_PRINT("Reached trajectory start\n");
+                startTrajectory(my_pos);
+                state = STATE_EXECUTING_TRAJECTORY;
+            }
+            break;
+        case STATE_EXECUTING_TRAJECTORY:
+            if (reachedNextWaypoint(my_pos) && crtpCommanderHighLevelIsTrajectoryFinished()) {
+                DEBUG_PRINT("Finished trajectory execution\n");
+                state = STATE_HOVERING;                    
+            }
             break;
         case STATE_GOING_TO_RANDOM_POINT:
             if (reachedNextWaypoint(my_pos)) {
@@ -555,6 +585,7 @@ void appMain()
 
     initCollisionAvoidance();
     enableHighlevelCommander();
+    defineTrajectory();
     
     // Register the callback function so that the CF can receive packets as well.
     p2pRegisterCB(p2pcallbackHandler);

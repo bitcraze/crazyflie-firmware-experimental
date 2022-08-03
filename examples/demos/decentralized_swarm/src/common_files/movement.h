@@ -38,6 +38,7 @@
 #include "sensors.h"
 #include "param_log_interface.h"
 #include "peer_localization.h"
+#include "pptraj.h"
 
 // This function will move the Crazyflie to the next waypoint via the high level commander.
 // It is used as a function because it works with the reachedNextWaypoint() since  
@@ -60,5 +61,11 @@ bool hasLock();
 bool chargedForTakeoff();
 
 bool noCopterFlyingAbove();
+
+void startTrajectory(Position my_pos);
+
+Position getTrajectoryStart();
+
+void defineTrajectory();
 
 #endif // MOVEMENT_H

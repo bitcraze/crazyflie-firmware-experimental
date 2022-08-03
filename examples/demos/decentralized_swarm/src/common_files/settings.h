@@ -111,8 +111,12 @@
 #define MIN_Z_BOUND -0.3f
 #define MAX_Z_BOUND  2.0f
 
+// Random trajectory execution
+#define SPECIAL_ID 9  //id of the copter that will execute the special trajectory 
+#define SPECIAL_TRAJ_PROBABILITY 1/3 //probability of executing the special trajectory
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)
 #define SNIFFER_PRINT_PERIOD_MS (1000 / SNIFFER_PRINT_FREQUENCY_HZ)
 #define COPTER_STATUS_PERIOD_MS (1000 / COPTER_STATUS_FREQUENCY_HZ)
+#define SPECIAL_TRAJ_PROB_LENGTH 1 / SPECIAL_TRAJ_PROBABILITY
