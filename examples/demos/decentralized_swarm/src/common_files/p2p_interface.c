@@ -132,3 +132,31 @@ bool isCopterIdActive(uint8_t copter_id){
     uint32_t dt = now - copters[copter_id].timestamp;
     return dt < ALIVE_TIMEOUT_MS;
 }
+
+bool isCopterFlying(uint8_t copter_id){
+    bool state_condition = copters[copter_id].state >=  STATE_TAKING_OFF && copters[copter_id].state < STATE_GOING_TO_PAD;
+    return state_condition && isCopterIdActive(copter_id); ;
+}
+
+uint8_t getMinimumFlyingCopterId(void){
+    uint8_t min_id = 11;
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        if (isCopterFlying(i) && copters[i].id < min_id){
+            min_id = copters[i].id;
+        }
+    }
+
+    return min_id;
+}
+
+bool isAnyOtherCopterExecutingTrajectory(void){
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        bool trajectory_condition = copters[i].state == STATE_GOING_TO_TRAJECTORY_START ||
+                                    copters[i].state == STATE_EXECUTING_TRAJECTORY;
+
+        if (isCopterFlying(i) && trajectory_condition){
+            return true;
+        }
+    }
+    return false;
+}

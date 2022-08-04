@@ -91,4 +91,11 @@ uint8_t otherCoptersActiveNumber(void);
 
 bool isCopterIdActive(uint8_t copter_id);
 
+//Returns true if the copter is active and flying
+bool isCopterFlying(uint8_t copter_id);
+
+uint8_t getMinimumFlyingCopterId(void);
+
+bool isAnyOtherCopterExecutingTrajectory(void);
+
 #endif // P2P_INTERFACE_H

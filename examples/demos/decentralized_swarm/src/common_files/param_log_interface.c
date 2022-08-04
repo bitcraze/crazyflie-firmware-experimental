@@ -32,6 +32,8 @@ bool takeOffWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
 bool terminateApp = false;
 
+static bool CollisionAvoidanceEnabled = false;
+
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
 static logVarId_t logIdStateEstimateY;
@@ -89,12 +91,21 @@ bool getTakeOffWhenReady() { return takeOffWhenReady; }
 bool getTerminateApp() { return terminateApp; }
 
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
+
+
 void enableCollisionAvoidance() { 
-    static bool enabled = false;
-    if (!enabled) {
+    if (!CollisionAvoidanceEnabled) {
         DEBUG_PRINT("Enabling Collision Avoidance\n");
         paramSetInt(paramIdCollisionAvoidanceEnable, 1);
-        enabled = true;
+        CollisionAvoidanceEnabled = true;
+    }
+}
+
+void disableCollisionAvoidance() { 
+    if (CollisionAvoidanceEnabled) {
+        DEBUG_PRINT("Disabling Collision Avoidance\n");
+        paramSetInt(paramIdCollisionAvoidanceEnable, 0);
+        CollisionAvoidanceEnabled = false;
     }
 }
 

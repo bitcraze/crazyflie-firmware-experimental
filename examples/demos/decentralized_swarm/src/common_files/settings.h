@@ -27,6 +27,8 @@
 
 #pragma once
 
+#define EXECUTE_TRAJ true
+
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
 #define DESIRED_FLYING_COPTERS 3
@@ -37,7 +39,7 @@
 #define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
-#define TAKE_OFF_TIME_MAX 3000
+#define TAKE_OFF_TIME_MAX 4000
 #define TAKE_OFF_TIME_MIN 500
 
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
