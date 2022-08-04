@@ -29,6 +29,7 @@
 
 #define EXECUTE_TRAJ true
 
+#define TERMINATION_BROADCAST_STOPPED_TIMEOUT 10*1000 // msec
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
 #define DESIRED_FLYING_COPTERS 3
@@ -95,7 +96,7 @@
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
 #define LANDING_HEIGHT 0.13f
-#define LANDING_DURATION 2 //sec 
+#define LANDING_DURATION 3 //sec 
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 4000 //ms

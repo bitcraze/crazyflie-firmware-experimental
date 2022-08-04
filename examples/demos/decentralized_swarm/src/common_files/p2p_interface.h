@@ -98,4 +98,6 @@ uint8_t getMinimumFlyingCopterId(void);
 
 bool isAnyOtherCopterExecutingTrajectory(void);
 
+bool appTerminationStillBeingSent(void);
+
 #endif // P2P_INTERFACE_H

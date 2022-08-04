@@ -97,9 +97,8 @@ static uint32_t now = 0;
 static uint32_t hovering_start_time = 0;
 static uint32_t position_lock_start_time = 0;
 static uint32_t random_time_for_next_event = 0;
-
+static uint32_t termination_broadcast_stopped_timeout_ms = 0;
 // LEDs Interface
-static bool seq_estim_stuck_running = false;
 static uint8_t seq_crash_running = 0;
 
 ledseqStep_t seq_flashing_def[] = {
@@ -186,33 +185,12 @@ static void sendPosition(xTimerHandle timer) {
         Position null_pos={10.0f,10.0f,10.0f};//TODO: make a parameter for the 10.0f
         memcpy(&p_reply.data[3], &null_pos, sizeof(Position));
     }
-
-    // position stuck handling (while testing position broadcasting seem to be stuck after resetting the estimator)
-    if (previous[0] == my_pos.x && previous[1] == my_pos.y && previous[2] == my_pos.z) {
-        // DEBUG_PRINT("Same value detected\n");
-        if (!seq_estim_stuck_running){
-            ledseqRun(&seq_estim_stuck);
-            seq_estim_stuck_running = 1;
-        }
-
-        // logResetAll();//TODO: it seems to fix the problem, but I'm not sure about it
-        initLogIds();
-        
-    }else{
-        if (seq_estim_stuck_running)            
-            ledseqStop(&seq_estim_stuck);
-        seq_estim_stuck_running = 0;
-    }
-    
-    previous[0] = my_pos.x;
-    previous[1] = my_pos.y;
-    previous[2] = my_pos.z;
     
     p_reply.data[1] = counter++;
     p_reply.data[2] = (uint8_t) ( landed ? STATE_UNKNOWN : state );
     p_reply.data[15] = compressVoltage( getVoltage() );
     
-    p_reply.data[16] = (getTerminateApp() && state != STATE_WAIT_FOR_POSITION_LOCK ) ? 1 : 0;
+    p_reply.data[16] = (getTerminateApp() && state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST) ? 1 : 0;
 
     //get current position and send it as the payload
     p_reply.size = sizeof(Position) + 5;//+5 for the id,counter,state ,Voltage and terminateApp
@@ -488,7 +466,7 @@ static void stateTransition(xTimerHandle timer){
                     }
                 } else if ( noCopterFlyingAbove() ){
                     DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                    crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT , 1.0);
+                    crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.1f , 1.0);
                     state = STATE_REPOSITION_ON_PAD;
                 }
             }
@@ -502,12 +480,25 @@ static void stateTransition(xTimerHandle timer){
             }
             break;
         case STATE_APP_TERMINATION:
-            if (flying_copters_number()==0){
+            if (flying_copters_number() == 0){
                 DEBUG_PRINT("All copters terminated, exiting\n");
                 initOtherStates();
 
                 setTerminateTrajectoryAndLand(false);
                 setTerminateApp(false);
+                termination_broadcast_stopped_timeout_ms = now + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
+                state = STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST;
+            }
+            break;
+        case STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST:
+            setTerminateApp(false);
+            if (appTerminationStillBeingSent()){
+                    DEBUG_PRINT("Still receiving termination broadcast\n");
+                    termination_broadcast_stopped_timeout_ms = now + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
+                    state = STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST;
+            }else if (now > termination_broadcast_stopped_timeout_ms){
+                DEBUG_PRINT("Timeout waiting for termination\n");
+                DEBUG_PRINT("No termination broadcast sent, going to IDLE\n");
                 state = STATE_IDLE;
             }
 
@@ -520,10 +511,7 @@ static void stateTransition(xTimerHandle timer){
                 seq_crash_running = 1;
             }
 
-            if (getTerminateApp() && flying_copters_number() == 0){
-                setTerminateApp(false);
-            }
-
+            setTerminateApp(false);
         break;
         
         default:

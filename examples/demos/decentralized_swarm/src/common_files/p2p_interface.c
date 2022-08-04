@@ -59,7 +59,9 @@ void p2pcallbackHandler(P2PPacket *p)
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
-        if (!getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK && state!=STATE_SNIFFING){
+        if (!getTerminateApp() && 
+            state != STATE_SNIFFING && state != STATE_CRASHED &&
+            state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST){
             setTerminateApp(true);
         }
     }
@@ -158,5 +160,15 @@ bool isAnyOtherCopterExecutingTrajectory(void){
             return true;
         }
     }
+    return false;
+}
+
+bool appTerminationStillBeingSent(void){
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        if (isCopterIdActive(i) && copters[i].terminateApp){
+            return true;
+        }
+    }
+
     return false;
 }
