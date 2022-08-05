@@ -73,8 +73,8 @@ static P2PPacket p_reply;
 static P2PPacket p_copter_status;
 
 //Landing to pad
-static uint32_t stabilizeEndTime;
-static float landingTimeCheckCharge;
+static uint32_t stabilizeEndTime_ms;
+static float landingTimeCheckCharge_ms;
 
 static uint8_t my_id;
 
@@ -93,10 +93,10 @@ static float padX = 0.0;
 static float padY = 0.0;
 static float padZ = 0.0;
 
-static uint32_t now = 0;
-static uint32_t hovering_start_time = 0;
-static uint32_t position_lock_start_time = 0;
-static uint32_t random_time_for_next_event = 0;
+static uint32_t now_ms = 0;
+static uint32_t hovering_start_time_ms = 0;
+static uint32_t position_lock_start_time_ms = 0;
+static uint32_t random_time_for_next_event_ms = 0;
 static uint32_t termination_broadcast_stopped_timeout_ms = 0;
 // LEDs Interface
 static uint8_t seq_crash_running = 0;
@@ -148,9 +148,9 @@ static void initPacket(){
     p_copter_status.data[0] = my_id;
 }
 
-uint32_t get_next_random_timeout(uint32_t now){
+uint32_t get_next_random_timeout(uint32_t now_ms){
     uint32_t extra = (rand() % (TAKE_OFF_TIME_MAX - TAKE_OFF_TIME_MIN)) + TAKE_OFF_TIME_MIN;
-    uint32_t timeout = now + extra;
+    uint32_t timeout = now_ms + extra;
     DEBUG_PRINT("Next random timeout dt: %lu \n", extra);
     return timeout;
 }
@@ -258,7 +258,7 @@ static void stateTransition(xTimerHandle timer){
         }
     }
 
-    now = T2M( xTaskGetTickCount() );
+    now_ms = T2M( xTaskGetTickCount() );
     uint32_t dt;
     switch(state) {
         case STATE_IDLE:
@@ -270,11 +270,11 @@ static void stateTransition(xTimerHandle timer){
             seq_crash_running = 0;
         }
         
-        position_lock_start_time = now;
+        position_lock_start_time_ms = now_ms;
         state = STATE_WAIT_FOR_POSITION_LOCK;
         break;
         case STATE_WAIT_FOR_POSITION_LOCK:
-        dt=now-position_lock_start_time;
+        dt=now_ms-position_lock_start_time_ms;
         if (hasLock() || dt > POSITION_LOCK_TIMEOUT) {
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
             // ledseqRun(&seq_lock);
@@ -294,7 +294,7 @@ static void stateTransition(xTimerHandle timer){
                 state = STATE_TAKING_OFF;
             }
             else if (needExtraCopters() && atLeastOneCopterHasFlown() ){// at least one copter is flying and  more copters needed
-                random_time_for_next_event = get_next_random_timeout(now);
+                random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 DEBUG_PRINT("Preparing for take off...\n");
                 state = STATE_PREPARING_FOR_TAKE_OFF;
             }
@@ -308,7 +308,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Another copter took off, no need to take off finally\n");
                 state = STATE_WAIT_FOR_TAKE_OFF;
             }
-            else if (now > random_time_for_next_event){
+            else if (now_ms > random_time_for_next_event_ms){
                 DEBUG_PRINT("Taking off...\n");
                 startTakeOffSequence();
                 state = STATE_TAKING_OFF;
@@ -318,7 +318,7 @@ static void stateTransition(xTimerHandle timer){
         case STATE_TAKING_OFF:
             // if ( needLessCopters() ){// more than desired copters are flying,need to land
                 // DEBUG_PRINT("More copters than desired are flying while taking off, need to land\n");
-                // random_time_for_next_event = get_next_random_timeout(now);
+                // random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 // state = STATE_PREPARING_FOR_LAND;
             // }
             // else 
@@ -327,12 +327,12 @@ static void stateTransition(xTimerHandle timer){
                 // ledseqStop(&seq_lock);
                 state = STATE_HOVERING;
                 enableCollisionAvoidance();
-                hovering_start_time = now;
+                hovering_start_time_ms = now_ms;
             }
             break;
 
         case STATE_HOVERING:
-            dt = now - hovering_start_time ;
+            dt = now_ms - hovering_start_time_ms ;
             if (getTerminateTrajectoryAndLand() || dt > HOVERING_TIME) {
                 DEBUG_PRINT("Going to pad...\n");
                 gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
@@ -340,7 +340,7 @@ static void stateTransition(xTimerHandle timer){
             }
             else if ( needLessCopters() ){
                 DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
-                random_time_for_next_event = get_next_random_timeout(now);
+                random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 state = STATE_PREPARING_FOR_LAND;
             }
             else { // wait for all flying copters to be hovering
@@ -394,7 +394,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Another copter landed, no need to land finally\n");
                 state = STATE_HOVERING;
             }
-            else if (now > random_time_for_next_event){
+            else if (now_ms > random_time_for_next_event_ms){
                 DEBUG_PRINT("Going to pad...\n");
                 gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                 disableCollisionAvoidance();
@@ -405,13 +405,13 @@ static void stateTransition(xTimerHandle timer){
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Over pad,starting lowering\n");
                 crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
-                stabilizeEndTime = now + STABILIZE_TIMEOUT;
+                stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
                 state = STATE_WAITING_AT_PAD;
             }
             break;
         case STATE_WAITING_AT_PAD:
-            if (now > stabilizeEndTime || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
-                if (now > stabilizeEndTime) {
+            if (now_ms > stabilizeEndTime_ms || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
+                if (now_ms > stabilizeEndTime_ms) {
                     DEBUG_PRINT("Warning: timeout!\n");
                 }
 
@@ -429,13 +429,13 @@ static void stateTransition(xTimerHandle timer){
                 else{
                     DEBUG_PRINT("Landed. Feed me!\n");
                     crtpCommanderHighLevelStop();
-                    landingTimeCheckCharge = now + 4000;
+                    landingTimeCheckCharge_ms = now_ms + 4000;
                     state = STATE_CHECK_CHARGING;
                 }
             }
             break;
         case STATE_CHECK_CHARGING:
-            if (now > landingTimeCheckCharge) {
+            if (now_ms > landingTimeCheckCharge_ms) {
                 DEBUG_PRINT("isCharging: %d\n", isCharging());
                 if (isCharging()) {
                     // ledseqRun(&seq_lock);
@@ -456,7 +456,7 @@ static void stateTransition(xTimerHandle timer){
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabilizing position\n");
                 gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
-                stabilizeEndTime = now + STABILIZE_TIMEOUT;
+                stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
                 state = STATE_WAITING_AT_PAD;
             }
             break;
@@ -467,7 +467,7 @@ static void stateTransition(xTimerHandle timer){
 
                 setTerminateTrajectoryAndLand(false);
                 setTerminateApp(false);
-                termination_broadcast_stopped_timeout_ms = now + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
+                termination_broadcast_stopped_timeout_ms = now_ms + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
                 state = STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST;
             }
             break;
@@ -475,9 +475,9 @@ static void stateTransition(xTimerHandle timer){
             setTerminateApp(false);
             if (appTerminationStillBeingSent()){
                     DEBUG_PRINT("Still receiving termination broadcast\n");
-                    termination_broadcast_stopped_timeout_ms = now + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
+                    termination_broadcast_stopped_timeout_ms = now_ms + TERMINATION_BROADCAST_STOPPED_TIMEOUT;
                     state = STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST;
-            }else if (now > termination_broadcast_stopped_timeout_ms){
+            }else if (now_ms > termination_broadcast_stopped_timeout_ms){
                 DEBUG_PRINT("Timeout waiting for termination\n");
                 DEBUG_PRINT("No termination broadcast sent, going to IDLE\n");
                 state = STATE_IDLE;

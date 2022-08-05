@@ -1,6 +1,6 @@
 import time
 from cflib.utils.power_switch import PowerSwitch
-from colorama import init,Fore, Back, Style
+from colorama import Fore
 
 uris = [
     'radio://0/20/2M/E7E7E7E700',
@@ -23,5 +23,5 @@ for uri in uris:
         pwr_switch.close()
         print(Fore.GREEN + 'Successfully turned off {}'.format(uri))
     except Exception as e:
-        print(Fore.RED+'Error: ', e,Fore.RESET)
+        print(Fore.RED + 'Error: ', e, Fore.RESET)
         pass
