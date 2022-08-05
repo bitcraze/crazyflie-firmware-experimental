@@ -122,11 +122,15 @@ uint8_t otherCoptersActiveNumber(void){
     uint8_t nr=0;
     for(int i = 0; i < MAX_ADDRESS; i++){
         // if they are active and not requesting to terminate the application
-        if (isCopterIdActive(i) && !copters[i].terminateApp ){
+        if (isCopterIdActive(i) && !copters[i].terminateApp && copters[i].state != STATE_TAKING_OFF){
             nr++;
         }
     }
     return nr;
+}
+
+bool selfIsFlying(void){
+    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD && !getTerminateApp();
 }
 
 bool isCopterIdActive(uint8_t copter_id){
@@ -171,4 +175,34 @@ bool appTerminationStillBeingSent(void){
     }
 
     return false;
+}
+
+bool needExtraCopters(void) {
+    uint8_t flying_copters = 0;
+    
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isCopterFlying(i)) {
+            flying_copters ++;
+        }
+    }
+
+    return flying_copters < DESIRED_FLYING_COPTERS;
+}
+
+bool needLessCopters(void){
+    uint8_t flying_copters = 0;
+    
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        uint8_t state = copters[i].state;
+        bool isFlying = state > STATE_TAKING_OFF && state < STATE_GOING_TO_PAD;
+        if (isCopterIdActive(i) && isFlying){
+            flying_copters ++;
+        }
+    }
+
+    if (selfIsFlying()){
+        flying_copters ++;
+    }
+
+    return flying_copters > DESIRED_FLYING_COPTERS;
 }

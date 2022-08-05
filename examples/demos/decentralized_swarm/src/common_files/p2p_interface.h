@@ -100,4 +100,10 @@ bool isAnyOtherCopterExecutingTrajectory(void);
 
 bool appTerminationStillBeingSent(void);
 
+bool selfIsFlying(void);
+
+bool needExtraCopters(void);
+
+bool needLessCopters(void);
+
 #endif // P2P_INTERFACE_H

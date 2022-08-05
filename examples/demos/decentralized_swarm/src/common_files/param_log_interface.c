@@ -102,7 +102,7 @@ void enableCollisionAvoidance() {
 }
 
 void disableCollisionAvoidance() { 
-    if (CollisionAvoidanceEnabled) {
+    if (paramGetInt(paramIdCollisionAvoidanceEnable) == 1) {
         DEBUG_PRINT("Disabling Collision Avoidance\n");
         paramSetInt(paramIdCollisionAvoidanceEnable, 0);
         CollisionAvoidanceEnabled = false;

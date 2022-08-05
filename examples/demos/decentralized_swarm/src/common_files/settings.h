@@ -40,7 +40,7 @@
 #define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
-#define TAKE_OFF_TIME_MAX 4000
+#define TAKE_OFF_TIME_MAX 8000
 #define TAKE_OFF_TIME_MIN 500
 
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
