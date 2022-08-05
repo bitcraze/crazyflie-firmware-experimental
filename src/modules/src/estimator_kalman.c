@@ -216,7 +216,7 @@ static void kalmanTask(void* parameters) {
     // If the client triggers an estimator reset via parameter update
     if (resetEstimation) {
       estimatorKalmanInit();
-      resetEstimation = false;
+      paramSetInt(paramGetVarId("kalman", "resetEstimation"), 0);
     }
 
     // Tracks whether an update to the state has been made, and the state therefore requires finalization

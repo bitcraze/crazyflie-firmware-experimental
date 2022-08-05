@@ -20,19 +20,18 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ *  
  */
 
 #pragma once
-
 #include <stdint.h>
-#include <stddef.h>
+#include <stdbool.h>
 
 /**
- * @brief Initialize the external router
+ * @brief Initialize the AI-deck CPX router.
  * 
- * This will initialize the external router, which will route
- * messages between external interfaces as well as into/out from the
- * internal router.
+ * Connect to Wifi (if configured) and start receiving CPX packages from
+ * the AI-deck.
  * 
  */
-void cpxExternalRouterInit();
+void aideckRouterInit(void);
