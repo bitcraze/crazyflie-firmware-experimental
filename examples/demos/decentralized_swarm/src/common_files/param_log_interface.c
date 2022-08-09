@@ -28,9 +28,11 @@
 #include "param_log_interface.h"
 
 //App parameters
-static bool takeOffWhenReady = false;
+bool takeOffWhenReady = false;
 static bool terminateTrajectoryAndLand = false;
-static bool terminateApp = false;
+bool terminateApp = false;
+
+static bool CollisionAvoidanceEnabled = false;
 
 // Log and param ids
 static logVarId_t logIdStateEstimateX;
@@ -89,12 +91,21 @@ bool getTakeOffWhenReady() { return takeOffWhenReady; }
 bool getTerminateApp() { return terminateApp; }
 
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
+
+
 void enableCollisionAvoidance() { 
-    static bool enabled = false;
-    if (!enabled) {
+    if (!CollisionAvoidanceEnabled) {
         DEBUG_PRINT("Enabling Collision Avoidance\n");
         paramSetInt(paramIdCollisionAvoidanceEnable, 1);
-        enabled = true;
+        CollisionAvoidanceEnabled = true;
+    }
+}
+
+void disableCollisionAvoidance() { 
+    if (paramGetInt(paramIdCollisionAvoidanceEnable) == 1) {
+        DEBUG_PRINT("Disabling Collision Avoidance\n");
+        paramSetInt(paramIdCollisionAvoidanceEnable, 0);
+        CollisionAvoidanceEnabled = false;
     }
 }
 

@@ -27,17 +27,20 @@
 
 #pragma once
 
+#define EXECUTE_TRAJ true
+
+#define TERMINATION_BROADCAST_STOPPED_TIMEOUT 10*1000 // msec
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
 #define DESIRED_FLYING_COPTERS 3
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
 // RANDOM POSITIONS ON CIRCLE
-#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  4
+#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  6
 #define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
-#define TAKE_OFF_TIME_MAX 3000
+#define TAKE_OFF_TIME_MAX 8000
 #define TAKE_OFF_TIME_MIN 500
 
 #define LED_ESTIMATOR_STUCK        LED_GREEN_R
@@ -86,14 +89,14 @@
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 4.0f //sec duration to go to next delta
 
-#define HOVERING_TIME 18000 //ms
+#define HOVERING_TIME 18*1000 //ms
 #define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
 #define LANDING_HEIGHT 0.13f
-#define LANDING_DURATION 2 //sec 
+#define LANDING_DURATION 3 //sec 
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 4000 //ms
@@ -111,8 +114,12 @@
 #define MIN_Z_BOUND -0.3f
 #define MAX_Z_BOUND  2.0f
 
+// Random trajectory execution
+#define SPECIAL_ID 9  //id of the copter that will execute the special trajectory 
+#define SPECIAL_TRAJ_PROBABILITY 1/3 //probability of executing the special trajectory
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)
 #define SNIFFER_PRINT_PERIOD_MS (1000 / SNIFFER_PRINT_FREQUENCY_HZ)
 #define COPTER_STATUS_PERIOD_MS (1000 / COPTER_STATUS_FREQUENCY_HZ)
+#define SPECIAL_TRAJ_PROB_LENGTH 1 / SPECIAL_TRAJ_PROBABILITY

@@ -54,6 +54,10 @@
 enum State state = STATE_SNIFFING;
 
 extern copter_t copters[MAX_ADDRESS]; //TODO:instead of extern, use a function that returns a pointer to the array
+
+extern bool takeOffWhenReady;
+extern bool terminateApp;
+
 static copter_t prev_copters[MAX_ADDRESS];
 static bool prev_copters_active[MAX_ADDRESS];
 static P2PPacket p_reply;
@@ -151,6 +155,8 @@ static uint8_t othersActiveNumber(){
     return count;
 }
 
+static bool terminate_flag=false;
+static uint32_t terminate_timeout_ms=0;
 void appMain()
 {
     DEBUG_PRINT("Running Decentralized swarm sniffer ...\n");
@@ -174,9 +180,17 @@ void appMain()
             }
         }
         else if (getTerminateApp()){
+            if (terminate_flag == false ){
+                terminate_flag = true;
+                terminate_timeout_ms = T2M(xTaskGetTickCount()) + 10000;
+
+            }
             DEBUG_PRINT("Terminate app\n");
-            if (othersActiveNumber() == 0){
+            uint32_t now = T2M(xTaskGetTickCount());
+            bool timeout_hit = now > terminate_timeout_ms && terminate_flag;
+            if (othersActiveNumber() == 0  || timeout_hit){
                 setTerminateApp(false);
+                terminate_flag = false;
             }else{
                 sendTerminatePacket();
             }
@@ -185,6 +199,12 @@ void appMain()
 }
 
 //LOGS
+LOG_GROUP_START(snifferActions)
+LOG_ADD(LOG_UINT8, takeoff, &takeOffWhenReady )
+LOG_ADD(LOG_UINT8, terminate,&terminateApp)
+LOG_GROUP_STOP(snifferActions)
+
+
 #define add_copter_log(i)   LOG_GROUP_START(id_##i)\
                             LOG_ADD(LOG_UINT8, state, &copters[i].state)\
                             LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\

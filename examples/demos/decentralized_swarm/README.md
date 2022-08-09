@@ -10,6 +10,27 @@ As soon as a Crazyflie is airborne, it starts to broadcast each position through
 
 In order to terminate the demo, the user must set the parameter `terminateApp` to 1 in at least one of the Crazyflie of the swarm.Then this information is broadcasted to all the copters and they will stop flying and land.
 
+The structure of each P2P packet is as follows:
+<pre>
+|--------------------|
+|   <b>PACKET FORMAT</b>    |
+|--------------------|
+| Id (1 byte)        |
+|--------------------|
+| counter (1 byte)   |
+|--------------------|
+| state (1 byte)     |
+|--------------------|
+| position (12 bytes)|
+|--------------------|
+| Voltage (1 byte)   |
+|--------------------|
+| Terminate (1 byte) |
+|   signal           |
+|--------------------|
+</pre>
+
+
 ## GUI
 A GUI is also provided to control and monitor the swarm.The communication with it is achieved through a static Crazyflie which acts as a sniffer for all the P2P packets sent by the copters.Keep in mind that the sniffer must be connected through USB to the PC in order not to interfere with the P2P radio communication.The user can also command the take off and the termination through the GUI and monitor the state and voltage of each copter.
 

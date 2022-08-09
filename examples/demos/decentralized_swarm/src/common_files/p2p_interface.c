@@ -59,7 +59,9 @@ void p2pcallbackHandler(P2PPacket *p)
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
-        if (!getTerminateApp() && state!=STATE_WAIT_FOR_POSITION_LOCK && state!=STATE_SNIFFING){
+        if (!getTerminateApp() && 
+            state != STATE_SNIFFING && state != STATE_CRASHED &&
+            state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST){
             setTerminateApp(true);
         }
     }
@@ -120,15 +122,87 @@ uint8_t otherCoptersActiveNumber(void){
     uint8_t nr=0;
     for(int i = 0; i < MAX_ADDRESS; i++){
         // if they are active and not requesting to terminate the application
-        if (isCopterIdActive(i) && !copters[i].terminateApp ){
+        if (isCopterIdActive(i) && !copters[i].terminateApp && copters[i].state != STATE_TAKING_OFF){
             nr++;
         }
     }
     return nr;
 }
 
+bool selfIsFlying(void){
+    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD && !getTerminateApp();
+}
+
 bool isCopterIdActive(uint8_t copter_id){
     uint32_t now = T2M(xTaskGetTickCount());
     uint32_t dt = now - copters[copter_id].timestamp;
     return dt < ALIVE_TIMEOUT_MS;
+}
+
+bool isCopterFlying(uint8_t copter_id){
+    bool state_condition = copters[copter_id].state >=  STATE_TAKING_OFF && copters[copter_id].state < STATE_GOING_TO_PAD;
+    return state_condition && isCopterIdActive(copter_id); ;
+}
+
+uint8_t getMinimumFlyingCopterId(void){
+    uint8_t min_id = 11;
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        if (isCopterFlying(i) && copters[i].id < min_id){
+            min_id = copters[i].id;
+        }
+    }
+
+    return min_id;
+}
+
+bool isAnyOtherCopterExecutingTrajectory(void){
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        bool trajectory_condition = copters[i].state == STATE_GOING_TO_TRAJECTORY_START ||
+                                    copters[i].state == STATE_EXECUTING_TRAJECTORY;
+
+        if (isCopterFlying(i) && trajectory_condition){
+            return true;
+        }
+    }
+    return false;
+}
+
+bool appTerminationStillBeingSent(void){
+    for(int i = 1; i < MAX_ADDRESS; i++){
+        if (isCopterIdActive(i) && copters[i].terminateApp){
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool needExtraCopters(void) {
+    uint8_t flying_copters = 0;
+    
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isCopterFlying(i)) {
+            flying_copters ++;
+        }
+    }
+
+    return flying_copters < DESIRED_FLYING_COPTERS;
+}
+
+bool needLessCopters(void){
+    uint8_t flying_copters = 0;
+    
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        uint8_t state = copters[i].state;
+        bool isFlying = state > STATE_TAKING_OFF && state < STATE_GOING_TO_PAD;
+        if (isCopterIdActive(i) && isFlying){
+            flying_copters ++;
+        }
+    }
+
+    if (selfIsFlying()){
+        flying_copters ++;
+    }
+
+    return flying_copters > DESIRED_FLYING_COPTERS;
 }

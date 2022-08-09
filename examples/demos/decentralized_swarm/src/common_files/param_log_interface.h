@@ -50,7 +50,9 @@ float getVoltage();
 bool isCharging(); 
 bool isLighthouseAvailable(); 
 void enableHighlevelCommander(); 
+
 void enableCollisionAvoidance(); 
+void disableCollisionAvoidance();
 
 // initialize logs and params
 void initCollisionAvoidance();
