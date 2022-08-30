@@ -32,9 +32,6 @@
 #include <math.h>
 #include <string.h>
 
-#include "FreeRTOS.h"
-#include "task.h"
-
 #include "estimator_kalman.h"
 
 #include "choose_app.h"
@@ -43,8 +40,6 @@
 #include "radiolink.h"
 #include "peer_localization.h"
 #include "settings.h"
-#include "debug.h"
-#include "param_log_interface.h"
 
 /*
     PACKET FORMAT:
@@ -52,7 +47,7 @@
     [1]     --> counter
     [2]     --> state
     [3-14]  --> x,y,z
-    [15]    --> compressed Voltage    
+    [15]    --> compressed Voltage
 */
 #define MAX_ADDRESS 10
 
@@ -63,7 +58,7 @@ typedef struct packet_struct {
     uint8_t id;
     uint8_t counter;
     uint8_t state;
-    uint8_t battery_voltage; //normalized to 0-255 (0-3.3V) 
+    uint8_t battery_voltage; //normalized to 0-255 (0-3.3V)
     bool terminateApp;
 
     uint32_t timestamp;

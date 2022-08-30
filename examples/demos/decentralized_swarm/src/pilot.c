@@ -51,7 +51,7 @@
 #include "pm.h"
 #include "supervisor.h"
 #include "settings.h"
-#include "p2p_interface.h"
+#include "ds_p2p_interface.h"
 #include "positions.h"
 #include "common.h"
 #include "param_log_interface.h"
@@ -118,7 +118,7 @@ ledseqStep_t seq_flashing_def[] = {
   {false, LEDSEQ_WAITMS(300)},
 
   {    0, LEDSEQ_LOOP},
-  
+
 };
 
 ledseqContext_t seq_estim_stuck = {
@@ -164,20 +164,20 @@ static void sendPosition(xTimerHandle timer) {
         [1]     --> counter
         [2]     --> state
         [3-14]  --> x,y,z
-        [15]    --> compressed Voltage 
-        [16]    --> terminateApp 
+        [15]    --> compressed Voltage
+        [16]    --> terminateApp
     */
-   
-   bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
+
+   bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD;
     if ( landed && !getTerminateApp() ){
-        // if landed and not in the process of terminating the app 
+        // if landed and not in the process of terminating the app
         // then abort sending P2P packet
         return;
     }
-        
+
     static uint8_t counter=0;
     initPacket();
-    
+
     //sampling position
     my_pos.x=getX();
     my_pos.y=getY();
@@ -191,11 +191,11 @@ static void sendPosition(xTimerHandle timer) {
         Position null_pos={10.0f,10.0f,10.0f};//TODO: make a parameter for the 10.0f
         memcpy(&p_reply.data[3], &null_pos, sizeof(Position));
     }
-    
+
     p_reply.data[1] = counter++;
     p_reply.data[2] = (uint8_t) ( landed ? STATE_UNKNOWN : state );
     p_reply.data[15] = compressVoltage( getVoltage() );
-    
+
     p_reply.data[16] = (getTerminateApp() && state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST) ? 1 : 0;
 
     //get current position and send it as the payload
@@ -232,15 +232,15 @@ static void startTakeOffSequence(){
     padZ = pad_sampler.z;
 
     DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ );
-    
+
     setTerminateTrajectoryAndLand(false);
     DEBUG_PRINT("Taking off...\n");
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
 
 static void stateTransition(xTimerHandle timer){
-    // In the following checks , sequence of checks is important 
-    
+    // In the following checks , sequence of checks is important
+
     if(supervisorIsTumbled()) {
         state = STATE_CRASHED;
     }
@@ -251,7 +251,7 @@ static void stateTransition(xTimerHandle timer){
     //     }
     // }
     else if (isBatLow() || getTerminateApp() ) {
-        
+
         if (!getTerminateTrajectoryAndLand()){
             DEBUG_PRINT(isBatLow()? "Battery low, stopping\n" : "Terminate app, stopping\n");
             setTerminateTrajectoryAndLand(true);
@@ -269,7 +269,7 @@ static void stateTransition(xTimerHandle timer){
             ledseqStop(&seq_crash);
             seq_crash_running = 0;
         }
-        
+
         position_lock_start_time_ms = now_ms;
         state = STATE_WAIT_FOR_POSITION_LOCK;
         break;
@@ -298,7 +298,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Preparing for take off...\n");
                 state = STATE_PREPARING_FOR_TAKE_OFF;
             }
-            
+
             break;
         case STATE_PREPARING_FOR_TAKE_OFF:
             if (getTerminateApp()){
@@ -314,14 +314,14 @@ static void stateTransition(xTimerHandle timer){
                 state = STATE_TAKING_OFF;
             }
 
-            break;  
+            break;
         case STATE_TAKING_OFF:
             // if ( needLessCopters() ){// more than desired copters are flying,need to land
                 // DEBUG_PRINT("More copters than desired are flying while taking off, need to land\n");
                 // random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 // state = STATE_PREPARING_FOR_LAND;
             // }
-            // else 
+            // else
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Hovering, waiting for command to start\n");
                 // ledseqStop(&seq_lock);
@@ -380,13 +380,13 @@ static void stateTransition(xTimerHandle timer){
                 state = STATE_GOING_TO_PAD;
             }else if (reachedNextWaypoint(my_pos) && crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Finished trajectory execution\n");
-                state = STATE_HOVERING;                    
+                state = STATE_HOVERING;
             }
             break;
         case STATE_GOING_TO_RANDOM_POINT:
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Reached next waypoint\n");
-                state = STATE_HOVERING;                    
+                state = STATE_HOVERING;
             }
             break;
         case STATE_PREPARING_FOR_LAND:
@@ -494,7 +494,7 @@ static void stateTransition(xTimerHandle timer){
 
             setTerminateApp(false);
         break;
-        
+
         default:
         break;
     }
@@ -504,17 +504,17 @@ static void copterStatusTransmit(xTimerHandle timer){
     /*
         PACKET FORMAT:
         [0]     --> id
-        [1]     --> counter 
+        [1]     --> counter
         [2]     --> state
         [3-14]  --> x,y,z (not needed)
-        [15]    --> compressed Voltage 
-        [16]    --> terminateApp 
+        [15]    --> compressed Voltage
+        [16]    --> terminateApp
     */
 
     static uint8_t counter = 0;
     // initPacket();
 
-    bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD; 
+    bool landed = state <= STATE_WAIT_FOR_TAKE_OFF || state >= STATE_WAITING_AT_PAD;
     if ( landed && !getTerminateApp() ){//if the other time doesn't send anything
         //sampling position
         my_pos.x = getX();
@@ -546,7 +546,7 @@ void appMain()
     // Get log and param ids
     initParamLogInterface();
 
-    ledseqRegisterSequence(&seq_estim_stuck);    
+    ledseqRegisterSequence(&seq_estim_stuck);
     ledseqRegisterSequence(&seq_crash);
 
     initPacket();
@@ -557,10 +557,10 @@ void appMain()
     initCollisionAvoidance();
     enableHighlevelCommander();
     defineTrajectory();
-    
+
     // Register the callback function so that the CF can receive packets as well.
     p2pRegisterCB(p2pcallbackHandler);
-    
+
     previous[0] = 0.0f;
     previous[1] = 0.0f;
     previous[2] = 0.0f;

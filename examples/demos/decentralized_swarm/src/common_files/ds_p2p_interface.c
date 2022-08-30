@@ -25,7 +25,12 @@
  * Peer to peer interface communication.
  */
 
-#include "p2p_interface.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
+#include "ds_p2p_interface.h"
+#include "param_log_interface.h"
+
 
 extern enum  State state;
 
@@ -37,7 +42,7 @@ uint8_t getCopterState(uint8_t copter_id){
 }
 
 void p2pcallbackHandler(P2PPacket *p)
-{   
+{
     #ifdef BUILD_PILOT_APP
         if (p->port == 0x01){ // If packet is only for the sniffer,ignore it
             return;
@@ -59,7 +64,7 @@ void p2pcallbackHandler(P2PPacket *p)
 
     if (copters[received_id].terminateApp){
         DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
-        if (!getTerminateApp() && 
+        if (!getTerminateApp() &&
             state != STATE_SNIFFING && state != STATE_CRASHED &&
             state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST){
             setTerminateApp(true);
@@ -68,10 +73,10 @@ void p2pcallbackHandler(P2PPacket *p)
 
     positionMeasurement_t pos_measurement;
     memcpy(&pos_measurement.pos, &(p->data[3]), sizeof(Position));
-    
+
     // DEBUG_PRINT("===================================================\n");
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);    
-    
+    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+
     pos_measurement.source =  MeasurementSourceLighthouse;
     pos_measurement.stdDev = 0.01f; //
     peerLocalizationTellPosition(received_id,&pos_measurement);//TODO: if id is 0--> PROBLEM WITH THE LOGIC OF THE PEER LOCALIZATION (maybe add 1 to the id)
@@ -179,7 +184,7 @@ bool appTerminationStillBeingSent(void){
 
 bool needExtraCopters(void) {
     uint8_t flying_copters = 0;
-    
+
     for (int i = 1; i < MAX_ADDRESS; i++) {
         if (isCopterFlying(i)) {
             flying_copters ++;
@@ -191,7 +196,7 @@ bool needExtraCopters(void) {
 
 bool needLessCopters(void){
     uint8_t flying_copters = 0;
-    
+
     for (int i = 1; i < MAX_ADDRESS; i++) {
         uint8_t state = copters[i].state;
         bool isFlying = state > STATE_TAKING_OFF && state < STATE_GOING_TO_PAD;

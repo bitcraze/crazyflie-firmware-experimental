@@ -47,7 +47,7 @@
 
 #define DEBUG_MODULE "P2P"
 
-#include "p2p_interface.h"
+#include "ds_p2p_interface.h"
 #include "param_log_interface.h"
 #include "common.h"
 
@@ -63,14 +63,14 @@ static bool prev_copters_active[MAX_ADDRESS];
 static P2PPacket p_reply;
 
 void update_copter_list(void)
-{   
+{
     bool printed_bar = false;
     for (int i = 0; i < MAX_ADDRESS; i++)
-    {   
+    {
         bool isAlive = peerLocalizationIsIDActive(i);
         bool changed_activity = prev_copters_active[i] != isAlive;
-        bool changed_state = prev_copters[i].state != copters[i].state; 
-         
+        bool changed_state = prev_copters[i].state != copters[i].state;
+
         if(  changed_state || changed_activity ){
             if (!printed_bar){
                 DEBUG_PRINT("========================================================\n");
@@ -79,8 +79,8 @@ void update_copter_list(void)
             // DEBUG_PRINT("Copter %d state changed to %d\n", i, copters[i].state);
             // printOtherCopters();
             prev_copters[i] = copters[i];
-            prev_copters_active[i] = isAlive; 
-        }    
+            prev_copters_active[i] = isAlive;
+        }
     }
 }
 
@@ -90,8 +90,8 @@ void update_copter_list(void)
     [1]     --> counter
     [2]     --> state
     [3-14]  --> x,y,z
-    [15]    --> compressed Voltage 
-    [16]    --> terminateApp 
+    [15]    --> compressed Voltage
+    [16]    --> terminateApp
 */
 
 static void initPacket(){
@@ -134,7 +134,7 @@ static void sendTerminatePacket(){
 
 static bool at_least_one_flying(void){
     for (int i = 0; i < MAX_ADDRESS; i++)
-    {   
+    {
         bool isFlying = copters[i].state >= STATE_TAKING_OFF && copters[i].state <= STATE_GOING_TO_PAD;
         if ( isFlying && isCopterIdActive(i) ){
             return true;
@@ -147,7 +147,7 @@ static bool at_least_one_flying(void){
 static uint8_t othersActiveNumber(){
     uint8_t count=0;
     for (int i = 0; i < MAX_ADDRESS; i++)
-    {   
+    {
         if ( isCopterIdActive(i) && !copters[i].terminateApp ){
             count++;
         }
@@ -160,7 +160,7 @@ static uint32_t terminate_timeout_ms=0;
 void appMain()
 {
     DEBUG_PRINT("Running Decentralized swarm sniffer ...\n");
-    
+
     initOtherStates();
     initPacket();
     // Register the callback function so that the CF can receive packets as well.

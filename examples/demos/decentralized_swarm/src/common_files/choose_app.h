@@ -23,7 +23,7 @@
  *
  *
  * choose_app.h - Choose app to build
- * 
+ *
  */
 
 #define BUILD_PILOT_APP
