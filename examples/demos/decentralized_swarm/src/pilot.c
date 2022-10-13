@@ -345,10 +345,18 @@ static void stateTransition(xTimerHandle timer){
             }
             else { // wait for all flying copters to be hovering
                 DEBUG_PRINT("All copters are hovering, going to next Waypoint\n");
-                uint8_t random_number = rand() % (uint8_t) SPECIAL_TRAJ_PROB_LENGTH;
-                DEBUG_PRINT("Random number: %d\n", random_number);
 
-                if ( EXECUTE_TRAJ && random_number == 0 && my_id <= getMinimumFlyingCopterId() && !isAnyOtherCopterExecutingTrajectory()){
+                int random_number = -1;
+                if (SPECIAL_TRAJ_PROBABILITY > 0.0f) {
+                    int special_traj_prob_length = (int)(1.0f / SPECIAL_TRAJ_PROBABILITY);
+                    random_number = rand() % special_traj_prob_length;
+                    // DEBUG_PRINT("special_traj_prob_length %i\n", special_traj_prob_length);
+                    DEBUG_PRINT("Random number: %i\n", random_number);
+                }
+
+                uint8_t minimumFlyingCopterId = getMinimumFlyingCopterId();
+                bool noOneElseIsFlyingTrajectory = !isAnyOtherCopterExecutingTrajectory();
+                if (EXECUTE_TRAJ && (random_number == 0) && (my_id <= minimumFlyingCopterId) && noOneElseIsFlyingTrajectory){
                     // If copter has the min id and no other is executing trajectory
                     DEBUG_PRINT("Special trajectory\n");
                     gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, DELTA_DURATION);
@@ -385,12 +393,14 @@ static void stateTransition(xTimerHandle timer){
         case STATE_GOING_TO_RANDOM_POINT:
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Reached next waypoint\n");
+                hovering_start_time_ms = now_ms;
                 state = STATE_HOVERING;
             }
             break;
         case STATE_PREPARING_FOR_LAND:
             if (!needLessCopters()){ // another copter landed , no need to land finally
                 DEBUG_PRINT("Another copter landed, no need to land finally\n");
+                hovering_start_time_ms = now_ms;
                 state = STATE_HOVERING;
             }
             else if (now_ms > random_time_for_next_event_ms){
