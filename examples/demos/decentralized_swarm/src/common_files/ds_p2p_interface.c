@@ -198,9 +198,7 @@ bool needLessCopters(void){
     uint8_t flying_copters = 0;
 
     for (int i = 1; i < MAX_ADDRESS; i++) {
-        uint8_t state = copters[i].state;
-        bool isFlying = state > STATE_TAKING_OFF && state < STATE_GOING_TO_PAD;
-        if (isCopterIdActive(i) && isFlying){
+        if (isCopterFlying(i)) {
             flying_copters ++;
         }
     }
