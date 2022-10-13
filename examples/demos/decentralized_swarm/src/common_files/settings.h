@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * settings.h - Settings for the decentralized swarm
- * 
+ *
  */
 
 #pragma once
@@ -32,12 +32,8 @@
 #define TERMINATION_BROADCAST_STOPPED_TIMEOUT 10*1000 // msec
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
-#define DESIRED_FLYING_COPTERS 3
+#define DESIRED_FLYING_COPTERS 2
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
-
-// RANDOM POSITIONS ON CIRCLE
-#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  6
-#define CIRCLE_RADIUS 1.5f
 
 // Randomizing takeoff times
 #define TAKE_OFF_TIME_MAX 8000
@@ -49,22 +45,8 @@
 // Go to next waypoint
 #define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
 #define WP_VEL_THRESHOLD          0.4f //velocity threshold to consider a waypoint reached
-#define REACHED_WP_TIMEOUT        7000 //ms 
+#define REACHED_WP_TIMEOUT        7000 //ms
 #define COPTER_FLYING_ABOVE_THRESHOLD 0.3f //radius of cylinder that defines if a copter is flying above
-
-// Collision avoidance
-#define  COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
-
-#define COLLISION_AVOIDANCE_BBOX_MIN_X  -2.0f
-#define COLLISION_AVOIDANCE_BBOX_MAX_X   2.0f
-
-#define COLLISION_AVOIDANCE_BBOX_MIN_Y  -2.0f
-#define COLLISION_AVOIDANCE_BBOX_MAX_Y   2.0f
-
-#define COLLISION_AVOIDANCE_BBOX_MIN_Z   0.1f
-#define COLLISION_AVOIDANCE_BBOX_MAX_Z   2.0f
 
 
 // P2P Interface
@@ -72,7 +54,7 @@
 
 #define BROADCAST_FREQUENCY_HZ 15
 #define CALC_NEXT_FREQUENCY_HZ 3
-#define COPTER_STATUS_FREQUENCY_HZ 5 
+#define COPTER_STATUS_FREQUENCY_HZ 5
 
 #define SNIFFER_PRINT_FREQUENCY_HZ 5
 
@@ -84,7 +66,7 @@
 #define POSITION_LOCK_TIMEOUT 10000
 
 // NEXT DELTA
-#define INTER_DIST 0.8f //distance between crazyflies
+#define INTER_DIST 0.4f //distance between crazyflies
 
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 4.0f //sec duration to go to next delta
@@ -96,7 +78,7 @@
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
 #define LANDING_HEIGHT 0.13f
-#define LANDING_DURATION 3 //sec 
+#define LANDING_DURATION 3 //sec
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 4000 //ms
@@ -105,21 +87,54 @@
 // BOUNDS DEFINITIONS
 #define SAFETY_LANDING_DURATION 6 //sec
 
-#define MIN_X_BOUND -2.5f
-#define MAX_X_BOUND  2.5f
+#define MIN_X_BOUND -0.69f
+#define MAX_X_BOUND  1.10f
 
-#define MIN_Y_BOUND -2.5f
-#define MAX_Y_BOUND  2.5f
+#define MIN_Y_BOUND -1.30f
+#define MAX_Y_BOUND  1.38f
 
 #define MIN_Z_BOUND -0.3f
-#define MAX_Z_BOUND  2.0f
+#define MAX_Z_BOUND  1.7f
+
+// RANDOM POSITIONS ON CIRCLE
+#define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  6
+#define CIRCLE_RADIUS 0.5f
+
+// RANDOM POSITIONS ON SQUARE
+// Uses the bounds definition with a margin
+#define NUMBER_OF_RANDOM_POINTS_ON_BOX 5
+#define RANDOM_BOX_MARGIN 0.20f
+#define MIN_BOX_DISTANCE 0.8f   // Minimum distance from current position when randomizing positions
+
+#define MIN_X_BOX (MIN_X_BOUND + RANDOM_BOX_MARGIN)
+#define MAX_X_BOX (MAX_X_BOUND - RANDOM_BOX_MARGIN)
+#define CENTER_X_BOX ((MIN_X_BOX + MAX_X_BOX) / 2.0f)
+
+#define MIN_Y_BOX (MIN_Y_BOUND + RANDOM_BOX_MARGIN)
+#define MAX_Y_BOX (MAX_Y_BOUND - RANDOM_BOX_MARGIN)
+#define CENTER_Y_BOX ((MIN_Y_BOX + MAX_Y_BOX) / 2.0f)
 
 // Random trajectory execution
-#define SPECIAL_ID 9  //id of the copter that will execute the special trajectory 
-#define SPECIAL_TRAJ_PROBABILITY 1/3 //probability of executing the special trajectory
+#define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory
+#define SPECIAL_TRAJ_START_HEIGHT 0.7f
+
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)
 #define SNIFFER_PRINT_PERIOD_MS (1000 / SNIFFER_PRINT_FREQUENCY_HZ)
 #define COPTER_STATUS_PERIOD_MS (1000 / COPTER_STATUS_FREQUENCY_HZ)
 #define SPECIAL_TRAJ_PROB_LENGTH 1 / SPECIAL_TRAJ_PROBABILITY
+
+// Collision avoidance
+#define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
+
+#define COLLISION_AVOIDANCE_BBOX_MIN_X  MIN_X_BOX
+#define COLLISION_AVOIDANCE_BBOX_MAX_X  MAX_X_BOX
+
+#define COLLISION_AVOIDANCE_BBOX_MIN_Y  MIN_Y_BOX
+#define COLLISION_AVOIDANCE_BBOX_MAX_Y  MAX_Y_BOX
+
+#define COLLISION_AVOIDANCE_BBOX_MIN_Z  MIN_Z_BOUND
+#define COLLISION_AVOIDANCE_BBOX_MAX_Z  MAX_Z_BOUND

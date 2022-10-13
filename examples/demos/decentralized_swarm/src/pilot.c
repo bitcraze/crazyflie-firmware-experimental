@@ -346,14 +346,12 @@ static void stateTransition(xTimerHandle timer){
             else { // wait for all flying copters to be hovering
                 DEBUG_PRINT("All copters are hovering, going to next Waypoint\n");
                 uint8_t random_number = rand() % (uint8_t) SPECIAL_TRAJ_PROB_LENGTH;
-                DEBUG_PRINT("SPECIAL_TRAJ_PROB_LENGTH %d\n", (uint8_t) SPECIAL_TRAJ_PROB_LENGTH);
                 DEBUG_PRINT("Random number: %d\n", random_number);
 
                 if ( EXECUTE_TRAJ && random_number == 0 && my_id <= getMinimumFlyingCopterId() && !isAnyOtherCopterExecutingTrajectory()){
                     // If copter has the min id and no other is executing trajectory
                     DEBUG_PRINT("Special trajectory\n");
-                    Position new_pos = getTrajectoryStart();
-                    gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, DELTA_DURATION);
+                    gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, DELTA_DURATION);
                     state = STATE_GOING_TO_TRAJECTORY_START;
                 }
                 else
@@ -378,8 +376,9 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Going to pad...\n");
                 gotoChargingPad(padX,padY,padZ+TAKE_OFF_HEIGHT,GO_TO_PAD_DURATION);
                 state = STATE_GOING_TO_PAD;
-            }else if (reachedNextWaypoint(my_pos) && crtpCommanderHighLevelIsTrajectoryFinished()) {
+            }else if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Finished trajectory execution\n");
+                hovering_start_time_ms = now_ms;
                 state = STATE_HOVERING;
             }
             break;
