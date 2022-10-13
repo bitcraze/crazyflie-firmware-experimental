@@ -356,8 +356,8 @@ static void stateTransition(xTimerHandle timer){
                 }
                 else
                 {
-                    DEBUG_PRINT("Normal new waypoint on circle\n");
-                    Position new_pos = getRandomPositionOnCircle();
+                    Position new_pos = RANDOMIZATION_METHOD(&my_pos);
+                    DEBUG_PRINT("Normal new waypoint (%.2f, %.2f, %.2f)\n", (double)new_pos.x, (double)new_pos.y, (double)new_pos.z);
                     gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, DELTA_DURATION);
                     state = STATE_GOING_TO_RANDOM_POINT;
                 }

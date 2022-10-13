@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * positions.h - Positioning data types and functions
- * 
+ *
  */
 
 #ifndef POSITIONS_H
@@ -74,4 +74,5 @@ float getDistanceBetweenVectors3D(Position a, Position b);
 uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t positions_len );
 
 Position getRandomPositionOnCircle();
+Position getRandomPositionOnBox();
 #endif // POSITIONS_H

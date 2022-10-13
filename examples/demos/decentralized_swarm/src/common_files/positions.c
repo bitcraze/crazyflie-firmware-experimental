@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * positions.c - Positioning data types and functions
- * 
+ *
  */
 
 #include "positions.h"
@@ -78,13 +78,55 @@ uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t posit
     return min_id;
 }
 
-Position getRandomPositionOnCircle() {
+Position getRandomPositionOnCircle(Position* my_pos) {
     Position result;
     float step = 2.0f * (float) M_PI / NUMBER_OF_RANDOM_POINTS_ON_CIRCLE;
     float angle = (rand() % NUMBER_OF_RANDOM_POINTS_ON_CIRCLE) * step;
     result.x = CIRCLE_RADIUS * (float) cos(angle);
     result.y = CIRCLE_RADIUS * (float) sin(angle);
     result.z = TAKE_OFF_HEIGHT;
+
+    return result;
+}
+
+/**
+ * @brief Randomize a position on a square based on  *
+ * @return Position
+ */
+Position getRandomPositionOnBox(Position* my_pos) {
+    Position result;
+    float distance = 0.0;
+
+    while (distance < MIN_BOX_DISTANCE) {
+        int side = rand() % 4;
+
+        float factor = ((float)(rand() % NUMBER_OF_RANDOM_POINTS_ON_BOX)) / (NUMBER_OF_RANDOM_POINTS_ON_BOX - 1);
+
+        if (0 == side || 2 == side) {
+            result.x = factor * (MAX_X_BOX - MIN_X_BOX) + MIN_X_BOX;
+        } else {
+            result.y = factor * (MAX_Y_BOX - MIN_Y_BOX) + MIN_Y_BOX;
+        }
+
+        switch(side) {
+            case 0:
+                result.y = MIN_Y_BOX;
+                break;
+            case 1:
+                result.x = MIN_X_BOX;
+                break;
+            case 2:
+                result.y = MAX_Y_BOX;
+                break;
+            case 3:
+                result.x = MAX_X_BOX;
+                break;
+        }
+
+        result.z = TAKE_OFF_HEIGHT;
+
+        distance = DISTANCE3D((*my_pos), result);
+    }
 
     return result;
 }

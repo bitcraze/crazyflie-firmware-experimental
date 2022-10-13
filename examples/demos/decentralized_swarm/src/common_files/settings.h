@@ -96,6 +96,10 @@
 #define MIN_Z_BOUND -0.3f
 #define MAX_Z_BOUND  1.7f
 
+// getRandomPositionOnCircle or getRandomPositionOnBox
+// #define RANDOMIZATION_METHOD getRandomPositionOnCircle
+#define RANDOMIZATION_METHOD getRandomPositionOnBox
+
 // RANDOM POSITIONS ON CIRCLE
 #define NUMBER_OF_RANDOM_POINTS_ON_CIRCLE  6
 #define CIRCLE_RADIUS 0.5f
