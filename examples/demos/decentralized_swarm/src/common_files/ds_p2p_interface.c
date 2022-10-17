@@ -34,53 +34,91 @@
 
 extern enum  State state;
 
-copter_t copters[MAX_ADDRESS];
-// uint8_t otherStates[MAX_ADDRESS];//array of states of the other drones
+// State of peers
+copter_full_state_t copters[MAX_ADDRESS];
+
+// Higher level control
+static uint8_t desiredFlyingCopters = INITIAL_DESIRED_FLYING_COPTERS;
+static bool isControlDataSetYet = false;
+static int32_t controlDataTimeMs = 0;  // Valid if isControlDataSetYet == true
+
+static uint8_t counter = 0;
 
 uint8_t getCopterState(uint8_t copter_id){
     return copters[copter_id].state;
 }
 
-void p2pcallbackHandler(P2PPacket *p)
-{
-    #ifdef BUILD_PILOT_APP
-        if (p->port == 0x01){ // If packet is only for the sniffer,ignore it
-            return;
+
+void p2pcallbackHandler(P2PPacket *p) {
+    static copter_message_t rxMessage;
+
+    if (p->port != 0x00){
+        return;
+    }
+
+    uint32_t nowMs = T2M(xTaskGetTickCount());
+
+    memcpy(&rxMessage, p->data, sizeof(rxMessage));
+
+    uint8_t received_id = rxMessage.fullState.id;
+    memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
+
+    if (rxMessage.isControlDataValid) {
+        int32_t newControlDataTimeMs = nowMs - rxMessage.ageOfControlDataMs;
+        if ( ! isControlDataSetYet || newControlDataTimeMs > controlDataTimeMs) {
+            controlDataTimeMs = newControlDataTimeMs;
+            desiredFlyingCopters = rxMessage.desiredFlyingCopters;
+            isControlDataSetYet = true;
         }
-    #endif
-    // Parse the data from the other crazyflie and print it
-    // uint8_t rssi = p->rssi;
-    uint8_t received_id = p->data[0];
-    // uint8_t counter = p->data[1];
-    uint32_t now_ms = T2M(xTaskGetTickCount());
+    }
 
-    copters[received_id].id = received_id;
-    copters[received_id].counter = p->data[1];
-    copters[received_id].state = p->data[2];
-    copters[received_id].battery_voltage = p->data[15];
-    copters[received_id].terminateApp = p->data[16] == 1;
-
-    copters[received_id].timestamp = now_ms;
-
-    if (copters[received_id].terminateApp){
-        DEBUG_PRINT("Copter %d has requested to terminate the application\n", received_id);
+    if (0 == desiredFlyingCopters) {
+        // Request to terminate
         if (!getTerminateApp() &&
-            state != STATE_SNIFFING && state != STATE_CRASHED &&
-            state != STATE_WAIT_FOR_POSITION_LOCK && state != STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST){
+            state != STATE_SNIFFING &&
+            state != STATE_CRASHED &&
+            state != STATE_WAIT_FOR_POSITION_LOCK){
             setTerminateApp(true);
         }
     }
 
-    positionMeasurement_t pos_measurement;
-    memcpy(&pos_measurement.pos, &(p->data[3]), sizeof(Position));
+    // If not a message from the sniffer, send the position to the peer localization system to handle collision avoidance
+    if (received_id > 0) {
+        positionMeasurement_t pos_measurement;
+        memcpy(&pos_measurement.pos, &rxMessage.fullState.position, sizeof(Position));
 
-    // DEBUG_PRINT("===================================================\n");
-    // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+        // DEBUG_PRINT("===================================================\n");
+        // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
 
-    pos_measurement.source =  MeasurementSourceLighthouse;
-    pos_measurement.stdDev = 0.01f; //
-    peerLocalizationTellPosition(received_id,&pos_measurement);//TODO: if id is 0--> PROBLEM WITH THE LOGIC OF THE PEER LOCALIZATION (maybe add 1 to the id)
+        pos_measurement.source =  MeasurementSourceLighthouse;
+        pos_measurement.stdDev = 0.01f;
+
+        peerLocalizationTellPosition(received_id, &pos_measurement);
+    }
 }
+
+void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
+    static P2PPacket packet;
+    static copter_message_t txMessage;
+
+    memcpy(&txMessage.fullState, state, sizeof(txMessage.fullState));
+    txMessage.fullState.counter = counter;
+
+    txMessage.isControlDataValid = isControlDataSetYet;
+    if (isControlDataSetYet) {
+        txMessage.desiredFlyingCopters = desiredFlyingCopters;
+        txMessage.ageOfControlDataMs = nowMs - controlDataTimeMs;
+    }
+
+    packet.port = 0;
+    memcpy(packet.data, &txMessage, sizeof(txMessage));
+
+    packet.size = sizeof(txMessage);
+    radiolinkSendP2PPacketBroadcast(&packet);
+
+    counter += 1;
+}
+
 
 void initOtherStates(){
     for(int i=0;i<MAX_ADDRESS;i++){
@@ -126,8 +164,7 @@ void printOtherCopters(void){
 uint8_t otherCoptersActiveNumber(void){
     uint8_t nr=0;
     for(int i = 0; i < MAX_ADDRESS; i++){
-        // if they are active and not requesting to terminate the application
-        if (isCopterIdActive(i) && !copters[i].terminateApp && copters[i].state != STATE_TAKING_OFF){
+        if (isCopterIdActive(i)  && copters[i].state != STATE_TAKING_OFF){
             nr++;
         }
     }
@@ -172,16 +209,6 @@ bool isAnyOtherCopterExecutingTrajectory(void){
     return false;
 }
 
-bool appTerminationStillBeingSent(void){
-    for(int i = 1; i < MAX_ADDRESS; i++){
-        if (isCopterIdActive(i) && copters[i].terminateApp){
-            return true;
-        }
-    }
-
-    return false;
-}
-
 bool needExtraCopters(void) {
     uint8_t flying_copters = 0;
 
@@ -191,7 +218,7 @@ bool needExtraCopters(void) {
         }
     }
 
-    return flying_copters < DESIRED_FLYING_COPTERS;
+    return flying_copters < desiredFlyingCopters;
 }
 
 bool needLessCopters(void){
@@ -207,5 +234,9 @@ bool needLessCopters(void){
         flying_copters ++;
     }
 
-    return flying_copters > DESIRED_FLYING_COPTERS;
+    return flying_copters > desiredFlyingCopters;
+}
+
+uint8_t getDesiredFlyingCopters() {
+    return desiredFlyingCopters;
 }

@@ -22,15 +22,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * param_log_interface.c - Parameter log interface
- * 
+ *
  */
 
 #include "param_log_interface.h"
 
 //App parameters
-bool takeOffWhenReady = false;
-static bool terminateTrajectoryAndLand = false;
-bool terminateApp = false;
 
 static bool CollisionAvoidanceEnabled = false;
 
@@ -80,20 +77,11 @@ float getVoltage() { return logGetFloat(logIdVBat); }
 bool isCharging() { return logGetInt(logIdPmState) == charging; }
 bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
 
-//App Parameters setters
-void setTerminateTrajectoryAndLand(bool value) { terminateTrajectoryAndLand = value; }
-void setTakeOffWhenReady(bool value) { takeOffWhenReady = value; }
-void setTerminateApp(bool value) { terminateApp = value; }
-
-//App Parameters getters
-bool getTerminateTrajectoryAndLand() { return terminateTrajectoryAndLand; }
-bool getTakeOffWhenReady() { return takeOffWhenReady; }
-bool getTerminateApp() { return terminateApp; }
 
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
 
 
-void enableCollisionAvoidance() { 
+void enableCollisionAvoidance() {
     if (!CollisionAvoidanceEnabled) {
         DEBUG_PRINT("Enabling Collision Avoidance\n");
         paramSetInt(paramIdCollisionAvoidanceEnable, 1);
@@ -101,7 +89,7 @@ void enableCollisionAvoidance() {
     }
 }
 
-void disableCollisionAvoidance() { 
+void disableCollisionAvoidance() {
     if (paramGetInt(paramIdCollisionAvoidanceEnable) == 1) {
         DEBUG_PRINT("Disabling Collision Avoidance\n");
         paramSetInt(paramIdCollisionAvoidanceEnable, 0);
@@ -114,7 +102,7 @@ void initCollisionAvoidance(){
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
     paramSetFloat(paramIdCollisionAvoidanceHorizon, COLLISION_AVOIDANCE_HORIZON);
     paramSetFloat(paramIdCollisionAvoidanceMaxVel, COLLISION_AVOIDANCE_MAX_VELOCITY);
-    
+
     paramSetFloat(paramIdCollisionAvoidanceBBoxMaxX, COLLISION_AVOIDANCE_BBOX_MAX_X);
     paramSetFloat(paramIdCollisionAvoidanceBBoxMaxY, COLLISION_AVOIDANCE_BBOX_MAX_Y);
     paramSetFloat(paramIdCollisionAvoidanceBBoxMaxZ, COLLISION_AVOIDANCE_BBOX_MAX_Z);
@@ -158,12 +146,6 @@ void initParamLogInterface(){
     paramIdCollisionAvoidanceBBoxMinX = paramGetVarId("colAv", "bboxMinX");
     paramIdCollisionAvoidanceBBoxMinY = paramGetVarId("colAv", "bboxMinY");
     paramIdCollisionAvoidanceBBoxMinZ = paramGetVarId("colAv", "bboxMinZ");
-     
+
     initLogIds();
 }
-
-PARAM_GROUP_START(app)
-  PARAM_ADD(PARAM_UINT8, takeoff, &takeOffWhenReady)
-  PARAM_ADD(PARAM_UINT8, stop, &terminateTrajectoryAndLand)
-  PARAM_ADD(PARAM_UINT8, terminateApp, &terminateApp)
-PARAM_GROUP_STOP(app)

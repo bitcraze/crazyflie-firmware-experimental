@@ -23,11 +23,11 @@
  *
  *
  * common.h - Common State for the apps
- * 
+ *
  */
 #pragma once
 
-// States of the state machine 
+// States of the state machine
 enum State {
     // Initialization
     STATE_IDLE = 0,
@@ -48,7 +48,7 @@ enum State {
     STATE_CHECK_CHARGING,
     STATE_REPOSITION_ON_PAD,
     STATE_APP_TERMINATION,
-    STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST,
+    STATE_WAIT_FOR_STOPPED_TERMINATION_BROADCAST, // Not used
     STATE_CRASHED,
     STATE_SNIFFING,
     STATE_UNKNOWN = 255,

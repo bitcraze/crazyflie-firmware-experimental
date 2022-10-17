@@ -41,29 +41,35 @@
 #include "peer_localization.h"
 #include "settings.h"
 
-/*
-    PACKET FORMAT:
-    [0]     --> id
-    [1]     --> counter
-    [2]     --> state
-    [3-14]  --> x,y,z
-    [15]    --> compressed Voltage
-*/
 #define MAX_ADDRESS 10
 
 #define VOLTAGE_MAX 4.2f
 #define VOLTAGE_MIN 3.0f
 
-typedef struct packet_struct {
+typedef struct {
+    // State communication
     uint8_t id;
     uint8_t counter;
     uint8_t state;
     uint8_t battery_voltage; //normalized to 0-255 (0-3.3V)
-    bool terminateApp;
-
     uint32_t timestamp;
+    Position position;
+} copter_full_state_t;
 
-} copter_t;
+typedef struct {
+    copter_full_state_t fullState;
+
+    // Higher level control ------
+
+    // The age of the control data is (in ms). When receiving data, ignore it if it is older than the current data.
+    // When transmitting, set the age to match what was received + the time that has passed since then.
+    int32_t ageOfControlDataMs;
+    uint8_t isControlDataValid;
+    uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
+} copter_message_t;
+
+
+void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs);
 
 uint8_t getCopterState(uint8_t copter_id);
 
@@ -93,12 +99,12 @@ uint8_t getMinimumFlyingCopterId(void);
 
 bool isAnyOtherCopterExecutingTrajectory(void);
 
-bool appTerminationStillBeingSent(void);
-
 bool selfIsFlying(void);
 
 bool needExtraCopters(void);
 
 bool needLessCopters(void);
+
+uint8_t getDesiredFlyingCopters();
 
 #endif // P2P_INTERFACE_H

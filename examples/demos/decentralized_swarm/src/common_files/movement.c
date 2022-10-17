@@ -49,8 +49,8 @@ void gotoNextWaypoint(float x,float y,float z,float duration){
     goToWayPointPositionBased(x,y,z,duration,REACHED_WP_TIMEOUT);
 }
 
-void gotoChargingPad(float x,float y,float z,float duration){
-    goToWayPointPositionBased(x,y,z,duration,REACHED_CHARGING_PAD_TIMEOUT);
+void gotoChargingPad(float x,float y,float z){
+    goToWayPointPositionBased(x, y, z + TAKE_OFF_HEIGHT, GO_TO_PAD_DURATION, REACHED_CHARGING_PAD_TIMEOUT);
 }
 
 bool reachedNextWaypoint(Position my_pos){

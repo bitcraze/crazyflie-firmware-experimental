@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * movement.h - Movement functions for the pilot
- * 
+ *
  */
 
 #ifndef  MOVEMENT_H
@@ -41,14 +41,14 @@
 #include "pptraj.h"
 
 // This function will move the Crazyflie to the next waypoint via the high level commander.
-// It is used as a function because it works with the reachedNextWaypoint() since  
+// It is used as a function because it works with the reachedNextWaypoint() since
 // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
 void gotoNextWaypoint(float x,float y,float z,float duration);
 
 // This function will move the Crazyflie to the next waypoint via the high level commander.
-// It is used as a function because it works with the reachedNextWaypoint() since  
+// It is used as a function because it works with the reachedNextWaypoint() since
 // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
-void gotoChargingPad(float x,float y,float z,float duration);
+void gotoChargingPad(float x, float y, float z);
 
 bool reachedNextWaypoint(Position my_pos);
 
