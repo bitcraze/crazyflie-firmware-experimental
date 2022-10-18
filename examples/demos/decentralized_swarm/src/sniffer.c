@@ -38,6 +38,7 @@
 #include "app.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include "timers.h"
 #include "radiolink.h"
 #include "configblock.h"
 #include "float.h"
@@ -50,14 +51,12 @@
 #include "param_log_interface.h"
 #include "common.h"
 
-extern copter_full_state_t copters[MAX_ADDRESS]; //TODO:instead of extern, use a function that returns a pointer to the array
+
+static xTimerHandle broadcastTimer;
 
 
-
-static void broadcastData(uint8_t newDesired) {
+static void broadcastData(xTimerHandle timer) {
     uint32_t nowMs = T2M(xTaskGetTickCount());
-
-    setDesiredFlyingCopters(newDesired);
 
     copter_full_state_t fullState;
 
@@ -76,13 +75,13 @@ static void broadcastData(uint8_t newDesired) {
 static uint8_t lessCoptersVal;
 static void lessCopters() {
     if (getDesiredFlyingCopters() > 0) {
-        broadcastData(getDesiredFlyingCopters() - 1);
+        setDesiredFlyingCopters(getDesiredFlyingCopters() - 1);
     }
 }
 
 static uint8_t moreCoptersVal;
 static void moreCopters() {
-    broadcastData(getDesiredFlyingCopters() + 1);
+    setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
 }
 
 
@@ -92,6 +91,10 @@ void appMain()
 
     initP2P();
     initOtherStates();
+
+    broadcastTimer = xTimerCreate("SendPosTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, broadcastData);
+    xTimerStart(broadcastTimer, 20);
+
 
     while(1) {
         vTaskDelay(M2T(SNIFFER_PRINT_PERIOD_MS));
