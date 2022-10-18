@@ -68,12 +68,11 @@ typedef struct {
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
 } copter_message_t;
 
+void initP2P();
 
 void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs);
 
 uint8_t getCopterState(uint8_t copter_id);
-
-void p2pcallbackHandler(P2PPacket *p);
 
 void initOtherStates();
 
@@ -83,14 +82,7 @@ uint8_t compressVoltage(float voltage);
 
 float decompressVoltage(uint8_t voltage);
 
-//Returns true if at least one copter has flown (doesn't mean that it is alive)
-bool atLeastOneCopterHasFlown(void);
-
 void printOtherCopters(void);
-
-uint8_t otherCoptersActiveNumber(void);
-
-bool isCopterIdActive(uint8_t copter_id);
 
 //Returns true if the copter is active and flying
 bool isCopterFlying(uint8_t copter_id);
@@ -99,12 +91,11 @@ uint8_t getMinimumFlyingCopterId(void);
 
 bool isAnyOtherCopterExecutingTrajectory(void);
 
-bool selfIsFlying(void);
+bool needMoreCopters(enum State ownState);
 
-bool needExtraCopters(void);
-
-bool needLessCopters(void);
+bool needLessCopters(enum State ownState);
 
 uint8_t getDesiredFlyingCopters();
+void setDesiredFlyingCopters(uint8_t desired);
 
 #endif // P2P_INTERFACE_H

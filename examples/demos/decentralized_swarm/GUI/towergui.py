@@ -95,23 +95,9 @@ class Crazyflie(ttk.Frame):
         self._led['background'] = "grey"
         self._led['foreground'] = "grey"
 
-    def wait_take_off_check(self, new_text):
-        """
-        This function checks if the copter enters in the wait_for_takeoff state.
-        If it does, it starts counting from that time in order to handle the state
-        of the take off button.
-        """
-        if new_text != self._status['text']:
-            if new_text == "WAIT TAKE OFF" and not self.wait_for_takeoff_already_shown:
-                self.wait_for_takeoff_already_shown = True
-                self.last_time_wait_for_takeoff = time.time()
-            else:
-                self.wait_for_takeoff_already_shown = False
-
     def set_state(self, state):
         if state in state_dict:
             new_text = state_dict[state][0]
-            self.wait_take_off_check(new_text)
             self._status.config(text=new_text, fg=state_dict[state][1])
         else:
             self._status.config(text="ERROR", fg="grey")
@@ -153,27 +139,33 @@ class ButtonsFrame(ttk.Frame):
         # Buttons frame
         buttons_frame = ttk.Frame(parent)
 
-        # Take off button
-        self.takeoff_button = tk.Button(buttons_frame, text="TAKE OFF", command=self.take_off,
+        # Less copters
+        self.less_button = tk.Button(buttons_frame, text="Less", command=self.less_copters,
                                         width=self.WIDTH, height=self.HEIGHT,
-                                        background=_from_rgb(93, 227, 9),
-                                        activebackground=_from_rgb(93, 215, 9),
+                                        background=_from_rgb(240, 20, 11),
+                                        activebackground=_from_rgb(212, 20, 11),
                                         activeforeground="#000")
-        self.takeoff_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
+        self.less_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
 
-        # terminate button
-        self.terminate_button = tk.Button(buttons_frame,
-                                          text="TERMINATE",
-                                          command=self.terminate,
+        self._desired_label = ttk.Label(buttons_frame, text="", font=("ubuntu", 33))
+        self._desired_label.grid(row=0, column=1)
+
+        # More copters
+        self.more_button = tk.Button(buttons_frame,
+                                          text="More",
+                                          command=self.more_copters,
                                           width=self.WIDTH, height=self.HEIGHT,
-                                          background=_from_rgb(240, 20, 11),
-                                          activebackground=_from_rgb(212, 20, 11),
+                                          background=_from_rgb(93, 227, 9),
+                                          activebackground=_from_rgb(93, 215, 9),
                                           activeforeground="#000")
 
-        self.terminate_button.grid(row=0, column=1, padx=self.PADX, pady=self.PADY)
+        self.more_button.grid(row=0, column=2, padx=self.PADX, pady=self.PADY)
 
         # insert buttons frame in the content
         buttons_frame.grid(row=3 + 1, column=0, columnspan=3)
+
+    def update_desired(self, desired):
+        self._desired_label.config(text=f"{desired}")
 
     def _send_command(self, command):
         command_obj = {
@@ -185,40 +177,11 @@ class ButtonsFrame(ttk.Frame):
         except Exception as e:
             print(Fore.RED + "Error sending report: {}".format(e), Fore.RESET)
 
-    def take_off(self):
-        print("Take off")
-        self._send_command("take_off")
+    def less_copters(self):
+        self._send_command("less")
 
-    def terminate(self):
-        print("Terminate")
-        self._send_command("terminate")
-
-
-class SnifferActionFrame(ttk.Frame):
-    PADX = 40
-
-    def __init__(self, parent, interface_socket: zmq.Socket = None):
-        ttk.Frame.__init__(self, parent)
-
-        # Sniffer actions frame
-        sniffer_actions_frame = ttk.Frame(parent)
-        sniffer_actions_frame.grid(row=0, column=2)
-
-        # Command Label
-        command_label_descr = ttk.Label(sniffer_actions_frame, text="SNIFFER COMMAND:", padding=(0, 0, 0, 0))
-        command_label_descr.grid(row=0, column=0, sticky="ew")
-
-        self.command_label = ttk.Label(sniffer_actions_frame, text="TAKE OFF", anchor=tk.CENTER, padding=(self.PADX, 0, 0, 0))
-        self.command_label.grid(row=0, column=1, sticky="e")
-
-    def update(self, command):
-        self.command_label['text'] = command
-        color_map = {
-            "NONE": "grey",
-            "TAKE OFF": "green",
-            "TERMINATE": "red",
-        }
-        self.command_label['foreground'] = color_map[command]
+    def more_copters(self):
+        self._send_command("more")
 
 
 sniffer_thread = snifferThread()
@@ -242,7 +205,6 @@ content.grid(column=0, row=0)
 root.columnconfigure(0, weight=1)
 root.rowconfigure(0, weight=1)
 
-snifferActions = SnifferActionFrame(content)
 
 cfs: List[Crazyflie] = []
 for i in range(MAX_COPTERS):
@@ -272,17 +234,6 @@ def tkloop():
     except Exception:
         pass
 
-    # Take off button state check
-    for i, cf in enumerate(cfs):
-        state = cf.get_state()
-        now = time.time()
-        # If at least one copter waits for take off for more than a threshold, the take off button is enabled
-        if state == "WAIT TAKE OFF" and now - cf.last_time_wait_for_takeoff > 2:
-            buttons.takeoff_button['state'] = 'normal'
-            break
-        else:
-            buttons.takeoff_button['state'] = 'disabled'
-
     root.after(100, tkloop)
 
 
@@ -301,7 +252,9 @@ def receive_thread():
                 "===================================================================================")
             for i, data in enumerate(report):
                 if data['id'] == "action":
-                    snifferActions.update(data['action'])
+                    desired = data['desired']
+                    buttons.update_desired(desired)
+                    print(f"Desired: {desired}")
                 else:
                     # -1 because index starts at 0 and all flying copters have adrreses >=
                     print(data)

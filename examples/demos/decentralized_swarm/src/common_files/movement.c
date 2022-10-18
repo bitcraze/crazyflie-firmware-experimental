@@ -46,7 +46,7 @@ static void goToWayPointPositionBased(float x,float y,float z,float duration,uin
 }
 
 void gotoNextWaypoint(float x,float y,float z,float duration){
-    goToWayPointPositionBased(x,y,z,duration,REACHED_WP_TIMEOUT);
+    goToWayPointPositionBased(x, y, z, duration, REACHED_WP_TIMEOUT);
 }
 
 void gotoChargingPad(float x,float y,float z){

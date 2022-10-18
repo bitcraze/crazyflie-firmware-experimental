@@ -22,7 +22,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  *
  * param_log_interface.h - Parameter log interface
- * 
+ *
  */
 #pragma once
 
@@ -38,20 +38,20 @@
 float getX();
 float getY();
 float getZ();
-float getVx(); 
-float getVy(); 
-float getVz(); 
+float getVx();
+float getVy();
+float getVz();
 float getVelMagnitude();
-float getVarPX(); 
-float getVarPY(); 
-float getVarPZ(); 
-bool isBatLow(); 
+float getVarPX();
+float getVarPY();
+float getVarPZ();
+bool isBatLow();
 float getVoltage();
-bool isCharging(); 
-bool isLighthouseAvailable(); 
-void enableHighlevelCommander(); 
+bool isCharging();
+bool isLighthouseAvailable();
+void enableHighlevelCommander();
 
-void enableCollisionAvoidance(); 
+void enableCollisionAvoidance();
 void disableCollisionAvoidance();
 
 // initialize logs and params
@@ -59,11 +59,3 @@ void initCollisionAvoidance();
 void initLogIds();
 
 void initParamLogInterface();
-
-void setTerminateTrajectoryAndLand(bool value);
-void setTakeOffWhenReady(bool value);
-void setTerminateApp(bool value);
-
-bool getTerminateTrajectoryAndLand();
-bool getTakeOffWhenReady();
-bool getTerminateApp();

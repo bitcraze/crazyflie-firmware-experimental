@@ -32,7 +32,7 @@
 #define TERMINATION_BROADCAST_STOPPED_TIMEOUT 10*1000 // msec
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
-#define INITIAL_DESIRED_FLYING_COPTERS 1
+#define INITIAL_DESIRED_FLYING_COPTERS 0
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
 // Randomizing takeoff times
@@ -52,10 +52,10 @@
 // P2P Interface
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 
-#define BROADCAST_FREQUENCY_HZ 15
+#define BROADCAST_FREQUENCY_HZ 10
 #define CALC_NEXT_FREQUENCY_HZ 3
 
-#define SNIFFER_PRINT_FREQUENCY_HZ 5
+#define SNIFFER_PRINT_FREQUENCY_HZ 1
 
 #define ALIVE_TIMEOUT_MS 1000 //ms after not receiving data from a copter ,it is considered dead
 
@@ -70,7 +70,6 @@
 #define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 4.0f //sec duration to go to next delta
 
-#define HOVERING_TIME 18*1000 //ms
 #define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad

@@ -27,12 +27,12 @@
 
 #include "FreeRTOS.h"
 #include "task.h"
+#include "log.h"
+
 
 #include "ds_p2p_interface.h"
 #include "param_log_interface.h"
 
-
-extern enum  State state;
 
 // State of peers
 copter_full_state_t copters[MAX_ADDRESS];
@@ -49,7 +49,7 @@ uint8_t getCopterState(uint8_t copter_id){
 }
 
 
-void p2pcallbackHandler(P2PPacket *p) {
+static void p2pcallbackHandler(P2PPacket *p) {
     static copter_message_t rxMessage;
 
     if (p->port != 0x00){
@@ -62,6 +62,7 @@ void p2pcallbackHandler(P2PPacket *p) {
 
     uint8_t received_id = rxMessage.fullState.id;
     memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
+    copters[received_id].timestamp = nowMs;
 
     if (rxMessage.isControlDataValid) {
         int32_t newControlDataTimeMs = nowMs - rxMessage.ageOfControlDataMs;
@@ -69,16 +70,6 @@ void p2pcallbackHandler(P2PPacket *p) {
             controlDataTimeMs = newControlDataTimeMs;
             desiredFlyingCopters = rxMessage.desiredFlyingCopters;
             isControlDataSetYet = true;
-        }
-    }
-
-    if (0 == desiredFlyingCopters) {
-        // Request to terminate
-        if (!getTerminateApp() &&
-            state != STATE_SNIFFING &&
-            state != STATE_CRASHED &&
-            state != STATE_WAIT_FOR_POSITION_LOCK){
-            setTerminateApp(true);
         }
     }
 
@@ -95,6 +86,10 @@ void p2pcallbackHandler(P2PPacket *p) {
 
         peerLocalizationTellPosition(received_id, &pos_measurement);
     }
+}
+
+void initP2P() {
+    p2pRegisterCB(p2pcallbackHandler);
 }
 
 void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
@@ -126,8 +121,9 @@ void initOtherStates(){
     }
 }
 
-bool isAlive(uint8_t copter_id){
-    uint32_t dt = T2M(xTaskGetTickCount()) - copters[copter_id].timestamp;
+bool isAlive(uint8_t copter_id) {
+    uint32_t nowMs = T2M(xTaskGetTickCount());
+    uint32_t dt = nowMs - copters[copter_id].timestamp;
     return dt < ALIVE_TIMEOUT_MS;
 }
 
@@ -139,17 +135,8 @@ float decompressVoltage(uint8_t voltage){
     return (voltage / 255.0f) * (VOLTAGE_MAX - VOLTAGE_MIN) + VOLTAGE_MIN;
 }
 
-bool atLeastOneCopterHasFlown(void){
-    for(int i = 0; i < MAX_ADDRESS; i++){
-        if(copters[i].state != STATE_UNKNOWN){
-            return true;
-        }
-    }
-    return false;
-}
-
 void printOtherCopters(void){
-    for(int i = 0; i<MAX_ADDRESS; i++){
+    for (int i = 0; i < MAX_ADDRESS; i++) {
         if (copters[i].state != STATE_UNKNOWN){
             if (!peerLocalizationIsIDActive(i)){
                 DEBUG_PRINT("Copter %d is not active\n",i);
@@ -161,29 +148,12 @@ void printOtherCopters(void){
     }
 }
 
-uint8_t otherCoptersActiveNumber(void){
-    uint8_t nr=0;
-    for(int i = 0; i < MAX_ADDRESS; i++){
-        if (isCopterIdActive(i)  && copters[i].state != STATE_TAKING_OFF){
-            nr++;
-        }
-    }
-    return nr;
-}
-
-bool selfIsFlying(void){
-    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD && !getTerminateApp();
-}
-
-bool isCopterIdActive(uint8_t copter_id){
-    uint32_t now = T2M(xTaskGetTickCount());
-    uint32_t dt = now - copters[copter_id].timestamp;
-    return dt < ALIVE_TIMEOUT_MS;
+static bool isFlyingState(enum State state) {
+    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD;
 }
 
 bool isCopterFlying(uint8_t copter_id){
-    bool state_condition = copters[copter_id].state >=  STATE_TAKING_OFF && copters[copter_id].state < STATE_GOING_TO_PAD;
-    return state_condition && isCopterIdActive(copter_id); ;
+    return isAlive(copter_id) && isFlyingState(copters[copter_id].state);
 }
 
 uint8_t getMinimumFlyingCopterId(void){
@@ -209,7 +179,7 @@ bool isAnyOtherCopterExecutingTrajectory(void){
     return false;
 }
 
-bool needExtraCopters(void) {
+static int getNrOfFlyingCopters(enum State ownState) {
     uint8_t flying_copters = 0;
 
     for (int i = 1; i < MAX_ADDRESS; i++) {
@@ -218,25 +188,49 @@ bool needExtraCopters(void) {
         }
     }
 
-    return flying_copters < desiredFlyingCopters;
+    if (isFlyingState(ownState)){
+        flying_copters += 1;
+    }
+
+    return flying_copters;
 }
 
-bool needLessCopters(void){
-    uint8_t flying_copters = 0;
+bool needMoreCopters(enum State ownState) {
+    return getNrOfFlyingCopters(ownState) < desiredFlyingCopters;
+}
 
-    for (int i = 1; i < MAX_ADDRESS; i++) {
-        if (isCopterFlying(i)) {
-            flying_copters ++;
-        }
-    }
-
-    if (selfIsFlying()){
-        flying_copters ++;
-    }
-
-    return flying_copters > desiredFlyingCopters;
+bool needLessCopters(enum State ownState){
+    return getNrOfFlyingCopters(ownState) > desiredFlyingCopters;
 }
 
 uint8_t getDesiredFlyingCopters() {
     return desiredFlyingCopters;
 }
+
+void setDesiredFlyingCopters(uint8_t desired) {
+    desiredFlyingCopters = desired;
+    isControlDataSetYet = true;
+    controlDataTimeMs = T2M(xTaskGetTickCount());
+}
+
+//LOGS
+
+#define add_copter_log(i)   LOG_GROUP_START(id_##i)\
+                            LOG_ADD(LOG_UINT8, state, &copters[i].state)\
+                            LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\
+                            LOG_ADD(LOG_UINT8, counter, &copters[i].counter)\
+                            LOG_GROUP_STOP(id_i)
+
+add_copter_log(1)
+add_copter_log(2)
+add_copter_log(3)
+add_copter_log(4)
+add_copter_log(5)
+add_copter_log(6)
+add_copter_log(7)
+add_copter_log(8)
+add_copter_log(9)
+
+LOG_GROUP_START(ds)
+LOG_ADD(LOG_UINT8, desired, &desiredFlyingCopters)
+LOG_GROUP_STOP(ds)
