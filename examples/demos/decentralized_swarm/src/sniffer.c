@@ -53,35 +53,45 @@
 
 
 static xTimerHandle broadcastTimer;
+static uint32_t endBroadcastTime = 0;
 
 
 static void broadcastData(xTimerHandle timer) {
     uint32_t nowMs = T2M(xTaskGetTickCount());
 
-    copter_full_state_t fullState;
+    if (nowMs < endBroadcastTime) {
+        copter_full_state_t fullState;
 
-    fullState.id = 0;  // The sniffer
-    // fullState.counter - set when transmitted
-    fullState.state = STATE_SNIFFING;
-    fullState.battery_voltage = 0;
-    fullState.timestamp = nowMs;
-    fullState.position.x = 0.0f;
-    fullState.position.y = 0.0f;
-    fullState.position.z = 0.0f;
+        fullState.id = 0;  // The sniffer
+        // fullState.counter - set when transmitted
+        fullState.state = STATE_SNIFFING;
+        fullState.battery_voltage = 0;
+        fullState.timestamp = nowMs;
+        fullState.position.x = 0.0f;
+        fullState.position.y = 0.0f;
+        fullState.position.z = 0.0f;
 
-    broadcastToPeers(&fullState, nowMs);
+        broadcastToPeers(&fullState, nowMs);
+    }
+}
+
+static void broadcastDesiredFlyingCopters(uint8_t desired) {
+    setDesiredFlyingCopters(desired);
+    endBroadcastTime = T2M(xTaskGetTickCount()) + 1000;
 }
 
 static uint8_t lessCoptersVal;
 static void lessCopters() {
-    if (getDesiredFlyingCopters() > 0) {
-        setDesiredFlyingCopters(getDesiredFlyingCopters() - 1);
+    uint8_t desired = getDesiredFlyingCopters();
+    if (desired > 0) {
+        desired -= 1;
     }
+    broadcastDesiredFlyingCopters(desired);
 }
 
 static uint8_t moreCoptersVal;
 static void moreCopters() {
-    setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
+    broadcastDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
 }
 
 
