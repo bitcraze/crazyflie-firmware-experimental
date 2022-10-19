@@ -29,7 +29,6 @@
 
 #define EXECUTE_TRAJ true
 
-#define TERMINATION_BROADCAST_STOPPED_TIMEOUT 10*1000 // msec
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.0f
 #define INITIAL_DESIRED_FLYING_COPTERS 0
@@ -65,12 +64,7 @@
 #define POSITION_LOCK_TIMEOUT 10000
 
 // NEXT DELTA
-#define INTER_DIST 0.4f //distance between crazyflies
-
-#define MAXIMUM_NEXT_DELTA 0.2f
 #define DELTA_DURATION 4.0f //sec duration to go to next delta
-
-#define POSITION_UPDATE_TIMEOUT_MS 1500 //ms Timeout to ignore position updates from another copter
 
 //Landing to charging pad
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
@@ -83,8 +77,6 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 10000 //ms
 
 // BOUNDS DEFINITIONS
-#define SAFETY_LANDING_DURATION 6 //sec
-
 #define MIN_X_BOUND -0.69f
 #define MAX_X_BOUND  1.10f
 
