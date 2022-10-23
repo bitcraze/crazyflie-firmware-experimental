@@ -34,7 +34,7 @@
 #include "param_log_interface.h"
 
 #define THE_MAGIC_NUMBER 0xbc471117
-#define P2P_PORT 17
+#define P2P_PORT 5
 
 // State of peers
 copter_full_state_t copters[MAX_ADDRESS];
