@@ -194,7 +194,11 @@ static void stateTransition(xTimerHandle timer){
     if(supervisorIsTumbled()) {
         state = STATE_CRASHED;
     }
-    else if (isBatLow()) {
+    else if (isBatLow() && (
+        state == STATE_HOVERING ||
+        state == STATE_GOING_TO_RANDOM_POINT ||
+        state == STATE_EXECUTING_TRAJECTORY
+    )) {
         DEBUG_PRINT("Battery low, landing\n");
         gotoChargingPad(padX, padY, padZ);
         state = STATE_GOING_TO_PAD;
