@@ -143,6 +143,14 @@ bool isAlive(uint8_t copter_id) {
 }
 
 uint8_t compressVoltage(float voltage){
+    if (voltage <= VOLTAGE_MIN) {
+        return 0;
+    }
+
+    if (voltage >= VOLTAGE_MAX) {
+        return 255;
+    }
+
     return (uint8_t) ((voltage - VOLTAGE_MIN) / (VOLTAGE_MAX - VOLTAGE_MIN) * 255);
 }
 
