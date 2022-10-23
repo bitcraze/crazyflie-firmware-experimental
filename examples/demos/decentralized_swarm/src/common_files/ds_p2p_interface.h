@@ -66,6 +66,7 @@ typedef struct {
     int32_t ageOfControlDataMs;
     uint8_t isControlDataValid;
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
+    uint32_t magicNumber;
 } copter_message_t;
 
 void initP2P();

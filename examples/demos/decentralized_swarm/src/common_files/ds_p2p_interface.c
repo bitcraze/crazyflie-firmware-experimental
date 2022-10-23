@@ -33,6 +33,8 @@
 #include "ds_p2p_interface.h"
 #include "param_log_interface.h"
 
+#define THE_MAGIC_NUMBER 0xbc471117
+#define P2P_PORT 17
 
 // State of peers
 copter_full_state_t copters[MAX_ADDRESS];
@@ -52,13 +54,19 @@ uint8_t getCopterState(uint8_t copter_id){
 static void p2pcallbackHandler(P2PPacket *p) {
     static copter_message_t rxMessage;
 
-    if (p->port != 0x00){
+    if (p->port != P2P_PORT){
+        DEBUG_PRINT("Wrong port %u\n", p->port);
         return;
     }
 
     uint32_t nowMs = T2M(xTaskGetTickCount());
 
     memcpy(&rxMessage, p->data, sizeof(rxMessage));
+
+    if (rxMessage.magicNumber != THE_MAGIC_NUMBER) {
+        DEBUG_PRINT("Wrong magic number %lu from %u\n", rxMessage.magicNumber, rxMessage.fullState.id);
+        return;
+    }
 
     uint8_t received_id = rxMessage.fullState.id;
     memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
@@ -105,7 +113,9 @@ void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
         txMessage.ageOfControlDataMs = nowMs - controlDataTimeMs;
     }
 
-    packet.port = 0;
+    txMessage.magicNumber = THE_MAGIC_NUMBER;
+
+    packet.port = 17;
     memcpy(packet.data, &txMessage, sizeof(txMessage));
 
     packet.size = sizeof(txMessage);
