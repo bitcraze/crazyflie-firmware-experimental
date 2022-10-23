@@ -304,7 +304,10 @@ static void stateTransition(xTimerHandle timer){
             }
             break;
         case STATE_WAITING_AT_PAD:
-            if (now_ms > stabilizeEndTime_ms || ((fabs(padX - getX()) < MAX_PAD_ERR) && (fabs(padY - getY()) < MAX_PAD_ERR))) {
+            if (now_ms > stabilizeEndTime_ms || (
+                (fabs(padX - getX()) < MAX_PAD_ERR) &&
+                (fabs(padY - getY()) < MAX_PAD_ERR) &&
+                (fabs((padZ + LANDING_HEIGHT) - getZ()) < MAX_PAD_ERR))) {
                 if (now_ms > stabilizeEndTime_ms) {
                     DEBUG_PRINT("Warning: timeout!\n");
                 }
