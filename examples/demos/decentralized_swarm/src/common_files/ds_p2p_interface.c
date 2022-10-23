@@ -70,7 +70,7 @@ static void p2pcallbackHandler(P2PPacket *p) {
 
     uint8_t received_id = rxMessage.fullState.id;
     if (received_id >= MAX_ADDRESS) {
-        DEBUG_PRINT("CCan not handle id %u\n", received_id);
+        DEBUG_PRINT("Can not handle id %u\n", received_id);
         return;
     }
 
@@ -88,16 +88,27 @@ static void p2pcallbackHandler(P2PPacket *p) {
 
     // If not a message from the sniffer, send the position to the peer localization system to handle collision avoidance
     if (received_id > 0) {
-        positionMeasurement_t pos_measurement;
-        memcpy(&pos_measurement.pos, &rxMessage.fullState.position, sizeof(Position));
+        enum State state = rxMessage.fullState.state;
+        if (state == STATE_TAKING_OFF ||
+            state == STATE_EXECUTING_TRAJECTORY ||
+            state == STATE_GOING_TO_PAD ||
+            state == STATE_GOING_TO_RANDOM_POINT ||
+            state == STATE_GOING_TO_TRAJECTORY_START ||
+            state == STATE_HOVERING ||
+            state == STATE_LANDING ||
+            state == STATE_PREPARING_FOR_LAND) {
 
-        // DEBUG_PRINT("===================================================\n");
-        // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
+            positionMeasurement_t pos_measurement;
+            memcpy(&pos_measurement.pos, &rxMessage.fullState.position, sizeof(Position));
 
-        pos_measurement.source =  MeasurementSourceLighthouse;
-        pos_measurement.stdDev = 0.01f;
+            // DEBUG_PRINT("===================================================\n");
+            // DEBUG_PRINT("[RSSI: -%d dBm] Message from CF nr. %d  with counter: %d --> (%.2f , %.2f , %.2f)\n", rssi, received_id, counter,(double)pos_received.x,(double)pos_received.y,(double)pos_received.z);
 
-        peerLocalizationTellPosition(received_id, &pos_measurement);
+            pos_measurement.source =  MeasurementSourceLighthouse;
+            pos_measurement.stdDev = 0.01f;
+
+            peerLocalizationTellPosition(received_id, &pos_measurement);
+        }
     }
 }
 
