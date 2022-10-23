@@ -69,6 +69,11 @@ static void p2pcallbackHandler(P2PPacket *p) {
     }
 
     uint8_t received_id = rxMessage.fullState.id;
+    if (received_id >= MAX_ADDRESS) {
+        DEBUG_PRINT("CCan not handle id %u\n", received_id);
+        return;
+    }
+
     memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
     copters[received_id].timestamp = nowMs;
 
@@ -115,7 +120,7 @@ void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
 
     txMessage.magicNumber = THE_MAGIC_NUMBER;
 
-    packet.port = 17;
+    packet.port = P2P_PORT;
     memcpy(packet.data, &txMessage, sizeof(txMessage));
 
     packet.size = sizeof(txMessage);
