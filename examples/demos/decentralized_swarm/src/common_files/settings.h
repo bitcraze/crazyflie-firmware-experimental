@@ -44,7 +44,7 @@
 // Go to next waypoint
 #define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
 #define WP_VEL_THRESHOLD          0.4f //velocity threshold to consider a waypoint reached
-#define REACHED_WP_TIMEOUT        7000 //ms
+#define REACHED_WP_TIMEOUT        4000 //ms
 #define COPTER_FLYING_ABOVE_THRESHOLD 0.3f //radius of cylinder that defines if a copter is flying above
 
 
@@ -107,6 +107,9 @@
 #define MIN_Y_BOX (MIN_Y_BOUND + RANDOM_BOX_MARGIN)
 #define MAX_Y_BOX (MAX_Y_BOUND - RANDOM_BOX_MARGIN)
 #define CENTER_Y_BOX ((MIN_Y_BOX + MAX_Y_BOX) / 2.0f)
+
+#define MIN_Z_BOX (TAKE_OFF_HEIGHT - 0.2f)
+#define MAX_Z_BOX (TAKE_OFF_HEIGHT + 0.2f)
 
 // Random trajectory execution
 #define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory

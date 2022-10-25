@@ -123,7 +123,8 @@ Position getRandomPositionOnBox(Position* my_pos) {
                 break;
         }
 
-        result.z = TAKE_OFF_HEIGHT;
+        float zFactor = (float)((rand() % 100) / 100.0f);
+        result.z = zFactor * (MAX_Z_BOX - MIN_Z_BOX) + MIN_Z_BOX;
 
         distance = DISTANCE3D((*my_pos), result);
     }
