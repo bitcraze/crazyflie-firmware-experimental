@@ -43,7 +43,7 @@
 // This function will move the Crazyflie to the next waypoint via the high level commander.
 // It is used as a function because it works with the reachedNextWaypoint() since
 // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
-void gotoNextWaypoint(float x,float y,float z,float duration);
+void gotoNextWaypoint(float x, float y, float z, float yaw, float duration);
 
 // This function will move the Crazyflie to the next waypoint via the high level commander.
 // It is used as a function because it works with the reachedNextWaypoint() since

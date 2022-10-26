@@ -254,12 +254,12 @@ static void stateTransition(xTimerHandle timer){
             } else {
                 if (shouldFlySpecialTrajectory()) {
                     DEBUG_PRINT("Special trajectory\n");
-                    gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, DELTA_DURATION);
+                    gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                     state = STATE_GOING_TO_TRAJECTORY_START;
                 } else {
-                    Position new_pos = RANDOMIZATION_METHOD(&my_pos);
+                    PositionWithYaw new_pos = RANDOMIZATION_METHOD(&my_pos);
                     DEBUG_PRINT("Normal new waypoint (%.2f, %.2f, %.2f)\n", (double)new_pos.x, (double)new_pos.y, (double)new_pos.z);
-                    gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, DELTA_DURATION);
+                    gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, new_pos.yaw, DELTA_DURATION);
                     state = STATE_GOING_TO_RANDOM_POINT;
                 }
             }
@@ -346,7 +346,7 @@ static void stateTransition(xTimerHandle timer){
         case STATE_REPOSITION_ON_PAD:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Over pad, stabilizing position\n");
-                gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, 1.5);
+                gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, NO_YAW, 1.5);
                 stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
                 state = STATE_WAITING_AT_PAD;
             }

@@ -33,11 +33,10 @@ static uint32_t lockWriteIndex;
 static uint32_t timeOfReachingWaypointTimeoutms;
 const uint8_t traj_id = 0;
 
-static void goToWayPointPositionBased(float x,float y,float z,float duration,uint32_t reach_wp_timeout){
+static void goToWayPointPositionBased(float x, float y, float z, float yaw, float duration, uint32_t reach_wp_timeout){
   next_wp.x = x;
   next_wp.y = y;
   next_wp.z = z;
-  const float yaw = 0.0f;
   const bool relative = false;
 
   timeOfReachingWaypointTimeoutms = T2M(xTaskGetTickCount()) + reach_wp_timeout ;
@@ -45,12 +44,12 @@ static void goToWayPointPositionBased(float x,float y,float z,float duration,uin
   crtpCommanderHighLevelGoTo(next_wp.x, next_wp.y, next_wp.z, yaw, duration,relative);
 }
 
-void gotoNextWaypoint(float x,float y,float z,float duration){
-    goToWayPointPositionBased(x, y, z, duration, REACHED_WP_TIMEOUT);
+void gotoNextWaypoint(float x, float y, float z, float yaw, float duration){
+    goToWayPointPositionBased(x, y, z, yaw, duration, REACHED_WP_TIMEOUT);
 }
 
 void gotoChargingPad(float x,float y,float z){
-    goToWayPointPositionBased(x, y, z + TAKE_OFF_HEIGHT, GO_TO_PAD_DURATION, REACHED_CHARGING_PAD_TIMEOUT);
+    goToWayPointPositionBased(x, y, z + TAKE_OFF_HEIGHT, NO_YAW, GO_TO_PAD_DURATION, REACHED_CHARGING_PAD_TIMEOUT);
 }
 
 bool reachedNextWaypoint(Position my_pos){

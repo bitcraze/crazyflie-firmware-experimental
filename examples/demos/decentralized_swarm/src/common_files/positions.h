@@ -47,6 +47,8 @@
 
 #define CLAMP(x, min, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
+#define NO_YAW 0.0f
+
 #define DISTANCE3D(a, b) sqrtf(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)) + ((a.z - b.z) * (a.z - b.z)))
 #define DISTANCE2D(a, b) sqrtf(((a.x - b.x) * (a.x - b.x)) + ((a.y - b.y) * (a.y - b.y)))
 typedef struct Position_struct {
@@ -54,6 +56,13 @@ typedef struct Position_struct {
     float y;
     float z;
 } Position;
+
+typedef struct {
+    float x;
+    float y;
+    float z;
+    float yaw;
+} PositionWithYaw;
 
 
 //The following functions are used to return a new Position struct
@@ -73,6 +82,6 @@ float getDistanceBetweenVectors3D(Position a, Position b);
 //Returns the id of the closest position to the given position
 uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t positions_len );
 
-Position getRandomPositionOnCircle();
-Position getRandomPositionOnBox();
+PositionWithYaw getRandomPositionOnCircle();
+PositionWithYaw getRandomPositionOnBox();
 #endif // POSITIONS_H

@@ -78,13 +78,14 @@ uint8_t getIdWithClosestDistance(Position p,Position positions[10],uint8_t posit
     return min_id;
 }
 
-Position getRandomPositionOnCircle(Position* my_pos) {
-    Position result;
+PositionWithYaw getRandomPositionOnCircle(Position* my_pos) {
+    PositionWithYaw result;
     float step = 2.0f * (float) M_PI / NUMBER_OF_RANDOM_POINTS_ON_CIRCLE;
     float angle = (rand() % NUMBER_OF_RANDOM_POINTS_ON_CIRCLE) * step;
     result.x = CIRCLE_RADIUS * (float) cos(angle);
     result.y = CIRCLE_RADIUS * (float) sin(angle);
     result.z = TAKE_OFF_HEIGHT;
+    result.yaw = NO_YAW;
 
     return result;
 }
@@ -93,8 +94,8 @@ Position getRandomPositionOnCircle(Position* my_pos) {
  * @brief Randomize a position on a square based on  *
  * @return Position
  */
-Position getRandomPositionOnBox(Position* my_pos) {
-    Position result;
+PositionWithYaw getRandomPositionOnBox(Position* my_pos) {
+    PositionWithYaw result;
     float distance = 0.0;
 
     while (distance < MIN_BOX_DISTANCE) {
@@ -125,6 +126,9 @@ Position getRandomPositionOnBox(Position* my_pos) {
 
         float zFactor = (float)((rand() % 100) / 100.0f);
         result.z = zFactor * (MAX_Z_BOX - MIN_Z_BOX) + MIN_Z_BOX;
+
+        float yawFactor = (float)((rand() % 100) / 100.0f);
+        result.yaw = yawFactor * 6.0f;
 
         distance = DISTANCE3D((*my_pos), result);
     }
