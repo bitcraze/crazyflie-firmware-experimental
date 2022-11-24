@@ -4,7 +4,7 @@
 #include "stabilizer_types.h"
 #include "clockCorrectionEngine.h"
 
-#define ANCHOR_STORAGE_COUNT 16
+#define ANCHOR_STORAGE_COUNT 18
 #define REMOTE_ANCHOR_DATA_COUNT 16
 #define TOF_PER_ANCHOR_COUNT 16
 
