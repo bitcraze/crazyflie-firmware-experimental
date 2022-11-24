@@ -120,6 +120,6 @@
 #define PID_POS_Z_KD 0.0f
 #define PID_POS_Z_KFF 0.0f
 
-#define PID_POS_VEL_X_MAX 3.0f
-#define PID_POS_VEL_Y_MAX 0.0f
-#define PID_POS_VEL_Z_MAX 0.0f
+#define PID_POS_VEL_X_MAX 1.5f
+#define PID_POS_VEL_Y_MAX 1.5f
+#define PID_POS_VEL_Z_MAX 1.5f
