@@ -29,6 +29,7 @@
 #include "stabilizer_types.h"
 #include "log.h"
 #include "debug.h"
+#include "param.h"
 
 #define BUCKET_ACCEPTANCE_LEVEL 3
 #define MAX_BUCKET_FILL 7
@@ -38,6 +39,7 @@ static float acceptanceLevel = 0.0;
 static float errorDistance;
 static int filterCloseDelayCounter = 0;
 static int previousFilterIndex = 0;
+static float maxFilterDistance = 100.0f;
 
 typedef struct {
   float acceptanceLevel;
@@ -97,6 +99,10 @@ bool outlierFilterValidateTdoaSteps(const tdoaMeasurement_t* tdoa, const float e
         sampleIsGood = true;
       }
     }
+  }
+
+  if (errorDistance > maxFilterDistance) {
+    sampleIsGood = false;
   }
 
   return sampleIsGood;
@@ -198,3 +204,7 @@ LOG_GROUP_START(outlierf)
   LOG_ADD(LOG_FLOAT, accLev, &acceptanceLevel)
   LOG_ADD(LOG_FLOAT, errD, &errorDistance)
 LOG_GROUP_STOP(outlierf)
+
+PARAM_GROUP_START(outlierf)
+  PARAM_ADD(PARAM_FLOAT, maxFilter, &maxFilterDistance)
+PARAM_GROUP_STOP(outlierf)
