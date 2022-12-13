@@ -44,3 +44,10 @@ obj-y += vl53l1/core/src/vl53l1_error_strings.o
 obj-y += vl53l1/core/src/vl53l1_register_funcs.o
 obj-y += vl53l1/core/src/vl53l1_silicon_core.o
 obj-y += vl53l1/core/src/vl53l1_wait.o
+
+# vl53l5cx
+obj-y += vl53l5cx/core/src/vl53l5cx_api.o
+obj-y += vl53l5cx/core/src/vl53l5cx_platform.o
+#obj-y += vl53l5cx/core/src/vl53l5cx_plugin_detection_thresholds.o
+#obj-y += vl53l5cx/core/src/vl53l5cx_plugin_motion_indicator.o
+#obj-y += vl53l5cx/core/src/vl53l5cx_plugin_xtalk.o

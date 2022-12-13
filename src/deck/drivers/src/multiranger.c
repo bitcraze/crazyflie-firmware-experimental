@@ -37,6 +37,7 @@
 #include "static_mem.h"
 
 #include "i2cdev.h"
+#include "vl53l5cx.h"
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -54,13 +55,34 @@ static uint16_t filterMask = 1 << VL53L1_RANGESTATUS_RANGE_VALID;
 #define MR_PIN_LEFT PCA95X4_P6
 #define MR_PIN_RIGHT PCA95X4_P2
 
-NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devFront;
-NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devBack;
-NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devUp;
-NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devLeft;
-NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devRight;
+// NO_DMA_CCM_SAFE_ZERO_INIT
+static VL53L5CX_Dev_t _devFront;
+NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t _devBack;
+NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t _devUp;
+NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t _devLeft;
+NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t _devRight;
 
-static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
+typedef enum {
+    MULTI_RANGER_SENSOR_VL53L1X,
+    MULTI_RANGER_SENSOR_VL53L5CX
+} MR_SensorType_t;
+
+typedef struct {
+    union {
+        VL53L1_Dev_t   *pdevL1;
+        VL53L5CX_Dev_t *pdevL5;
+    };
+    MR_SensorType_t sensorType;
+} MR_Sensor_t;
+
+MR_Sensor_t devFront = {.pdevL5=&_devFront, .sensorType=MULTI_RANGER_SENSOR_VL53L5CX};
+MR_Sensor_t devBack  = {.pdevL1=&_devBack,  .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
+MR_Sensor_t devUp    = {.pdevL1=&_devUp,    .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
+MR_Sensor_t devLeft  = {.pdevL1=&_devLeft,  .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
+MR_Sensor_t devRight = {.pdevL1=&_devRight, .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
+
+
+static bool mrInitSensor(MR_Sensor_t* sensor, uint32_t pca95pin, char *name)
 {
     bool status;
 
@@ -68,8 +90,24 @@ static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
     pca95x4SetOutput(pca95pin);
     // Let VL53 boot
     vTaskDelay(M2T(2));
+
     // Init VL53
-    if (vl53l1xInit(pdev, I2C1_DEV))
+    bool initOk;
+
+    switch (sensor->sensorType) {
+        case MULTI_RANGER_SENSOR_VL53L1X:
+            initOk = vl53l1xInit(sensor->pdevL1, I2C1_DEV);
+            break;
+        case MULTI_RANGER_SENSOR_VL53L5CX:
+            initOk = vl53l5cxInit(sensor->pdevL5, I2C1_DEV);
+            break;
+        default:
+            // Unknown sensor type, shouldn't really occur.
+            initOk = false;
+            break;
+    }
+
+    if (initOk)
     {
         DEBUG_PRINT("Init %s sensor [OK]\n", name);
         status = true;
@@ -121,28 +159,44 @@ static void mrTask(void *param)
     systemWaitStart();
 
     // Restart all sensors
-    status = VL53L1_StopMeasurement(&devFront);
-    status = VL53L1_StartMeasurement(&devFront);
-    status = VL53L1_StopMeasurement(&devBack);
-    status = VL53L1_StartMeasurement(&devBack);
-    status = VL53L1_StopMeasurement(&devUp);
-    status = VL53L1_StartMeasurement(&devUp);
-    status = VL53L1_StopMeasurement(&devLeft);
-    status = VL53L1_StartMeasurement(&devLeft);
-    status = VL53L1_StopMeasurement(&devRight);
-    status = VL53L1_StartMeasurement(&devRight);
-    status = status;
+    status = vl53l5cx_stop_ranging(&devFront.pdevL5->dev);  //status = VL53L1_StopMeasurement(&devFront);
+    status = vl53l5cx_start_ranging(&devFront.pdevL5->dev); //status = VL53L1_StartMeasurement(&devFront);
+    //status = VL53L1_StopMeasurement(&devBack);
+    //status = VL53L1_StartMeasurement(&devBack);
+    //status = VL53L1_StopMeasurement(&devUp);
+    //status = VL53L1_StartMeasurement(&devUp);
+    //status = VL53L1_StopMeasurement(&devLeft);
+    //status = VL53L1_StartMeasurement(&devLeft);
+    //status = VL53L1_StopMeasurement(&devRight);
+    //status = VL53L1_StartMeasurement(&devRight);
+    //status = status;
+
+    //pca95x4SetOutput(MR_PIN_FRONT);
+    //vTaskDelay(M2T(2));
+    //vl53l5cx_start_ranging(devFront.pdevL5);
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
+    uint8_t isReady;
+
     while (1)
     {
+        // Collect data
+        vl53l5cx_check_data_ready(&devFront.pdevL5->dev, &isReady);
+        if (isReady) {
+            vl53l5cx_get_ranging_data(&devFront.pdevL5->dev, &devFront.pdevL5->results);
+            for(int i = 0; i < 16; i++) {
+                DEBUG_PRINT("%4d ", devFront.pdevL5->results.distance_mm[VL53L5CX_NB_TARGET_PER_ZONE*i]);
+			}
+			DEBUG_PRINT("\n");
+        }
         vTaskDelayUntil(&lastWakeTime, M2T(100));
-        rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
-        rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
-        rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
-        rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
-        rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
+
+        //rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
+        //rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
+        //rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
+        //rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
+        //rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
     }
 }
 
@@ -181,7 +235,6 @@ static bool mrTest()
     }
 
     isPassed = isInit;
-
     isPassed &= mrInitSensor(&devFront, MR_PIN_FRONT, "front");
     isPassed &= mrInitSensor(&devBack, MR_PIN_BACK, "back");
     isPassed &= mrInitSensor(&devUp, MR_PIN_UP, "up");
