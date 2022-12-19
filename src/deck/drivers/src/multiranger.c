@@ -121,36 +121,36 @@ static bool mrInitSensor(MR_Sensor_t* sensor, uint32_t pca95pin, char *name)
     return status;
 }
 
-static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
-{
-    VL53L1_Error status = VL53L1_ERROR_NONE;
-    VL53L1_RangingMeasurementData_t rangingData;
-    uint8_t dataReady = 0;
-    uint16_t range;
+// static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
+// {
+//     VL53L1_Error status = VL53L1_ERROR_NONE;
+//     VL53L1_RangingMeasurementData_t rangingData;
+//     uint8_t dataReady = 0;
+//     uint16_t range;
 
-    while (dataReady == 0)
-    {
-        status = VL53L1_GetMeasurementDataReady(dev, &dataReady);
-        vTaskDelay(M2T(1));
-    }
+//     while (dataReady == 0)
+//     {
+//         status = VL53L1_GetMeasurementDataReady(dev, &dataReady);
+//         vTaskDelay(M2T(1));
+//     }
 
-    status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
+//     status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
 
-    if (filterMask & (1 << rangingData.RangeStatus))
-    {
-        range = rangingData.RangeMilliMeter;
-    }
-    else
-    {
-        range = 32767;
-    }
+//     if (filterMask & (1 << rangingData.RangeStatus))
+//     {
+//         range = rangingData.RangeMilliMeter;
+//     }
+//     else
+//     {
+//         range = 32767;
+//     }
 
-    VL53L1_StopMeasurement(dev);
-    status = VL53L1_StartMeasurement(dev);
-    status = status;
+//     VL53L1_StopMeasurement(dev);
+//     status = VL53L1_StartMeasurement(dev);
+//     status = status;
 
-    return range;
-}
+//     return range;
+// }
 
 static void mrTask(void *param)
 {

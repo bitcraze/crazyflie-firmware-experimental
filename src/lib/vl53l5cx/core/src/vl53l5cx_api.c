@@ -92,7 +92,7 @@ static uint8_t _vl53l5cx_poll_for_answer(
 		{
 			status |= (uint8_t)VL53L5CX_STATUS_TIMEOUT_ERROR;
 			break;
-		}else if((size >= (uint8_t)4) 
+		}else if((size >= (uint8_t)4)
                          && (p_dev->temp_buffer[2] >= (uint8_t)0x7f))
 		{
 			status |= VL53L5CX_MCU_ERROR;
@@ -597,7 +597,7 @@ uint8_t vl53l5cx_start_ranging(
 	/* Update data size */
 	for (i = 0; i < (uint32_t)(sizeof(output)/sizeof(uint32_t)); i++)
 	{
-		if ((output[i] == (uint8_t)0) 
+		if ((output[i] == (uint8_t)0)
                     || ((output_bh_enable[i/(uint32_t)32]
                          &((uint32_t)1 << (i%(uint32_t)32))) == (uint32_t)0))
 		{
@@ -605,10 +605,10 @@ uint8_t vl53l5cx_start_ranging(
 		}
 
 		bh_ptr = (union Block_header *)&(output[i]);
-		if (((uint8_t)bh_ptr->type >= (uint8_t)0x1) 
+		if (((uint8_t)bh_ptr->type >= (uint8_t)0x1)
                     && ((uint8_t)bh_ptr->type < (uint8_t)0x0d))
 		{
-			if ((bh_ptr->idx >= (uint16_t)0x54d0) 
+			if ((bh_ptr->idx >= (uint16_t)0x54d0)
                             && (bh_ptr->idx < (uint16_t)(0x54d0 + 960)))
 			{
 				bh_ptr->size = resolution;
@@ -757,7 +757,7 @@ uint8_t vl53l5cx_get_ranging_data(
 	uint8_t status = VL53L5CX_STATUS_OK;
 	union Block_header *bh_ptr;
 	uint16_t header_id, footer_id;
-	uint32_t i, j, msize;
+	uint32_t i, msize;
 
 	status |= RdMulti(&(p_dev->platform), 0x0,
 			p_dev->temp_buffer, p_dev->data_read_size);
@@ -765,11 +765,11 @@ uint8_t vl53l5cx_get_ranging_data(
 	SwapBuffer(p_dev->temp_buffer, (uint16_t)p_dev->data_read_size);
 
 	/* Start conversion at position 16 to avoid headers */
-	for (i = (uint32_t)16; i 
+	for (i = (uint32_t)16; i
              < (uint32_t)p_dev->data_read_size; i+=(uint32_t)4)
 	{
 		bh_ptr = (union Block_header *)&(p_dev->temp_buffer[i]);
-		if ((bh_ptr->type > (uint32_t)0x1) 
+		if ((bh_ptr->type > (uint32_t)0x1)
                     && (bh_ptr->type < (uint32_t)0xd))
 		{
 			msize = bh_ptr->type * bh_ptr->size;
@@ -1190,7 +1190,7 @@ uint8_t vl53l5cx_set_ranging_mode(
 			VL53L5CX_DCI_RANGING_MODE, (uint16_t)8);
 
 	status |= vl53l5cx_dci_write_data(p_dev, (uint8_t*)&single_range,
-			VL53L5CX_DCI_SINGLE_RANGE, 
+			VL53L5CX_DCI_SINGLE_RANGE,
                         (uint16_t)sizeof(single_range));
 
 	return status;
@@ -1252,8 +1252,8 @@ uint8_t vl53l5cx_dci_read_data(
 	}
 	else
 	{
-		cmd[0] = (uint8_t)(index >> 8);	
-		cmd[1] = (uint8_t)(index & (uint32_t)0xff);			
+		cmd[0] = (uint8_t)(index >> 8);
+		cmd[1] = (uint8_t)(index & (uint32_t)0xff);
 		cmd[2] = (uint8_t)((data_size & (uint16_t)0xff0) >> 4);
 		cmd[3] = (uint8_t)((data_size & (uint16_t)0xf) << 4);
 
@@ -1289,14 +1289,14 @@ uint8_t vl53l5cx_dci_write_data(
 
 	uint8_t headers[] = {0x00, 0x00, 0x00, 0x00};
 	uint8_t footer[] = {0x00, 0x00, 0x00, 0x0f, 0x05, 0x01,
-			(uint8_t)((data_size + (uint16_t)8) >> 8), 
+			(uint8_t)((data_size + (uint16_t)8) >> 8),
 			(uint8_t)((data_size + (uint16_t)8) & (uint8_t)0xFF)};
 
-	uint16_t address = (uint16_t)VL53L5CX_UI_CMD_END - 
+	uint16_t address = (uint16_t)VL53L5CX_UI_CMD_END -
 		(data_size + (uint16_t)12) + (uint16_t)1;
 
 	/* Check if cmd buffer is large enough */
-	if((data_size + (uint16_t)12) 
+	if((data_size + (uint16_t)12)
            > (uint16_t)VL53L5CX_TEMPORARY_BUFFER_SIZE)
 	{
 		status |= VL53L5CX_STATUS_ERROR;

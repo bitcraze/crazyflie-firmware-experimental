@@ -59,6 +59,7 @@ INCLUDES += -I$(LIB)/STM32_USB_Device_Library/Core/inc
 INCLUDES += -I$(LIB)/STM32_USB_OTG_Driver/inc
 INCLUDES += -I$(LIB)/STM32F4xx_StdPeriph_Driver/inc
 INCLUDES += -I$(LIB)/vl53l1 -I$(LIB)/vl53l1/core/inc
+INCLUDES += -I$(LIB)/vl53l1 -I$(LIB)/vl53l5cx/core/inc
 INCLUDES += -I$(KBUILD_OUTPUT)/include/generated
 
 # Here we tell Kbuild where to look for Kbuild files which will tell the
@@ -169,12 +170,12 @@ flash_verify:
 #sends a usb message to the CF to place it in DFU mode, then updates firmware over usb
 flash_dfu:
 	$(PYTHON) $(srctree)/tools/make/usb-bootloader.py
-	$(DFU_UTIL) -d 0483:df11 -a 0 -s 0x08004000:leave -D $(PROG).bin 
+	$(DFU_UTIL) -d 0483:df11 -a 0 -s 0x08004000:leave -D $(PROG).bin
 
 #uses the dfu utility to flash the firmware at 0x08004000, just after the bootloader
 #call this target directly if CF cannont be flashed automatically through flash_dfu
 flash_dfu_manual:
-	$(DFU_UTIL) -d 0483:df11 -a 0 -s 0x08004000:leave -D $(PROG).bin 
+	$(DFU_UTIL) -d 0483:df11 -a 0 -s 0x08004000:leave -D $(PROG).bin
 
 #STM utility targets
 halt:
@@ -225,4 +226,3 @@ test_python: cffirmware.py
 endif
 
 .PHONY: all clean build compile unit prep erase flash check_submodules trace openocd gdb halt reset flash_dfu flash_dfu_manual flash_verify cload size print_version clean_version bindings_python
-

@@ -26,3 +26,4 @@ obj-y += vl53l1x.o
 obj-y += vl53l5cx.o
 obj-y += watchdog.o
 obj-y += ws2812_cf2.o
+obj-y += vl53l5cx.o
