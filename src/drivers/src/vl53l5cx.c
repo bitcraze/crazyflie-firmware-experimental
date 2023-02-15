@@ -37,6 +37,8 @@ bool vl53l5cxInit(VL53L5CX_Dev_t *pdev, I2C_Dev *I2Cx)
     return false;
   }
 
+  vl53l5cx_set_resolution(&pdev->dev, VL53L5CX_RESOLUTION_8X8);
+  vl53l5cx_set_ranging_frequency_hz(&pdev->dev, 15);
   // TODO: fix i2c address set
   return true;
 
@@ -49,6 +51,8 @@ bool vl53l5cxInit(VL53L5CX_Dev_t *pdev, I2C_Dev *I2Cx)
 
   pdev->dev.platform.address = newI2cAddress & 0b01111111;
   DEBUG_PRINT("VL5 init OK with i2c address %d\n", pdev->dev.platform.address);
+
+
   return true;
 }
 

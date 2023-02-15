@@ -238,6 +238,7 @@ static void i2cdrvTryToRestartBus(I2cDrv* i2c)
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
   GPIO_InitStructure.GPIO_Pin = i2c->def->gpioSCLPin; // SCL
   GPIO_Init(i2c->def->gpioSCLPort, &GPIO_InitStructure);
   GPIO_InitStructure.GPIO_Pin =  i2c->def->gpioSDAPin; // SDA

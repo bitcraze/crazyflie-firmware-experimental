@@ -29,6 +29,7 @@
 #define DEBUG_MODULE "MR"
 
 #include "system.h"
+#include "mem.h"
 #include "debug.h"
 #include "log.h"
 #include "pca95x4.h"
@@ -43,6 +44,8 @@
 #include "task.h"
 
 #include <stdlib.h>
+
+#define VL53L5_ZONE_SIZE_IN_BYTES (sizeof(uint16_t) * VL53L5CX_RESOLUTION_8X8)
 
 static bool isInit = false;
 static bool isTested = false;
@@ -80,6 +83,16 @@ MR_Sensor_t devBack  = {.pdevL1=&_devBack,  .sensorType=MULTI_RANGER_SENSOR_VL53
 MR_Sensor_t devUp    = {.pdevL1=&_devUp,    .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
 MR_Sensor_t devLeft  = {.pdevL1=&_devLeft,  .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
 MR_Sensor_t devRight = {.pdevL1=&_devRight, .sensorType=MULTI_RANGER_SENSOR_VL53L1X};
+
+// Handling from the memory module
+static uint32_t handleMemGetSize(void) { return  VL53L5_ZONE_SIZE_IN_BYTES; }
+static bool handleMemRead(const uint32_t memAddr, const uint8_t readLen, uint8_t* buffer);
+static const MemoryHandlerDef_t memDef = {
+  .type = MEM_TYPE_MULTIRANGER,
+  .getSize = handleMemGetSize,
+  .read = handleMemRead,
+  .write = 0, // Write not supported
+};
 
 
 static bool mrInitSensor(MR_Sensor_t* sensor, uint32_t pca95pin, char *name)
@@ -177,20 +190,23 @@ static void mrTask(void *param)
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
-    uint8_t isReady;
+    uint8_t isReady = 0;
 
     while (1)
     {
         // Collect data
-        vl53l5cx_check_data_ready(&devFront.pdevL5->dev, &isReady);
-        if (isReady) {
-            vl53l5cx_get_ranging_data(&devFront.pdevL5->dev, &devFront.pdevL5->results);
-            for(int i = 0; i < 16; i++) {
-                DEBUG_PRINT("%4d ", devFront.pdevL5->results.distance_mm[VL53L5CX_NB_TARGET_PER_ZONE*i]);
-			}
-			DEBUG_PRINT("\n");
-        }
-        vTaskDelayUntil(&lastWakeTime, M2T(100));
+      while (isReady == 0)
+      {
+         vl53l5cx_check_data_ready(&devFront.pdevL5->dev, &isReady);
+         vTaskDelay(M2T(1));
+      }
+      vl53l5cx_get_ranging_data(&devFront.pdevL5->dev, &devFront.pdevL5->results);
+//            for(int i = 0; i < 64; i++) {
+//              devFront.pdevL5->results.distance_mm[i] = i;
+//                DEBUG_PRINT("%4d ", devFront.pdevL5->results.distance_mm[VL53L5CX_NB_TARGET_PER_ZONE*i]);
+//        }
+//          DEBUG_PRINT("\n");
+      vTaskDelayUntil(&lastWakeTime, M2T(100));
 
         //rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
         //rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
@@ -225,6 +241,8 @@ static void mrInit()
 
     xTaskCreate(mrTask, MULTIRANGER_TASK_NAME, MULTIRANGER_TASK_STACKSIZE, NULL,
                 MULTIRANGER_TASK_PRI, NULL);
+
+    memoryRegisterHandler(&memDef);
 }
 
 static bool mrTest()
@@ -244,6 +262,16 @@ static bool mrTest()
     isTested = true;
 
     return isPassed;
+}
+
+static bool handleMemRead(const uint32_t memAddr, const uint8_t readLen, uint8_t* buffer)
+{
+  if (memAddr + readLen <= VL53L5_ZONE_SIZE_IN_BYTES)
+  {
+    memcpy((void *)buffer, (void *)((uint32_t)devFront.pdevL5->results.distance_mm + memAddr), readLen);
+  }
+
+  return true;
 }
 
 static const DeckDriver multiranger_deck = {
