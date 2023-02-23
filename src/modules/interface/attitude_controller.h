@@ -43,7 +43,8 @@ bool attitudeControllerTest(void);
 void attitudeControllerCorrectAttitudePID(
        float eulerRollActual, float eulerPitchActual, float eulerYawActual,
        float eulerRollDesired, float eulerPitchDesired, float eulerYawDesired,
-       float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired);
+       float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired,
+       float dt);
 
 /**
  * Make the controller run an update of the rate PID. The output is
@@ -51,7 +52,8 @@ void attitudeControllerCorrectAttitudePID(
  */
 void attitudeControllerCorrectRatePID(
        float rollRateActual, float pitchRateActual, float yawRateActual,
-       float rollRateDesired, float pitchRateDesired, float yawRateDesired);
+       float rollRateDesired, float pitchRateDesired, float yawRateDesired,
+       float dt);
 
 /**
  * Reset controller roll attitude PID

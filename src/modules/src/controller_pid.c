@@ -53,6 +53,11 @@ static float capAngle(float angle) {
   return result;
 }
 
+static float attitudeTargetDt = 1.0f / ATTITUDE_RATE;
+static float positionTargetDt = 1.0f / POSITION_RATE;
+
+static uint32_t previousAttitudeUpdate;
+static uint32_t previousPositionUpdate;
 void controllerPid(control_t *control, const setpoint_t *setpoint,
                                          const sensorData_t *sensors,
                                          const state_t *state,
@@ -60,10 +65,20 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
 {
   control->controlMode = controlModeLegacy;
 
-  if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
+  if (previousAttitudeUpdate == 0) {
+    previousAttitudeUpdate = tick;
+    previousPositionUpdate = tick;
+  }
+
+  const float dtAttitude = (tick - previousAttitudeUpdate) / 1000.0f;
+  const float dtPosition = (tick - previousPositionUpdate) / 1000.0f;
+
+  if (dtAttitude >= attitudeTargetDt) {
+    previousAttitudeUpdate = tick;
+
     // Rate-controled YAW is moving YAW angle setpoint
     if (setpoint->mode.yaw == modeVelocity) {
-      attitudeDesired.yaw = capAngle(attitudeDesired.yaw + setpoint->attitudeRate.yaw * ATTITUDE_UPDATE_DT);
+      attitudeDesired.yaw = capAngle(attitudeDesired.yaw + setpoint->attitudeRate.yaw * dtAttitude);
 
       float yawMaxDelta = attitudeControllerGetYawMaxDelta();
       if (yawMaxDelta != 0.0f)
@@ -90,11 +105,12 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     attitudeDesired.yaw = capAngle(attitudeDesired.yaw);
   }
 
-  if (RATE_DO_EXECUTE(POSITION_RATE, tick)) {
-    positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
+  if (dtPosition >= positionTargetDt) {
+    previousPositionUpdate = tick;
+    positionController(&actuatorThrust, &attitudeDesired, setpoint, state, dtPosition);
   }
 
-  if (RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
+  if (dtAttitude >= attitudeTargetDt) {
     // Switch between manual and automatic position control
     if (setpoint->mode.z == modeDisable) {
       actuatorThrust = setpoint->thrust;
@@ -106,7 +122,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
 
     attitudeControllerCorrectAttitudePID(state->attitude.roll, state->attitude.pitch, state->attitude.yaw,
                                 attitudeDesired.roll, attitudeDesired.pitch, attitudeDesired.yaw,
-                                &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw);
+                                &rateDesired.roll, &rateDesired.pitch, &rateDesired.yaw, dtAttitude);
 
     // For roll and pitch, if velocity mode, overwrite rateDesired with the setpoint
     // value. Also reset the PID to avoid error buildup, which can lead to unstable
@@ -122,7 +138,7 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
 
     // TODO: Investigate possibility to subtract gyro drift.
     attitudeControllerCorrectRatePID(sensors->gyro.x, -sensors->gyro.y, sensors->gyro.z,
-                             rateDesired.roll, rateDesired.pitch, rateDesired.yaw);
+                             rateDesired.roll, rateDesired.pitch, rateDesired.yaw, dtAttitude);
 
     attitudeControllerGetActuatorOutput(&control->roll,
                                         &control->pitch,
@@ -161,6 +177,11 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     attitudeDesired.yaw = state->attitude.yaw;
   }
 }
+
+PARAM_GROUP_START(pid)
+PARAM_ADD(PARAM_FLOAT, atDt, &attitudeTargetDt)
+PARAM_ADD(PARAM_FLOAT, poDt, &positionTargetDt)
+PARAM_GROUP_STOP(pid)
 
 /**
  * Logging variables for the command and reference signals for the

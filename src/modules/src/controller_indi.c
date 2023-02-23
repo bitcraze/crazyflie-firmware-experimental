@@ -168,7 +168,7 @@ void controllerINDI(control_t *control, const setpoint_t *setpoint,
 	}
 
 	if (RATE_DO_EXECUTE(POSITION_RATE, tick) && !outerLoopActive) {
-		positionController(&actuatorThrust, &attitudeDesired, setpoint, state);
+		positionController(&actuatorThrust, &attitudeDesired, setpoint, state, 0);
 	}
 
 	/*

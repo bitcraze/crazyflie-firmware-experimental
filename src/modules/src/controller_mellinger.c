@@ -39,7 +39,6 @@ We added the following:
 
 #include "param.h"
 #include "log.h"
-#include "position_controller.h"
 #include "controller_mellinger.h"
 #include "physicalConstants.h"
 
@@ -97,6 +96,7 @@ void controllerMellingerReset(controllerMellinger_t* self)
   self->i_error_m_x = 0;
   self->i_error_m_y = 0;
   self->i_error_m_z = 0;
+  self->previousUpdate = 0;
 }
 
 void controllerMellingerInit(controllerMellinger_t* self)
@@ -131,11 +131,23 @@ void controllerMellinger(controllerMellinger_t* self, control_t *control, const 
 
   control->controlMode = controlModeLegacy;
 
-  if (!RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
-    return;
+  // if (!RATE_DO_EXECUTE(ATTITUDE_RATE, tick)) {
+  //   return;
+  // }
+
+  // dt = (float)(1.0f/ATTITUDE_RATE);
+
+  if (self->previousUpdate == 0) {
+    self->previousUpdate = tick;
   }
 
-  dt = (float)(1.0f/ATTITUDE_RATE);
+  dt = (float)((tick - self->previousUpdate) / 1000.0f);
+
+  if (dt < 1000.0f / ATTITUDE_RATE) {
+    return;
+  }
+  self->previousUpdate = tick;
+
   struct vec setpointPos = mkvec(setpoint->position.x, setpoint->position.y, setpoint->position.z);
   struct vec setpointVel = mkvec(setpoint->velocity.x, setpoint->velocity.y, setpoint->velocity.z);
   struct vec statePos = mkvec(state->position.x, state->position.y, state->position.z);

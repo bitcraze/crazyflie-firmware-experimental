@@ -34,8 +34,8 @@ void positionControllerInit();
 void positionControllerResetAllPID();
 void positionControllerResetAllfilters();
 void positionController(float* thrust, attitude_t *attitude, const setpoint_t *setpoint,
-                                                             const state_t *state);
+                                                             const state_t *state, const float dt);
 void velocityController(float* thrust, attitude_t *attitude, const Axis3f *setpoint_velocity,
-                                                             const state_t *state);
+                                                             const state_t *state, const float dt);
 
 #endif /* POSITION_CONTROLLER_H_ */

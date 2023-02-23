@@ -184,6 +184,7 @@ static float runPid(float input, struct pidAxis_s *axis, float setpoint, float d
   axis->setpoint = setpoint;
 
   pidSetDesired(&axis->pid, axis->setpoint);
+  pidSetDt(&axis->pid, dt);
   return pidUpdate(&axis->pid, input, true);
 }
 
@@ -191,7 +192,7 @@ static float runPid(float input, struct pidAxis_s *axis, float setpoint, float d
 float state_body_x, state_body_y, state_body_vx, state_body_vy;
 
 void positionController(float* thrust, attitude_t *attitude, const setpoint_t *setpoint,
-                                                             const state_t *state)
+                                                             const state_t *state, const float dt)
 {
   this.pidX.pid.outputLimit = xVelMax * velMaxOverhead;
   this.pidY.pid.outputLimit = yVelMax * velMaxOverhead;
@@ -217,24 +218,24 @@ void positionController(float* thrust, attitude_t *attitude, const setpoint_t *s
   setpoint_velocity.y = setpoint->velocity.y;
   setpoint_velocity.z = setpoint->velocity.z;
   if (setpoint->mode.x == modeAbs) {
-    setpoint_velocity.x = runPid(state_body_x, &this.pidX, setp_body_x, DT);
+    setpoint_velocity.x = runPid(state_body_x, &this.pidX, setp_body_x, dt);
   } else if (!setpoint->velocity_body) {
     setpoint_velocity.x = globalvx * cosyaw + globalvy * sinyaw;
   }
   if (setpoint->mode.y == modeAbs) {
-    setpoint_velocity.y = runPid(state_body_y, &this.pidY, setp_body_y, DT);
+    setpoint_velocity.y = runPid(state_body_y, &this.pidY, setp_body_y, dt);
   } else if (!setpoint->velocity_body) {
     setpoint_velocity.y = globalvy * cosyaw - globalvx * sinyaw;
   }
   if (setpoint->mode.z == modeAbs) {
-    setpoint_velocity.z = runPid(state->position.z, &this.pidZ, setpoint->position.z, DT);
+    setpoint_velocity.z = runPid(state->position.z, &this.pidZ, setpoint->position.z, dt);
   }
 
-  velocityController(thrust, attitude, &setpoint_velocity, state);
+  velocityController(thrust, attitude, &setpoint_velocity, state, dt);
 }
 
 void velocityController(float* thrust, attitude_t *attitude, const Axis3f* setpoint_velocity,
-                                                             const state_t *state)
+                                                             const state_t *state, const float dt)
 {
   this.pidVX.pid.outputLimit = pLimit * rpLimitOverhead;
   this.pidVY.pid.outputLimit = rLimit * rpLimitOverhead;
@@ -248,14 +249,14 @@ void velocityController(float* thrust, attitude_t *attitude, const Axis3f* setpo
   state_body_vy = -state->velocity.x * sinyaw + state->velocity.y * cosyaw;
 
   // Roll and Pitch
-  attitude->pitch = -runPid(state_body_vx, &this.pidVX, setpoint_velocity->x, DT);
-  attitude->roll = -runPid(state_body_vy, &this.pidVY, setpoint_velocity->y, DT);
+  attitude->pitch = -runPid(state_body_vx, &this.pidVX, setpoint_velocity->x, dt);
+  attitude->roll = -runPid(state_body_vy, &this.pidVY, setpoint_velocity->y, dt);
 
   attitude->roll  = constrain(attitude->roll,  -rLimit, rLimit);
   attitude->pitch = constrain(attitude->pitch, -pLimit, pLimit);
 
   // Thrust
-  float thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint_velocity->z, DT);
+  float thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint_velocity->z, dt);
   // Scale the thrust and add feed forward term
   *thrust = thrustRaw*thrustScale + this.thrustBase;
   // Check for minimum thrust

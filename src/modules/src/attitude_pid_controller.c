@@ -130,6 +130,8 @@ void attitudeControllerInit(const float updateDt)
   pidSetIntegralLimit(&pidPitch, PID_PITCH_INTEGRATION_LIMIT);
   pidSetIntegralLimit(&pidYaw,   PID_YAW_INTEGRATION_LIMIT);
 
+  // previousUpdate = 0;
+
   isInit = true;
 }
 
@@ -140,29 +142,35 @@ bool attitudeControllerTest()
 
 void attitudeControllerCorrectRatePID(
        float rollRateActual, float pitchRateActual, float yawRateActual,
-       float rollRateDesired, float pitchRateDesired, float yawRateDesired)
+       float rollRateDesired, float pitchRateDesired, float yawRateDesired,
+       float dt)
 {
   pidSetDesired(&pidRollRate, rollRateDesired);
+  pidSetDt(&pidRollRate, dt);
   rollOutput = saturateSignedInt16(pidUpdate(&pidRollRate, rollRateActual, true));
 
   pidSetDesired(&pidPitchRate, pitchRateDesired);
+  pidSetDt(&pidPitchRate, dt);
   pitchOutput = saturateSignedInt16(pidUpdate(&pidPitchRate, pitchRateActual, true));
 
   pidSetDesired(&pidYawRate, yawRateDesired);
-
+  pidSetDt(&pidYawRate, dt);
   yawOutput = saturateSignedInt16(pidUpdate(&pidYawRate, yawRateActual, true));
 }
 
 void attitudeControllerCorrectAttitudePID(
        float eulerRollActual, float eulerPitchActual, float eulerYawActual,
        float eulerRollDesired, float eulerPitchDesired, float eulerYawDesired,
-       float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired)
+       float* rollRateDesired, float* pitchRateDesired, float* yawRateDesired,
+       float dt)
 {
   pidSetDesired(&pidRoll, eulerRollDesired);
+  pidSetDt(&pidRoll, dt);
   *rollRateDesired = pidUpdate(&pidRoll, eulerRollActual, true);
 
   // Update PID for pitch axis
   pidSetDesired(&pidPitch, eulerPitchDesired);
+  pidSetDt(&pidPitch, dt);
   *pitchRateDesired = pidUpdate(&pidPitch, eulerPitchActual, true);
 
   // Update PID for yaw axis
@@ -173,6 +181,7 @@ void attitudeControllerCorrectAttitudePID(
   else if (yawError < -180.0f)
     yawError += 360.0f;
   pidSetError(&pidYaw, yawError);
+  pidSetDt(&pidYaw, dt);
   *yawRateDesired = pidUpdate(&pidYaw, eulerYawActual, false);
 }
 
@@ -210,7 +219,7 @@ float attitudeControllerGetYawMaxDelta(void)
 
 /**
  *  Log variables of attitude PID controller
- */ 
+ */
 LOG_GROUP_START(pid_attitude)
 /**
  * @brief Proportional output roll
@@ -319,7 +328,7 @@ LOG_GROUP_STOP(pid_rate)
 /**
  * Tuning settings for the gains of the PID
  * controller for the attitude of the Crazyflie which consists
- * of the Yaw Pitch and Roll 
+ * of the Yaw Pitch and Roll
  */
 PARAM_GROUP_START(pid_attitude)
 /**
@@ -386,7 +395,7 @@ PARAM_GROUP_STOP(pid_attitude)
 
 /**
  * Tuning settings for the gains of the PID controller for the rate angles of
- * the Crazyflie, which consists of the yaw, pitch and roll rates 
+ * the Crazyflie, which consists of the yaw, pitch and roll rates
  */
 PARAM_GROUP_START(pid_rate)
 /**
