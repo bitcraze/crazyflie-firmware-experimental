@@ -70,10 +70,14 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     previousPositionUpdate = tick;
   }
 
-  const float dtAttitude = (tick - previousAttitudeUpdate) / 1000.0f;
   const float dtPosition = (tick - previousPositionUpdate) / 1000.0f;
+  const bool runPosition = (dtPosition >= positionTargetDt);
 
-  if (dtAttitude >= attitudeTargetDt) {
+  const float dtAttitude = (tick - previousAttitudeUpdate) / 1000.0f;
+  // Attitude controller must run if the position controller runs
+  const bool runAttitude = (dtAttitude >= attitudeTargetDt) || runPosition;
+
+  if (runAttitude) {
     previousAttitudeUpdate = tick;
 
     // Rate-controled YAW is moving YAW angle setpoint
@@ -105,12 +109,12 @@ void controllerPid(control_t *control, const setpoint_t *setpoint,
     attitudeDesired.yaw = capAngle(attitudeDesired.yaw);
   }
 
-  if (dtPosition >= positionTargetDt) {
+  if (runPosition) {
     previousPositionUpdate = tick;
     positionController(&actuatorThrust, &attitudeDesired, setpoint, state, dtPosition);
   }
 
-  if (dtAttitude >= attitudeTargetDt) {
+  if (runAttitude) {
     // Switch between manual and automatic position control
     if (setpoint->mode.z == modeDisable) {
       actuatorThrust = setpoint->thrust;
