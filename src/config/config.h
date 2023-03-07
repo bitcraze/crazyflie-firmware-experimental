@@ -27,7 +27,7 @@
  * It contains two types of parameters:
  * - The global parameters are globally defined and independent of any
  *   compilation profile. An example of such define could be some pinout.
- * - The profiled defines, they are parameter that can be specific to each
+ * - The profiled defines, they are parameters that can be specific to each
  *   dev build. The vanilla build is intended to be a "customer" build without
  *   fancy spinning debugging stuff. The developers build are anything the
  *   developer could need to debug and run his code/crazy stuff.
@@ -92,7 +92,9 @@
 #define UART1_TEST_TASK_PRI     1
 #define UART2_TEST_TASK_PRI     1
 #define KALMAN_TASK_PRI         2
+#define ERROR_UKF_TASK_PRI      2
 #define LEDSEQCMD_TASK_PRI      1
+#define FLAPPERDECK_TASK_PRI    2
 #define SYSLINK_TASK_PRI        3
 #define USBLINK_TASK_PRI        3
 #define ACTIVE_MARKER_TASK_PRI  3
@@ -144,6 +146,7 @@
 #define UART1_TEST_TASK_NAME    "UART1TEST"
 #define UART2_TEST_TASK_NAME    "UART2TEST"
 #define KALMAN_TASK_NAME        "KALMAN"
+#define ERROR_UKF_TASK_NAME     "ERROR_UKF"
 #define ACTIVE_MARKER_TASK_NAME "ACTIVEMARKER-DECK"
 #define AI_DECK_GAP_TASK_NAME   "AI-DECK-GAP"
 #define AIDECK_ESP_TX_TASK_NAME "AI-DECK ESP TX"
@@ -156,6 +159,8 @@
 #define CPX_RT_INT_TASK_NAME    "ROUTER FROM INTERNAL"
 #define CPX_TASK_NAME           "CPX"
 #define APP_TASK_NAME           "APP"
+#define FLAPPERDECK_TASK_NAME   "FLAPPERDECK"
+
 
 //Task stack sizes
 #define SYSTEM_TASK_STACKSIZE         (2* configMINIMAL_STACK_SIZE)
@@ -199,6 +204,8 @@
 #define LPS_DECK_STACKSIZE            (3 * configMINIMAL_STACK_SIZE)
 #define OA_DECK_TASK_STACKSIZE        (2 * configMINIMAL_STACK_SIZE)
 #define KALMAN_TASK_STACKSIZE         (3 * configMINIMAL_STACK_SIZE)
+#define FLAPPERDECK_TASK_STACKSIZE    (2 * configMINIMAL_STACK_SIZE)
+#define ERROR_UKF_TASK_STACKSIZE      (4 * configMINIMAL_STACK_SIZE)
 
 //The radio channel. From 0 to 125
 #define RADIO_CHANNEL 80
@@ -213,16 +220,16 @@
 #define PROPELLER_BALANCE_TEST_THRESHOLD  2.5f
 
 /**
- * \def BAT_LOADING_SAG_THESHOLD
+ * \def BAT_LOADING_SAG_THRESHOLD
  * This is the threshold for a battery and connector to pass. It loads the power path by spinning all 4 motors
  * and measure the voltage sag. The threshold is very experimental and dependent on stock configuration. It is
  * fairly constant over the battery voltage range but testing with fully changed battery is best.
  */
-#define BAT_LOADING_SAG_THRESHOLD  0.95f
+#define BAT_LOADING_SAG_THRESHOLD  0.70f
 
 /**
  * \def ACTIVATE_STARTUP_SOUND
- * Playes a startup melody using the motors and PWM modulation
+ * Plays a startup melody using the motors and PWM modulation
  */
 #define ACTIVATE_STARTUP_SOUND
 

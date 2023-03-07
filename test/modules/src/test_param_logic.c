@@ -9,7 +9,6 @@
 #include "unity.h"
 
 #include "mock_crtp.h"
-#include "mock_cfassert.h"
 #include "mock_storage.h"
 #include "crc32.h"
 
@@ -84,7 +83,7 @@ void testSetUint8(void) {
   // Fixture
   uint8_t expected = UINT8_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myUint8");
 
   // Test
@@ -98,7 +97,7 @@ void testSetUint16(void) {
   // Fixture
   uint16_t expected = UINT16_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myUint16");
 
   // Test
@@ -112,7 +111,7 @@ void testSetUint32(void) {
   // Fixture
   uint32_t expected = UINT32_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myUint32");
 
   // Test
@@ -126,7 +125,7 @@ void testSetInt8(void) {
   // Fixture
   uint8_t expected = INT8_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myInt8");
 
   // Test
@@ -140,7 +139,7 @@ void testSetInt16(void) {
   // Fixture
   uint16_t expected =UINT16_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myInt16");
 
   // Test
@@ -154,7 +153,7 @@ void testSetInt32(void) {
   // Fixture
   uint32_t expected = INT32_MAX - 1;
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
   paramVarId_t varid = paramGetVarId("myGroup", "myInt32");
 
   // Test
@@ -269,7 +268,7 @@ void testPersistentSetGetFloat(void) {
 
   paramVarId_t varid = paramGetVarId("myGroup", "myPersistentFloat");
 
-  crtpSendPacketBlock_StubWithCallback(crtpReply);
+  crtpSendPacket_StubWithCallback(crtpReply);
 
   // Test
   paramSetFloat(varid, expected);

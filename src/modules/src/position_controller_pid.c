@@ -58,13 +58,13 @@ struct this_s {
 };
 
 // Maximum roll/pitch angle permited
-static float rLimit  = PID_VEL_ROLL_MAX;
-static float pLimit  = PID_VEL_PITCH_MAX;
+static float rLimit = PID_VEL_ROLL_MAX;
+static float pLimit = PID_VEL_PITCH_MAX;
 static float rpLimitOverhead = 1.10f;
 // Velocity maximums
 static float xVelMax = PID_POS_VEL_X_MAX;
 static float yVelMax = PID_POS_VEL_Y_MAX;
-static float zVelMax  = PID_POS_VEL_Z_MAX;
+static float zVelMax = PID_POS_VEL_Z_MAX;
 static float velMaxOverhead = 1.10f;
 
 static const float thrustScale = 1000.0f;
@@ -190,7 +190,7 @@ static float runPid(float input, struct pidAxis_s *axis, float setpoint, float d
 
 float state_body_x, state_body_y, state_body_vx, state_body_vy;
 
-void positionController(float* thrust, attitude_t *attitude, setpoint_t *setpoint,
+void positionController(float* thrust, attitude_t *attitude, const setpoint_t *setpoint,
                                                              const state_t *state)
 {
   this.pidX.pid.outputLimit = xVelMax * velMaxOverhead;
@@ -207,29 +207,33 @@ void positionController(float* thrust, attitude_t *attitude, setpoint_t *setpoin
 
   state_body_x = state->position.x * cosyaw + state->position.y * sinyaw;
   state_body_y = -state->position.x * sinyaw + state->position.y * cosyaw;
-    
+
   float globalvx = setpoint->velocity.x;
   float globalvy = setpoint->velocity.y;
 
   //X, Y
+  Axis3f setpoint_velocity;
+  setpoint_velocity.x = setpoint->velocity.x;
+  setpoint_velocity.y = setpoint->velocity.y;
+  setpoint_velocity.z = setpoint->velocity.z;
   if (setpoint->mode.x == modeAbs) {
-    setpoint->velocity.x = runPid(state_body_x, &this.pidX, setp_body_x, DT);
+    setpoint_velocity.x = runPid(state_body_x, &this.pidX, setp_body_x, DT);
   } else if (!setpoint->velocity_body) {
-    setpoint->velocity.x = globalvx * cosyaw + globalvy * sinyaw;
+    setpoint_velocity.x = globalvx * cosyaw + globalvy * sinyaw;
   }
   if (setpoint->mode.y == modeAbs) {
-    setpoint->velocity.y = runPid(state_body_y, &this.pidY, setp_body_y, DT);
+    setpoint_velocity.y = runPid(state_body_y, &this.pidY, setp_body_y, DT);
   } else if (!setpoint->velocity_body) {
-    setpoint->velocity.y = globalvy * cosyaw - globalvx * sinyaw;
+    setpoint_velocity.y = globalvy * cosyaw - globalvx * sinyaw;
   }
   if (setpoint->mode.z == modeAbs) {
-    setpoint->velocity.z = runPid(state->position.z, &this.pidZ, setpoint->position.z, DT);
+    setpoint_velocity.z = runPid(state->position.z, &this.pidZ, setpoint->position.z, DT);
   }
 
-  velocityController(thrust, attitude, setpoint, state);
+  velocityController(thrust, attitude, &setpoint_velocity, state);
 }
 
-void velocityController(float* thrust, attitude_t *attitude, setpoint_t *setpoint,
+void velocityController(float* thrust, attitude_t *attitude, const Axis3f* setpoint_velocity,
                                                              const state_t *state)
 {
   this.pidVX.pid.outputLimit = pLimit * rpLimitOverhead;
@@ -244,14 +248,14 @@ void velocityController(float* thrust, attitude_t *attitude, setpoint_t *setpoin
   state_body_vy = -state->velocity.x * sinyaw + state->velocity.y * cosyaw;
 
   // Roll and Pitch
-  attitude->pitch = -runPid(state_body_vx, &this.pidVX, setpoint->velocity.x, DT);
-  attitude->roll = -runPid(state_body_vy, &this.pidVY, setpoint->velocity.y, DT);
+  attitude->pitch = -runPid(state_body_vx, &this.pidVX, setpoint_velocity->x, DT);
+  attitude->roll = -runPid(state_body_vy, &this.pidVY, setpoint_velocity->y, DT);
 
   attitude->roll  = constrain(attitude->roll,  -rLimit, rLimit);
   attitude->pitch = constrain(attitude->pitch, -pLimit, pLimit);
 
   // Thrust
-  float thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint->velocity.z, DT);
+  float thrustRaw = runPid(state->velocity.z, &this.pidVZ, setpoint_velocity->z, DT);
   // Scale the thrust and add feed forward term
   *thrust = thrustRaw*thrustScale + this.thrustBase;
   // Check for minimum thrust
@@ -283,66 +287,66 @@ void positionControllerResetAllfilters() {
 
 /**
  * Log variables of the PID position controller
- * 
+ *
  * Note: rename to posCtrlPID ?
  */
 LOG_GROUP_START(posCtl)
 
 /**
  * @brief PID controller target desired body-yaw-aligned velocity x [m/s]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetVX, &this.pidVX.pid.desired)
 /**
  * @brief PID controller target desired body-yaw-aligned velocity y [m/s]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetVY, &this.pidVY.pid.desired)
 /**
  * @brief PID controller target desired velocity z [m/s]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetVZ, &this.pidVZ.pid.desired)
 /**
  * @brief PID controller target desired body-yaw-aligned position x [m]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetX, &this.pidX.pid.desired)
 /**
  * @brief PID controller target desired body-yaw-aligned position y [m]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetY, &this.pidY.pid.desired)
 /**
  * @brief PID controller target desired global position z [m]
- * 
+ *
  * Note: Same as stabilizer log
  */
 LOG_ADD(LOG_FLOAT, targetZ, &this.pidZ.pid.desired)
 
 /**
  * @brief PID state body-yaw-aligned velocity x [m/s]
- * 
+ *
  */
 LOG_ADD(LOG_FLOAT, bodyVX, &state_body_vx)
 /**
  * @brief PID state body-yaw-aligned velocity y [m/s]
- * 
+ *
  */
 LOG_ADD(LOG_FLOAT, bodyVY, &state_body_vy)
 /**
  * @brief PID state body-yaw-aligned position x [m]
- * 
+ *
  */
 LOG_ADD(LOG_FLOAT, bodyX, &state_body_x)
 /**
  * @brief PID state body-yaw-aligned position y [m]
- * 
+ *
  */
 LOG_ADD(LOG_FLOAT, bodyY, &state_body_y)
 

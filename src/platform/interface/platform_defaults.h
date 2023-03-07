@@ -40,6 +40,9 @@
 #ifdef CONFIG_PLATFORM_TAG
     #include "platform_defaults_tag.h"
 #endif
+#ifdef CONFIG_PLATFORM_FLAPPER
+    #include "platform_defaults_flapper.h"
+#endif
 
 // IMU alignment on the airframe 
 #ifndef IMU_PHI
@@ -105,3 +108,38 @@
 #ifndef PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD
     #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7 f
 #endif
+
+// Tumble detection enabled by default
+#ifndef SUPERVISOR_TUMBLE_CHECK_ENABLE
+    #define SUPERVISOR_TUMBLE_CHECK_ENABLE true
+#endif
+
+
+// Health test parameters
+#ifndef HEALTH_BRUSHED_ON_PERIOD_MSEC
+    #define HEALTH_BRUSHED_ON_PERIOD_MSEC 50
+#endif
+#ifndef HEALTH_BRUSHED_OFF_PERIOD_MSEC
+    #define HEALTH_BRUSHED_OFF_PERIOD_MSEC 950
+#endif
+#ifndef HEALTH_BRUSHED_VARIANCE_START_MSEC
+    #define HEALTH_BRUSHED_VARIANCE_START_MSEC 0
+#endif
+#ifndef HEALTH_BRUSHED_PROP_ON_PERIOD_PWM_RATIO
+    #define HEALTH_BRUSHED_PROP_ON_PERIOD_PWM_RATIO 0xFFFF
+#endif
+#ifndef HEALTH_BRUSHED_BAT_ON_PERIOD_PWM_RATIO
+    #define HEALTH_BRUSHED_BAT_ON_PERIOD_PWM_RATIO 40000
+#endif
+
+#ifndef HEALTH_BRUSHLESS_ON_PERIOD_MSEC
+    #define HEALTH_BRUSHLESS_ON_PERIOD_MSEC 2000
+#endif
+#ifndef HEALTH_BRUSHLESS_OFF_PERIOD_MSEC
+    #define HEALTH_BRUSHLESS_OFF_PERIOD_MSEC 1000
+#endif
+#ifndef HEALTH_BRUSHLESS_VARIANCE_START_MSEC
+    #define HEALTH_BRUSHLESS_VARIANCE_START_MSEC 1000
+#endif
+
+

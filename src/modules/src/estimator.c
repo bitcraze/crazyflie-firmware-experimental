@@ -1,3 +1,4 @@
+#include "stm32fxxx.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "static_mem.h"
@@ -9,13 +10,14 @@
 #include "estimator.h"
 #include "estimator_complementary.h"
 #include "estimator_kalman.h"
+#include "estimator_ukf.h"
 #include "log.h"
 #include "statsCnt.h"
 #include "eventtrigger.h"
 #include "quatcompress.h"
 
-#define DEFAULT_ESTIMATOR complementaryEstimator
-static StateEstimatorType currentEstimator = anyEstimator;
+#define DEFAULT_ESTIMATOR StateEstimatorTypeComplementary
+static StateEstimatorType currentEstimator = StateEstimatorTypeAutoSelect;
 
 
 #define MEASUREMENTS_QUEUE_SIZE (20)
@@ -78,6 +80,15 @@ static EstimatorFcns estimatorFunctions[] = {
         .name = "Kalman",
     },
 #endif
+#ifdef CONFIG_ESTIMATOR_UKF_ENABLE
+    {
+	    .init = errorEstimatorUkfInit,
+	    .deinit = NOT_IMPLEMENTED,
+	    .test = errorEstimatorUkfTest,
+	    .update = errorEstimatorUkf,
+	    .name = "Error State UKF",
+	},
+#endif
 #ifdef CONFIG_ESTIMATOR_OOT
     {
         .init = estimatorOutOfTreeInit,
@@ -95,26 +106,28 @@ void stateEstimatorInit(StateEstimatorType estimator) {
 }
 
 void stateEstimatorSwitchTo(StateEstimatorType estimator) {
-  if (estimator < 0 || estimator >= StateEstimatorTypeCount) {
+  if (estimator < 0 || estimator >= StateEstimatorType_COUNT) {
     return;
   }
 
   StateEstimatorType newEstimator = estimator;
 
-  if (anyEstimator == newEstimator) {
+  if (StateEstimatorTypeAutoSelect == newEstimator) {
     newEstimator = DEFAULT_ESTIMATOR;
   }
 
   #if defined(CONFIG_ESTIMATOR_KALMAN)
-    #define ESTIMATOR kalmanEstimator
+    #define ESTIMATOR StateEstimatorTypeKalman
+  #elif defined(CONFIG_UKF_KALMAN)
+    #define ESTIMATOR StateEstimatorTypeUkf
   #elif defined(CONFIG_ESTIMATOR_COMPLEMENTARY)
-    #define ESTIMATOR complementaryEstimator
+    #define ESTIMATOR StateEstimatorTypeComplementary
   #else
-    #define ESTIMATOR anyEstimator
+    #define ESTIMATOR StateEstimatorTypeAutoSelect
   #endif
 
   StateEstimatorType forcedEstimator = ESTIMATOR;
-  if (forcedEstimator != anyEstimator) {
+  if (forcedEstimator != StateEstimatorTypeAutoSelect) {
     DEBUG_PRINT("Estimator type forced\n");
     newEstimator = forcedEstimator;
   }
@@ -127,7 +140,7 @@ void stateEstimatorSwitchTo(StateEstimatorType estimator) {
   DEBUG_PRINT("Using %s (%d) estimator\n", stateEstimatorGetName(), currentEstimator);
 }
 
-StateEstimatorType getStateEstimator(void) {
+StateEstimatorType stateEstimatorGetType(void) {
   return currentEstimator;
 }
 
