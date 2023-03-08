@@ -2,61 +2,69 @@
 
 ## Description
 
-This folder contains the app layer application for a swarm of Crazyflies that fly autonomously by communicating each other through the Peer to Peer Protocol (P2P). The swarm is composed of an arbitrary  number of Crazyflies with the maximum number of Crazyflies allowed being defined in the `MAX_ADDRESS` (no more than 9) definition in settings.h .All the copters start placed on their charging pads.The goal is to have a certain number of drones flying and avoid collision  while the rest are being charged and wait.
+This folder contains the app layer application for a swarm of Crazyflies that fly autonomously by communicating with each other through the Peer to Peer Protocol (P2P). The swarm is composed of an arbitrary  number of Crazyflies with the maximum number of Crazyflies allowed being defined in the `MAX_ADDRESS` (no more than 9) definition in settings.h. All the copters start placed on their charging pads. The goal is to have a certain number of drones flying and avoid collision while the rest are being charged and wait.
 
-The demo starts by setting the parameter  `take_off`  to 1, in  at least one of the Crazyflie of the swarm. After that, all the copters assign a random time to wait before taking off. In case the desired number of flying copters is reached during this time, the swarm is considered to be ready and the particular copter will remain landed,otherwise it takes off.Through this randomization the swarm is able to be led to consensus on the flying copters at each time step,despite some false take offs that may happen.
+The demo it intended to be used with the Lighthouse positioning system.
 
-As soon as a Crazyflie is airborne, it starts to broadcast each position through the peer to peer protocol and it enables the on board, online collision avoidance algorithm based on Buffered Voronoi cells.In this way ,each copter is aware of the position of the other ones and can avoid collision.While flying , copters pick random positions on a circle and move to them until a certain flight time pass by.After that, they land and wait for a new random time to take off as explained above.
+There are three types of participants in the system:
+* Pilot - one of the flying Crazyflies
+* Sniffer - a Crazyflie that is listening to the P2P traffic and is used to visualizing the system state. It is also used to broadcast changes in the desired nr of flying Crazyflies.
+* Human tracker - a Crazyflie that broadcasts its position, much like the pilots, but without flying. Pilots will avoid the human tracker and it can be used to enter the flying space.
 
-In order to terminate the demo, the user must set the parameter `terminateApp` to 1 in at least one of the Crazyflie of the swarm.Then this information is broadcasted to all the copters and they will stop flying and land.
+## Set up
 
-The structure of each P2P packet is as follows:
-<pre>
-|--------------------|
-|   <b>PACKET FORMAT</b>    |
-|--------------------|
-| Id (1 byte)        |
-|--------------------|
-| counter (1 byte)   |
-|--------------------|
-| state (1 byte)     |
-|--------------------|
-| position (12 bytes)|
-|--------------------|
-| Voltage (1 byte)   |
-|--------------------|
-| Terminate (1 byte) |
-|   signal           |
-|--------------------|
-</pre>
+Get a bunch of Crazyflies, configure them to use the same channel and addresses where the last byte is 00 for the sniffer and 01 to 09 for the others.
+Connect the shiffer to a computer via USB.
 
-
-## GUI
-A GUI is also provided to control and monitor the swarm.The communication with it is achieved through a static Crazyflie which acts as a sniffer for all the P2P packets sent by the copters.Keep in mind that the sniffer must be connected through USB to the PC in order not to interfere with the P2P radio communication.The user can also command the take off and the termination through the GUI and monitor the state and voltage of each copter.
-
+Place charging pads in the flying space.
 
 ## Building the Demo
-Make sure that you are in the decentralized_swarm folder (not the main folder of the crazyflie firmware). **It is assumed that the sniffer has a radio address ending in '00' and all the swarm copters from '01' to '09'**.
 
-If you want to build the sniffer app the `BUILD_SNIFFER_APP` flag must be defined in the `choose_app.h` header file and then type the following to build and flash it while the crazyflie is put into bootloader mode:
+Make sure that you are in the decentralized_swarm folder (not the main folder of the crazyflie firmware).
+
+Edit `settings.h` and set the bounds (MIN_X_BOUND, MAX_X_BOUND, MIN_Y_BOUND...) to fit the flying space (cage).
+
+Chose which type of app (pilot, sniffer or human tracker) to build by modifying the `chose_app.h` file.
+
+Type the following to build and flash it while the crazyflie is put into bootloader mode:
 ```
 make clean
-make 
+make
 make cload
 ```
 
-If you want to build the pilot app for the swarm copters the `BUILD_PILOT_APP` flag must be defined in the `choose_app.h` header file and then the standard flashing procedure can be used for each crazyflie or use the `cload-all.sh` script to flash all the copters automatically:
+The pilot firmware can be flashed to multiple Crazyflies using the `cload-all.sh` script, to speed up the process.
 ```
 ./cload-all.sh
 ```
 
-
-If you want to use the GUI for monitoring the state of each copter and controlling the swarm ,the python libraries in requirements.txt must be installed by running the following command:
+Install requirements for the GUI
 ```
 pip install -r requirements.txt
 ```
 
-and then executing the script `towergui.py` in the folder GUI.
+## Running the demo
+
+Put the pilot Crazyflies on the charging pads and turn them on.
+
+Connect the sniffer to your computer via USB and start the gui
+```
+./GUI/towergui.py
+```
+
+In the GUI, click the "More" and "Less" buttons to set the desired nr of flying Crazyflies.
+
+## Handling crashes
+
+If a pilot crashes. put it back on the charging pad (the correct one) and restart it.
+
+## Entering the space with a human tracker
+
+To use a Crazyflie as a human tracker, flash it with the human tracker flavor of the firmware. The Crazyflie must be configured
+as one of the pilot Crazyfles, that is address 01 to 09. Hold the tracker (or put it on your head) so that it can receive
+the lighthouse base stations and track its position.
+The pilot Crazyflies will (should) avoid the space around the tracker (human), but note that the space is fairly small.
+
 ## Resources
 You can find on Bitcraze's website the [API documentation for P2P](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/p2p_api/) as well as the [App layer API guide](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/userguides/app_layer/)
 

@@ -26,7 +26,7 @@
  */
 
 #include "choose_app.h"
-#ifdef BUILD_PILOT_APP
+#if (BUILD_TYPE == BUILD_TYPE_PILOT_APP)
 
 #include <string.h>
 #include <stdint.h>
@@ -408,4 +408,4 @@ LOG_GROUP_START(app)
   LOG_ADD(LOG_UINT8, state, &state)
 LOG_GROUP_STOP(app)
 
-#endif // BUILD_PILOT_APP
+#endif // BUILD_TYPE_PILOT_APP

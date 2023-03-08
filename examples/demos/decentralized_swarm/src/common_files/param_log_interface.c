@@ -51,6 +51,7 @@ static paramVarId_t paramIdLighthouseMethod;
 static paramVarId_t paramIdCollisionAvoidanceEnable;
 static paramVarId_t paramIdCollisionAvoidanceEllipsoidX;
 static paramVarId_t paramIdCollisionAvoidanceEllipsoidY;
+static paramVarId_t paramIdCollisionAvoidanceEllipsoidZ;
 static paramVarId_t paramIdCollisionAvoidanceHorizon;
 static paramVarId_t paramIdCollisionAvoidanceMaxVel;
 
@@ -100,6 +101,7 @@ void disableCollisionAvoidance() {
 void initCollisionAvoidance(){
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidX, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
     paramSetFloat(paramIdCollisionAvoidanceEllipsoidY, COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS);
+    paramSetFloat(paramIdCollisionAvoidanceEllipsoidZ, COLLISION_AVOIDANCE_ELLIPSOID_Z_RADIUS);
     paramSetFloat(paramIdCollisionAvoidanceHorizon, COLLISION_AVOIDANCE_HORIZON);
     paramSetFloat(paramIdCollisionAvoidanceMaxVel, COLLISION_AVOIDANCE_MAX_VELOCITY);
 
@@ -138,6 +140,7 @@ void initParamLogInterface(){
     paramIdCollisionAvoidanceEnable = paramGetVarId("colAv", "enable");
     paramIdCollisionAvoidanceEllipsoidX = paramGetVarId("colAv", "ellipsoidX");
     paramIdCollisionAvoidanceEllipsoidY = paramGetVarId("colAv", "ellipsoidY");
+    paramIdCollisionAvoidanceEllipsoidZ = paramGetVarId("colAv", "ellipsoidZ");
     paramIdCollisionAvoidanceHorizon = paramGetVarId("colAv", "horizon");
     paramIdCollisionAvoidanceMaxVel = paramGetVarId("colAv", "maxSpeed");
     paramIdCollisionAvoidanceBBoxMaxX = paramGetVarId("colAv", "bboxMaxX");

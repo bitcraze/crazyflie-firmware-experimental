@@ -26,7 +26,7 @@
  */
 
 #include "choose_app.h"
-#ifdef BUILD_SNIFFER_APP
+#if (BUILD_TYPE == BUILD_TYPE_SNIFFER_APP)
 
 #include <string.h>
 #include <stdint.h>
@@ -118,4 +118,4 @@ PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, less, &lessCoptersVal, &lessCopters)
 PARAM_GROUP_STOP(app)
 
 
-#endif // BUILD_SNIFFER_APP
+#endif // BUILD_TYPE_SNIFFER_APP

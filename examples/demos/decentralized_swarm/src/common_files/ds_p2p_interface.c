@@ -96,7 +96,8 @@ static void p2pcallbackHandler(P2PPacket *p) {
             state == STATE_GOING_TO_TRAJECTORY_START ||
             state == STATE_HOVERING ||
             state == STATE_LANDING ||
-            state == STATE_PREPARING_FOR_LAND) {
+            state == STATE_PREPARING_FOR_LAND ||
+            state == STATE_I_AM_A_HUMAN) {
 
             positionMeasurement_t pos_measurement;
             memcpy(&pos_measurement.pos, &rxMessage.fullState.position, sizeof(Position));

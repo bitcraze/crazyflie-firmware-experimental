@@ -21,6 +21,7 @@ class State:
     STATE_REPOSITION_ON_PAD = 14
     STATE_CRASHED = 15
     STATE_SNIFFING = 16
+    STATE_I_AM_A_HUMAN = 17
     STATE_UNKNOWN = 255
 
 
@@ -42,4 +43,5 @@ state_dict = {
     State.STATE_REPOSITION_ON_PAD: ["REPOSITION ON PAD", "yellow"],
     State.STATE_CRASHED: ["CRASHED", "red"],
     State.STATE_SNIFFING: ["SNIFFING", "blue"],
+    State.STATE_I_AM_A_HUMAN: ["HUMAN TRACKER", "black"],
 }

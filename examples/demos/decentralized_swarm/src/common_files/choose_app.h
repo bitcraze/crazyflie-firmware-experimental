@@ -26,10 +26,11 @@
  *
  */
 
-#define BUILD_PILOT_APP
-// #define BUILD_SNIFFER_APP
+#define BUILD_TYPE_PILOT_APP (1)
+#define BUILD_TYPE_HUMAN_TRACKER_APP (2)
+#define BUILD_TYPE_SNIFFER_APP (3)
 
-// check if both apps are defined
-#if defined(BUILD_PILOT_APP) && defined(BUILD_SNIFFER_APP)
-    #error "Only one app can be defined to be built!"
-#endif
+// Enable one
+#define BUILD_TYPE BUILD_TYPE_PILOT_APP
+// #define BUILD_TYPE BUILD_TYPE_HUMAN_TRACKER_APP
+// #define BUILD_TYPE BUILD_TYPE_SNIFFER_APP

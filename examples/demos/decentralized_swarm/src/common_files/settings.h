@@ -83,7 +83,7 @@
 #define MIN_Y_BOUND -2.00f
 #define MAX_Y_BOUND  2.00f
 
-#define MIN_Z_BOUND -0.3f
+#define MIN_Z_BOUND -0.1f
 #define MAX_Z_BOUND  1.7f
 
 // getRandomPositionOnCircle or getRandomPositionOnBox
@@ -122,6 +122,11 @@
 
 // Collision avoidance
 #define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
+
+// The Z is set to "very large" to support human tracker/avoidance. This essentially changes the collision avoidance to
+// 2D as drones will not try to go over each other. If no human tracking is needed, it can be changed to 0.9.
+#define COLLISION_AVOIDANCE_ELLIPSOID_Z_RADIUS 3.0f //radius of the ellipsoid used to avoid collisions.
+
 #define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
 
@@ -131,5 +136,5 @@
 #define COLLISION_AVOIDANCE_BBOX_MIN_Y  MIN_Y_BOX
 #define COLLISION_AVOIDANCE_BBOX_MAX_Y  MAX_Y_BOX
 
-#define COLLISION_AVOIDANCE_BBOX_MIN_Z  MIN_Z_BOUND
+#define COLLISION_AVOIDANCE_BBOX_MIN_Z  0.3f
 #define COLLISION_AVOIDANCE_BBOX_MAX_Z  MAX_Z_BOUND

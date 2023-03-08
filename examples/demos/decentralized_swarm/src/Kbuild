@@ -1,3 +1,4 @@
 obj-y += pilot.o
 obj-y += sniffer.o
+obj-y += human_tracker.o
 obj-y += common_files/
