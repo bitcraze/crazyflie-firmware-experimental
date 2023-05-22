@@ -86,7 +86,7 @@ struct trajectoryDescription
 #define ALL_GROUPS 0
 
 // Global variables
-uint8_t trajectories_memory[TRAJECTORY_MEMORY_SIZE];
+uint8_t trajectories_memory[TRAJECTORY_MEMORY_SIZE] __attribute__((aligned(4)));
 static struct trajectoryDescription trajectory_descriptions[NUM_TRAJECTORY_DEFINITIONS];
 
 // Static structs are zero-initialized, so nullSetpoint corresponds to
@@ -97,6 +97,7 @@ const static setpoint_t nullSetpoint;
 static bool isInit = false;
 static struct planner planner;
 static uint8_t group_mask;
+static bool isBlocked; // Are we blocked to do anything by the supervisor
 static struct vec pos; // last known setpoint (position [m])
 static struct vec vel; // last known setpoint (velocity [m/s])
 static float yaw; // last known setpoint yaw (yaw [rad])
@@ -129,8 +130,8 @@ STATIC_MEM_TASK_ALLOC(crtpCommanderHighLevelTask, CMD_HIGH_LEVEL_TASK_STACKSIZE)
 // trajectory command (first byte of crtp packet)
 enum TrajectoryCommand_e {
   COMMAND_SET_GROUP_MASK          = 0,
-  COMMAND_TAKEOFF                 = 1, // Deprecated, use COMMAND_TAKEOFF_2
-  COMMAND_LAND                    = 2, // Deprecated, use COMMAND_LAND_2
+  COMMAND_TAKEOFF                 = 1, // Deprecated (removed after August 2023), use COMMAND_TAKEOFF_2
+  COMMAND_LAND                    = 2, // Deprecated (removed after August 2023), use COMMAND_LAND_2
   COMMAND_STOP                    = 3,
   COMMAND_GO_TO                   = 4,
   COMMAND_START_TRAJECTORY        = 5,
@@ -146,7 +147,7 @@ struct data_set_group_mask {
 } __attribute__((packed));
 
 // vertical takeoff from current x-y position to given height
-// Deprecated
+// Deprecated (removed after August 2023)
 struct data_takeoff {
   uint8_t groupMask;        // mask for which CFs this should apply to
   float height;             // m (absolute)
@@ -174,7 +175,7 @@ struct data_takeoff_with_velocity {
 } __attribute__((packed));
 
 // vertical land from current x-y position to given height
-// Deprecated
+// Deprecated (removed after August 2023)
 struct data_land {
   uint8_t groupMask;        // mask for which CFs this should apply to
   float height;             // m (absolute)
@@ -275,6 +276,8 @@ void crtpCommanderHighLevelInit(void)
   vel = vzero();
   yaw = 0;
 
+  isBlocked = false;
+
   isInit = true;
 }
 
@@ -298,9 +301,9 @@ int crtpCommanderHighLevelDisable()
   return 0;
 }
 
-bool crtpCommanderHighLevelGetSetpoint(setpoint_t* setpoint, const state_t *state, uint32_t tick)
+bool crtpCommanderHighLevelGetSetpoint(setpoint_t* setpoint, const state_t *state, stabilizerStep_t stabilizerStep)
 {
-  if (!RATE_DO_EXECUTE(RATE_HL_COMMANDER, tick)) {
+  if (!RATE_DO_EXECUTE(RATE_HL_COMMANDER, stabilizerStep)) {
     return false;
   }
 
@@ -433,8 +436,13 @@ int set_group_mask(const struct data_set_group_mask* data)
   return 0;
 }
 
+// Deprecated (removed after August 2023)
 int takeoff(const struct data_takeoff* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -447,6 +455,10 @@ int takeoff(const struct data_takeoff* data)
 
 int takeoff2(const struct data_takeoff_2* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -465,6 +477,10 @@ int takeoff2(const struct data_takeoff_2* data)
 
 int takeoff_with_velocity(const struct data_takeoff_with_velocity* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -488,8 +504,13 @@ int takeoff_with_velocity(const struct data_takeoff_with_velocity* data)
   return result;
 }
 
+// Deprecated (removed after August 2023)
 int land(const struct data_land* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -502,6 +523,10 @@ int land(const struct data_land* data)
 
 int land2(const struct data_land_2* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -520,6 +545,10 @@ int land2(const struct data_land_2* data)
 
 int land_with_velocity(const struct data_land_with_velocity* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
@@ -562,6 +591,10 @@ int go_to(const struct data_go_to* data)
     .omega = {0.0f, 0.0f, 0.0f},
   };
 
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     struct vec hover_pos = mkvec(data->x, data->y, data->z);
@@ -583,6 +616,10 @@ int go_to(const struct data_go_to* data)
 
 int start_trajectory(const struct data_start_trajectory* data)
 {
+  if (isBlocked) {
+    return EBUSY;
+  }
+
   int result = 0;
   if (isInGroup(data->groupMask)) {
     if (data->trajectoryId < NUM_TRAJECTORY_DEFINITIONS) {
@@ -613,7 +650,6 @@ int start_trajectory(const struct data_start_trajectory* data)
           result = plan_start_compressed_trajectory(&planner, &compressed_trajectory, data->relative, pos);
           xSemaphoreGive(lockTraj);
         }
-
       }
     }
   }
@@ -734,6 +770,33 @@ int crtpCommanderHighLevelStop()
   };
 
   return handleCommand(COMMAND_STOP, (const uint8_t*)&data);
+}
+
+int crtpCommanderBlock(bool doBlock)
+{
+  if (doBlock)
+  {
+    if (!isBlocked)
+    {
+      const bool isNotDisabled = !plan_is_disabled(&planner);
+      const bool isNotStopped = !plan_is_stopped(&planner);
+      if (isNotDisabled && isNotStopped)
+      {
+        xSemaphoreTake(lockTraj, portMAX_DELAY);
+        plan_stop(&planner);
+        xSemaphoreGive(lockTraj);
+      }
+    }
+  }
+
+  isBlocked = doBlock;
+
+  return 0;
+}
+
+bool crtpCommanderHighLevelIsBlocked()
+{
+  return isBlocked;
 }
 
 int crtpCommanderHighLevelGoTo(const float x, const float y, const float z, const float yaw, const float duration_s, const bool relative)

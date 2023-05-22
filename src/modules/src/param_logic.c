@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2011-2021 Bitcraze AB
+ * Copyright (C) 2011-2023 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@
 #include <errno.h>
 
 #include "config.h"
+#include "FreeRTOS.h"
 #include "param_logic.h"
 #include "storage.h"
 #include "crc32.h"
@@ -65,6 +66,7 @@ static const uint8_t typeLength[] = {
 
 //Private functions
 static int variableGetIndex(int id);
+static void paramNotifyChanged(int index);
 static char paramWriteByNameProcess(char* group, char* name, int type, void *valptr);
 
 
@@ -368,6 +370,10 @@ void paramWriteProcess(CRTPPacket *p)
 
   crtpSendPacketBlock(p);
 
+  paramNotifyChanged(index);
+}
+
+static void paramNotifyChanged(int index) {
   if (params[index].callback) {
     params[index].callback();
   }
@@ -406,6 +412,8 @@ static char paramWriteByNameProcess(char* group, char* name, int type, void *val
   }
 
   paramSet(index, valptr);
+
+  paramNotifyChanged(index);
 
   return 0;
 }
@@ -563,14 +571,23 @@ void paramSetInt(paramVarId_t varid, int valuei)
   paramSize = paramSet(varid.index, (void *)&valuei);
 
 #ifndef CONFIG_PARAM_SILENT_UPDATES
-  static CRTPPacket pk;
-  pk.header=CRTP_HEADER(CRTP_PORT_PARAM, MISC_CH);
-  pk.data[0] = MISC_VALUE_UPDATED;
-  pk.data[1] = varid.id & 0xffu;
-  pk.data[2] = (varid.id >> 8) & 0xffu;
-  pk.size = 3 + paramSize;
-  crtpSendPacketBlock(&pk);
+  if (crtpIsConnected())
+  {
+    static CRTPPacket pk;
+    pk.header=CRTP_HEADER(CRTP_PORT_PARAM, MISC_CH);
+    pk.data[0] = MISC_VALUE_UPDATED;
+    pk.data[1] = varid.id & 0xffu;
+    pk.data[2] = (varid.id >> 8) & 0xffu;
+    pk.size = 3 + paramSize;
+    const int sendResult = crtpSendPacket(&pk);
+    if (sendResult == errQUEUE_FULL)
+    {
+      DEBUG_PRINT("WARNING: Param update not sent\n");
+    }
+  }
 #endif
+
+  paramNotifyChanged(varid.index);
 }
 
 void paramSetFloat(paramVarId_t varid, float valuef)
@@ -581,16 +598,25 @@ void paramSetFloat(paramVarId_t varid, float valuef)
   *(float *)params[varid.index].address = valuef;
 
 #ifndef CONFIG_PARAM_SILENT_UPDATES
-  static CRTPPacket pk;
-  pk.header  = CRTP_HEADER(CRTP_PORT_PARAM, MISC_CH);
-  pk.data[0] = MISC_VALUE_UPDATED;
-  pk.data[1] = varid.id & 0xffu;
-  pk.data[2] = (varid.id >> 8) & 0xffu;
-  pk.size = 3;
-  memcpy(&pk.data[2], &valuef, 4);
-  pk.size += 4;
-  crtpSendPacketBlock(&pk);
+  if (crtpIsConnected())
+  {
+    static CRTPPacket pk;
+    pk.header  = CRTP_HEADER(CRTP_PORT_PARAM, MISC_CH);
+    pk.data[0] = MISC_VALUE_UPDATED;
+    pk.data[1] = varid.id & 0xffu;
+    pk.data[2] = (varid.id >> 8) & 0xffu;
+    pk.size = 3;
+    memcpy(&pk.data[2], &valuef, 4);
+    pk.size += 4;
+    const int sendResult = crtpSendPacket(&pk);
+    if (sendResult == errQUEUE_FULL)
+    {
+      DEBUG_PRINT("WARNING: Param update not sent\n");
+    }
+  }
 #endif
+
+  paramNotifyChanged(varid.index);
 }
 
 void paramSetByName(CRTPPacket *p)
@@ -615,7 +641,7 @@ void paramSetByName(CRTPPacket *p)
   type = p->data[1 + strlen(group) + 1 + strlen(name) + 1];
   valPtr = &p->data[1 + strlen(group) + 1 + strlen(name) + 2];
 
-  error = paramWriteByNameProcess(group, name, type, valPtr);
+  error = paramWriteByNameProcess(group, name, type, valPtr);  /* calls callback */
 
   p->data[1 + strlen(group) + 1 + strlen(name) + 1] = error;
   p->size = 1 + strlen(group) + 1 + strlen(name) + 1 + 1;

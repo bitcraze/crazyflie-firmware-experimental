@@ -89,37 +89,40 @@ static void splitAndSend(const CPXRoutablePacket_t* rxp, RouteContext_t* context
 static void route(Receiver_t receive, CPXRoutablePacket_t* rxp, RouteContext_t* context, const char* routerName) {
   while(1) {
     receive(rxp);
+    // this should never fail, as it should be checked when the packet is received
+    // however, double checking doesn't harm
+    if (cpxCheckVersion(rxp->route.version)) {
+      const CPXTarget_t source = rxp->route.source;
+      const CPXTarget_t destination = rxp->route.destination;
+      const uint16_t cpxDataLength = rxp->dataLength;
 
-    const CPXTarget_t source = rxp->route.source;
-    const CPXTarget_t destination = rxp->route.destination;
-    const uint16_t cpxDataLength = rxp->dataLength;
-
-    switch (destination) {
-      case CPX_T_WIFI_HOST:
-      case CPX_T_ESP32:
-      case CPX_T_GAP8:
-        //DEBUG_PRINT("%s [0x%02X] -> UART2 [0x%02X] (%u)\n", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, cpxUARTTransportSend, CPX_UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      case CPX_T_STM32:
-        //DEBUG_PRINT("%s [0x%02X] -> STM32 [0x%02X] (%u)\n", routerName, source, destination, cpxDataLength);
-        splitAndSend(rxp, context, cpxInternalRouterRouteIn, CPX_UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
-        break;
-      default:
-        DEBUG_PRINT("Cannot route from %s [0x%02X] to [0x%02X](%u)\n", routerName, source, destination, cpxDataLength);
-        break;
+      switch (destination) {
+        case CPX_T_WIFI_HOST:
+        case CPX_T_ESP32:
+        case CPX_T_GAP8:
+          //DEBUG_PRINT("%s [0x%02X] -> UART2 [0x%02X] (%u)\n", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, cpxUARTTransportSend, CPX_UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        case CPX_T_STM32:
+          //DEBUG_PRINT("%s [0x%02X] -> STM32 [0x%02X] (%u)\n", routerName, source, destination, cpxDataLength);
+          splitAndSend(rxp, context, cpxInternalRouterRouteIn, CPX_UART_TRANSPORT_MTU - CPX_ROUTING_PACKED_SIZE);
+          break;
+        default:
+          DEBUG_PRINT("Cannot route from %s [0x%02X] to [0x%02X](%u)\n", routerName, source, destination, cpxDataLength);
+          break;
+      }
     }
   }
 }
 
 static void router_from_uart(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_UART_ROUTER_RUNNING);
-  route(cpxUARTTransportReceive, &internalRxBuf, &internal_task_context, "UART2");
+  route(cpxUARTTransportReceive, &uartRxBuf, &uart_task_context, "UART2");
 }
 
 static void router_from_internal(void* _param) {
   xEventGroupSetBits(startUpEventGroup, START_UP_INTERNAL_ROUTER_RUNNING);
-  route(cpxInternalRouterRouteOut, &uartRxBuf, &uart_task_context, "STM32");
+  route(cpxInternalRouterRouteOut, &internalRxBuf, &internal_task_context, "STM32");
 }
 
 void cpxExternalRouterInit() {
@@ -136,5 +139,5 @@ void cpxExternalRouterInit() {
                       pdTRUE, // Wait for all bits
                       portMAX_DELAY);
 
-  DEBUG_PRINT("CPX External router initialized\n");
+  DEBUG_PRINT("CPX External router initialized, CPX_VERSION: %d\n", CPX_VERSION);
 }

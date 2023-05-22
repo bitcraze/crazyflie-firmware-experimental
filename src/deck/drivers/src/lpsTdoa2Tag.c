@@ -5,8 +5,6 @@
  * +------+    / /_/ / / /_/ /__/ /  / /_/ / / /_/  __/
  *  ||  ||    /_____/_/\__/\___/_/   \__,_/ /___/\___/
  *
- * LPS node firmware.
- *
  * Copyright 2016, Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
@@ -252,8 +250,9 @@ static uint32_t onEvent(dwDevice_t *dev, uwbEvent_t event) {
       }
       break;
     case eventTimeout:
-      setRadioInReceiveMode(dev);
-      break;
+      // Fall through
+    case eventReceiveFailed:
+      // Fall through
     case eventReceiveTimeout:
       setRadioInReceiveMode(dev);
       break;
