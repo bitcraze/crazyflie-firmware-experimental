@@ -5,6 +5,8 @@
         "**/bower_components": true
     },
     "files.associations": {
-        "bootloader.h": "c"
+        "bootloader.h": "c",
+        "debug.h": "c",
+        "config.h": "c"
     }
 }

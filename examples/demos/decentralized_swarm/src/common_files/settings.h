@@ -30,7 +30,7 @@
 #define EXECUTE_TRAJ true
 
 // Flight Settings
-#define TAKE_OFF_HEIGHT 1.0f
+#define TAKE_OFF_HEIGHT 1.5f
 #define INITIAL_DESIRED_FLYING_COPTERS 0
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
@@ -77,11 +77,11 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 10000 //ms
 
 // BOUNDS DEFINITIONS
-#define MIN_X_BOUND -0.60f
-#define MAX_X_BOUND  1.10f
+#define MIN_X_BOUND -0.6f
+#define MAX_X_BOUND  0.9f
 
-#define MIN_Y_BOUND -1.30f
-#define MAX_Y_BOUND  1.40f
+#define MIN_Y_BOUND -1.0f
+#define MAX_Y_BOUND  1.0f
 
 #define MIN_Z_BOUND -0.3f
 #define MAX_Z_BOUND  1.7f
