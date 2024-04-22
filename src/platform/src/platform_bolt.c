@@ -40,23 +40,27 @@ static platformConfig_t configs[] = {
   {  // Old ID of Crazyflie Bolt
     .deviceType = "RZ10",
     .deviceTypeName = "Crazyflie Bolt",
-    .sensorImplementation = SensorImplementation_bmi088_spi_bmp388,
+    .sensorImplementation = SensorImplementation_bmi088_spi_bmp3xx,
     .physicalLayoutAntennasAreClose = false,
     .motorMap = motorMapBoltBrushless,
   },
   {
     .deviceType = "CB10",
     .deviceTypeName = "Crazyflie Bolt",
-    .sensorImplementation = SensorImplementation_bmi088_spi_bmp388,
+    .sensorImplementation = SensorImplementation_bmi088_spi_bmp3xx,
     .physicalLayoutAntennasAreClose = false,
     .motorMap = motorMapBoltBrushless,
   },
   {
     .deviceType = "CB11",
     .deviceTypeName = "Crazyflie Bolt 1.1",
-    .sensorImplementation = SensorImplementation_bmi088_spi_bmp388,
+    .sensorImplementation = SensorImplementation_bmi088_spi_bmp3xx,
     .physicalLayoutAntennasAreClose = false,
+  #ifdef CONFIG_BOLT11_BRUSHED
+    .motorMap = motorMapBolt11Brushed,
+  #else
     .motorMap = motorMapBolt11Brushless,
+  #endif
   }
 #endif
 };

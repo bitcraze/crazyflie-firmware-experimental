@@ -41,6 +41,7 @@
 #include "platform_defaults.h"
 #include "crtp_localization_service.h"
 #include "system.h"
+#include "autoconf.h"
 
 #define DEBUG_MODULE "SUP"
 #include "debug.h"
@@ -54,17 +55,34 @@
 #define COMMANDER_WDT_TIMEOUT_STABILIZE  M2T(500)
 #define COMMANDER_WDT_TIMEOUT_SHUTDOWN   M2T(2000)
 
+#ifndef CONFIG_MOTORS_REQUIRE_ARMING
+  #define AUTO_ARMING 1
+#else
+  #define AUTO_ARMING 0
+#endif
+
+static uint16_t landingTimeoutDuration = LANDING_TIMEOUT_MS;
+
 typedef struct {
   bool canFly;
   bool isFlying;
   bool isTumbled;
+  bool isArmingActivated;
+  bool isCrashed;
+  uint16_t infoBitfield;
   uint8_t paramEmergencyStop;
+
+  // Deprecated, remove after 2024-06-01
+  int8_t deprecatedArmParam;
 
   // The time (in ticks) of the first tumble event. 0=no tumble
   uint32_t initialTumbleTick;
 
   // The time (in ticks) of the latest high thrust event. 0=no high thrust event yet
   uint32_t latestThrustTick;
+
+  // The time (in ticks) of the latest landing event. 0=no landing event yet
+  uint32_t latestLandingTick;
 
   supervisorState_t state;
 
@@ -89,6 +107,63 @@ bool supervisorIsFlying() {
 
 bool supervisorIsTumbled() {
   return supervisorMem.isTumbled;
+}
+
+bool supervisorCanArm() {
+  return supervisorStatePreFlChecksPassed == supervisorMem.state;
+}
+
+bool supervisorIsArmed() {
+  return supervisorMem.isArmingActivated || supervisorMem.deprecatedArmParam;
+}
+
+bool supervisorIsLocked() {
+  return supervisorStateLocked == supervisorMem.state;
+}
+
+bool supervisorIsCrashed() {
+  return supervisorMem.isCrashed;
+}
+
+static void supervisorSetLatestLandingTime(SupervisorMem_t* this, const uint32_t currentTick) {
+  this->latestLandingTick = currentTick;
+}
+
+bool supervisorIsLandingTimeout(SupervisorMem_t* this, const uint32_t currentTick) {
+  if (0 == this->latestLandingTick) {
+    return false;
+  }
+
+  const uint32_t landingTime = currentTick - this->latestLandingTick;
+  return landingTime > M2T(landingTimeoutDuration);
+}
+
+bool supervisorRequestCrashRecovery(const bool doRecovery) {
+
+  if (doRecovery && !supervisorIsCrashed()) {
+    return true;
+  } else if (doRecovery && supervisorIsCrashed() && !supervisorIsTumbled()) {
+    supervisorMem.isCrashed = false;
+    return true;
+  } else if (!doRecovery) {
+    supervisorMem.isCrashed = true;
+    return true;
+  }
+
+  return false;
+}
+
+bool supervisorRequestArming(const bool doArm) {
+  if (doArm == supervisorMem.isArmingActivated) {
+    return true;
+  }
+
+  if (doArm && !supervisorCanArm()) {
+    return false;
+  }
+
+  supervisorMem.isArmingActivated = doArm;
+  return true;
 }
 
 //
@@ -120,7 +195,7 @@ static bool isFlyingCheck(SupervisorMem_t* this, const uint32_t tick) {
 }
 
 //
-// Tumbling is defined as being tilted more than 60 degrees for one second, or more than 90 degrees for 30 ms.
+// Tumbling is defined as being tilted a bit for some time, or closer to up side down for a shorter time.
 // Free falling is considered a valid flight mode.
 //
 // Once a tumbled situation is identified, we can use this for instance to cut
@@ -133,8 +208,8 @@ static bool isTumbledCheck(SupervisorMem_t* this, const sensorData_t *data, cons
   const float acceptedTiltAccZ = 0.5;  // 60 degrees tilt (when stationary)
   const uint32_t maxTiltTime = M2T(1000);
 
-  const float acceptedUpsideDownAccZ = -0.0;  // 90 degrees tilt
-  const uint32_t maxUpsideDownTime = M2T(30);
+  const float acceptedUpsideDownAccZ = -0.2;
+  const uint32_t maxUpsideDownTime = M2T(100);
 
   const bool isFreeFalling = (fabsf(data->acc.z) < freeFallThreshold && fabsf(data->acc.y) < freeFallThreshold && fabsf(data->acc.x) < freeFallThreshold);
   if (isFreeFalling) {
@@ -178,25 +253,54 @@ static bool checkEmergencyStopWatchdog(const uint32_t tick) {
   return isOk;
 }
 
-static void transitionActions(const supervisorState_t currentState, const supervisorState_t newState) {
+static void postTransitionActions(SupervisorMem_t* this, const supervisorState_t previousState, const uint32_t currentTick) {
+  const supervisorState_t newState = this->state;
+
   if (newState == supervisorStateReadyToFly) {
     DEBUG_PRINT("Ready to fly\n");
+  }
+
+  if (newState == supervisorStateLanded) {
+    supervisorSetLatestLandingTime(this, currentTick);
+  }
+  
+  if ((previousState == supervisorStateLanded) && (newState == supervisorStateReset)) {
+    DEBUG_PRINT("Landing timeout, disarming\n");
   }
 
   if (newState == supervisorStateLocked) {
     DEBUG_PRINT("Locked, reboot required\n");
   }
 
-  if ((currentState == supervisorStateNotInitialized || currentState == supervisorStateReadyToFly || currentState == supervisorStateFlying) &&
-      newState != supervisorStateReadyToFly && newState != supervisorStateFlying) {
+  if (newState == supervisorStateCrashed) {
+    DEBUG_PRINT("Crashed, recovery required\n");
+    supervisorRequestCrashRecovery(false);
+  }
+
+  if ((previousState == supervisorStateNotInitialized || previousState == supervisorStateReadyToFly || previousState == supervisorStateFlying) &&
+      newState != supervisorStateReadyToFly && newState != supervisorStateFlying && newState != supervisorStateLanded) {
     DEBUG_PRINT("Can not fly\n");
+  }
+
+  if (newState != supervisorStateReadyToFly &&
+      newState != supervisorStateFlying &&
+      newState != supervisorStateWarningLevelOut &&
+      newState != supervisorStateLanded) {
+    supervisorRequestArming(false);
+  }
+
+  // We do not require an arming action by the user, auto arm
+  if (AUTO_ARMING || this->deprecatedArmParam) {
+    if (newState == supervisorStatePreFlChecksPassed) {
+      supervisorRequestArming(true);
+    }
   }
 }
 
 static supervisorConditionBits_t updateAndPopulateConditions(SupervisorMem_t* this, const sensorData_t *sensors, const setpoint_t* setpoint, const uint32_t currentTick) {
   supervisorConditionBits_t conditions = 0;
 
-  if (systemIsArmed()) {
+  if (supervisorIsArmed()) {
     conditions |= SUPERVISOR_CB_ARMED;
   }
 
@@ -230,6 +334,14 @@ static supervisorConditionBits_t updateAndPopulateConditions(SupervisorMem_t* th
     conditions |= SUPERVISOR_CB_EMERGENCY_STOP;
   }
 
+  if (supervisorIsCrashed()) {
+    conditions |= SUPERVISOR_CB_CRASHED;
+  }
+
+  if (supervisorIsLandingTimeout(this, currentTick)) {
+    conditions |= SUPERVISOR_CB_LANDING_TIMEOUT;
+  }
+
   return conditions;
 }
 
@@ -237,6 +349,32 @@ static void updateLogData(SupervisorMem_t* this, const supervisorConditionBits_t
   this->canFly = supervisorAreMotorsAllowedToRun();
   this->isFlying = (this->state == supervisorStateFlying) || (this->state == supervisorStateWarningLevelOut);
   this->isTumbled = (conditions & SUPERVISOR_CB_IS_TUMBLED) != 0;
+
+  this->infoBitfield = 0;
+  if (supervisorCanArm()) {
+    this->infoBitfield |= 0x0001;
+  }
+  if (supervisorIsArmed()) {
+    this->infoBitfield |= 0x0002;
+  }
+  if(AUTO_ARMING || this->deprecatedArmParam) {
+    this->infoBitfield |= 0x0004;
+  }
+  if (this->canFly) {
+    this->infoBitfield |= 0x0008;
+  }
+  if (this->isFlying) {
+    this->infoBitfield |= 0x0010;
+  }
+  if (this->isTumbled) {
+    this->infoBitfield |= 0x0020;
+  }
+  if (supervisorStateLocked == this->state) {
+    this->infoBitfield |= 0x0040;
+  }
+  if (this->isCrashed) {
+    this->infoBitfield |= 0x0080;
+  }
 }
 
 void supervisorUpdate(const sensorData_t *sensors, const setpoint_t* setpoint, stabilizerStep_t stabilizerStep) {
@@ -250,8 +388,9 @@ void supervisorUpdate(const sensorData_t *sensors, const setpoint_t* setpoint, s
   const supervisorConditionBits_t conditions = updateAndPopulateConditions(this, sensors, setpoint, currentTick);
   const supervisorState_t newState = supervisorStateUpdate(this->state, conditions);
   if (this->state != newState) {
-    transitionActions(this->state, newState);
+    const supervisorState_t previousState = this->state;
     this->state = newState;
+    postTransitionActions(this, previousState, currentTick);
   }
 
   this->latestConditions = conditions;
@@ -266,6 +405,8 @@ void supervisorOverrideSetpoint(setpoint_t* setpoint) {
   SupervisorMem_t* this = &supervisorMem;
   switch(this->state){
     case supervisorStateReadyToFly:
+      // Fall through
+    case supervisorStateLanded:
       // Fall through
     case supervisorStateFlying:
       // Do nothing
@@ -294,7 +435,8 @@ bool supervisorAreMotorsAllowedToRun() {
   SupervisorMem_t* this = &supervisorMem;
   return (this->state == supervisorStateReadyToFly) ||
          (this->state == supervisorStateFlying) ||
-         (this->state == supervisorStateWarningLevelOut);
+         (this->state == supervisorStateWarningLevelOut) ||
+         (this->state == supervisorStateLanded);
 }
 
 void infoDump(const SupervisorMem_t* this) {
@@ -320,14 +462,20 @@ void infoDump(const SupervisorMem_t* this) {
 LOG_GROUP_START(sys)
 /**
  * @brief Nonzero if system is ready to fly.
+ *
+ * Deprecated, will be removed after 2024-06-01. Use supervisor.info instead
  */
 LOG_ADD_CORE(LOG_UINT8, canfly, &supervisorMem.canFly)
 /**
  * @brief Nonzero if the system thinks it is flying
+ *
+ * Deprecated, will be removed after 2024-06-01. Use supervisor.info instead
  */
 LOG_ADD_CORE(LOG_UINT8, isFlying, &supervisorMem.isFlying)
 /**
  * @brief Nonzero if the system thinks it is tumbled/crashed
+ *
+ * Deprecated, will be removed after 2024-06-01. Use supervisor.info instead
  */
 LOG_ADD_CORE(LOG_UINT8, isTumbled, &supervisorMem.isTumbled)
 LOG_GROUP_STOP(sys)
@@ -335,18 +483,55 @@ LOG_GROUP_STOP(sys)
 
 PARAM_GROUP_START(stabilizer)
 /**
- * @brief If set to nonzero will turn off power
+ * @brief If set to nonzero will turn off motors
  */
 PARAM_ADD_CORE(PARAM_UINT8, stop, &supervisorMem.paramEmergencyStop)
 PARAM_GROUP_STOP(stabilizer)
+
+
+PARAM_GROUP_START(system)
+
+/**
+ * @brief Set to nonzero to arm the system. A nonzero value enables the auto arm functionality
+ *
+ * Deprecated, will be removed after 2024-06-01. Use the CRTP `PlatformCommand` `armSystem` on the CRTP_PORT_PLATFORM port instead.
+ */
+PARAM_ADD_CORE(PARAM_INT8, arm, &supervisorMem.deprecatedArmParam)
+PARAM_GROUP_STOP(system)
+
 
 /**
  * The purpose of the supervisor is to monitor the system and its state. Depending on the situation, the supervisor
  * can enable/disable functionality as well as take action to protect the system or humans close by.
  */
-PARAM_GROUP_START(superv)
+LOG_GROUP_START(supervisor)
+/**
+ * @brief Bitfield containing information about the supervisor status
+ * Bit 0 = Can be armed - the system can be armed and will accept an arming command
+ * Bit 1 = is armed - the system is armed
+ * Bit 2 = auto arm - the system is configured to automatically arm
+ * Bit 3 = can fly - the Crazyflie is ready to fly
+ * Bit 4 = is flying - the Crazyflie is flying.
+ * Bit 5 = is tumbled - the Crazyflie is up side down.
+ * Bit 6 = is locked - the Crazyflie is in the locked state and must be restarted.
+ */
+LOG_ADD(LOG_UINT16, info, &supervisorMem.infoBitfield)
+LOG_GROUP_STOP(supervisor)
+
+
+/**
+ * The purpose of the supervisor is to monitor the system and its state. Depending on the situation, the supervisor
+ * can enable/disable functionality as well as take action to protect the system or humans close by.
+ */
+PARAM_GROUP_START(supervisor)
 /**
  * @brief Set to nonzero to dump information about the current supervisor state to the console log
  */
 PARAM_ADD(PARAM_UINT8, infdmp, &supervisorMem.doinfodump)
-PARAM_GROUP_STOP(superv)
+
+/**
+ * @brief Landing timeout duration (ms)
+ */
+PARAM_ADD(PARAM_UINT16 | PARAM_PERSISTENT, landedTimeout, &landingTimeoutDuration)
+
+PARAM_GROUP_STOP(supervisor)

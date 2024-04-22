@@ -104,6 +104,8 @@ $ tb make cf2_defconfig
 $ tb make
 ```
 
+Build artifacts, including binaries, will end up in the `build` directory.
+
 ### Bolt and Roadrunner
 We have some ready-to-go config files in the `configs/` directory. So, for example, if you want to build the Roadrunner (tag) you can go:
 
@@ -137,8 +139,9 @@ First make sure that you have [SWIG](https://swig.org/) installed on your system
 ```bash
 make cf2_defconfig
 make bindings_python
+cd build
+python3 setup.py install --user
 ```
-
 
 ## Make targets
 
@@ -205,7 +208,9 @@ Warning: if multiple Crazyflies within range are in bootloader mode the result i
 
 #### Automatically enter bootloader mode
 * Make sure the Crazyflie is on
-* In your terminal, run `CLOAD_CMDS="-w radio://0/80/2M" make cload`
+* In your terminal, run `CLOAD_CMDS="-w [CRAZYFLIE_URI]" make cload`
+* or run `cfloader flash cf2.bin stm32-fw -w [CRAZYFLIE_URI]`
+with [CRAZYFLIE_URI] being the uri of the crazyflie.
 
 It will connect to the Crazyflie with the specified address, put it in bootloader mode and flash the binary. This method is suitable for classroom situations.
 

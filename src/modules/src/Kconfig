@@ -154,7 +154,7 @@ config MOTORS_DEFAULT_IDLE_THRUST
     int "Default idle thrust for motors in armed state"
     range 0 65535
     default 0
-    depends on MOTORS_START_DISARMED
+    depends on MOTORS_REQUIRE_ARMING
     help
         Default thrust for motors when idling in armed state, expressed as an
         integer in the range 0 to 65535. This can be overridden with parameters;
@@ -218,6 +218,14 @@ config ENABLE_THRUST_BAT_COMPENSATED
         The compensation is based on thrust measurements, which are only valid for CF2.X stock configuration.
         Not applied for brushless motor setup.
 
+config LOG_MOTOR_CAP_WARNING
+    bool "Log a warning if the motor thrust is capped"
+    default n
+    help
+        If the computed thrust of one or more motors is outside of the possible range, the thrust will be capped or
+        reduced for one or more motors depending on configuration. Enabeling this setting will report in the console log
+        that the thrust has been capped.
+
 endmenu
 
 menu "Parameter subsystem"
@@ -230,5 +238,13 @@ config PARAM_SILENT_UPDATES
         break some functionality in clients that expect to receive feedback
         about parameter updates, so this option should be enabled if you know
         what you are doing.
+
+config DEFRAG_STORAGE_ON_STARTUP
+    bool "Defrag_on_startup"
+    default y
+    help
+        This enables defragmentation of parameter storage memory everytime the
+        CPU is started. It increases startup time, depending on
+        fragmentation level.
 
 endmenu

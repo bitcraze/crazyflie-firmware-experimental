@@ -43,13 +43,14 @@
 #include "nvicconf.h"
 #include "static_mem.h"
 
-/** This uart is conflicting with SPI2 DMA used in sensors_bmi088_spi_bmp388.c
+/** This uart is conflicting with SPI2 DMA used in sensors_bmi088_spi_bmp3xx.c
  *  which is used in CF-Bolt. So for other products this can be enabled.
  */
 //#define ENABLE_UART1_DMA
 
+#define QUEUE_LENGTH 64
 static xQueueHandle uart1queue;
-STATIC_MEM_QUEUE_ALLOC(uart1queue, 64, sizeof(uint8_t));
+STATIC_MEM_QUEUE_ALLOC(uart1queue, QUEUE_LENGTH, sizeof(uint8_t));
 
 static bool isInit = false;
 static bool hasOverrun = false;
@@ -261,6 +262,16 @@ int uart1Putchar(int ch)
 void uart1Getchar(char * ch)
 {
   xQueueReceive(uart1queue, ch, portMAX_DELAY);
+}
+
+uint32_t uart1bytesAvailable()
+{
+  return uxQueueMessagesWaiting(uart1queue);
+}
+
+uint32_t uart1QueueMaxLength()
+{
+  return QUEUE_LENGTH;
 }
 
 bool uart1DidOverrun()

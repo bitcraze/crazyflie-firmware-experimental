@@ -58,7 +58,6 @@
 #define MOTORS_TIM_DBG_CFG        DBGMCU_APB2PeriphConfig
 #define MOTORS_GPIO_AF_CFG(a,b,c) GPIO_PinAFConfig(a,b,c)
 
-
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_ONESHOT125
 /**
  * *WARNING* Make sure the brushless driver is configured correctly as on the Crazyflie with normal
@@ -259,6 +258,7 @@ extern const MotorPerifDef* motorMapDefaltConBrushless[NBR_OF_MOTORS];
 extern const MotorPerifDef* motorMapBigQuadDeck[NBR_OF_MOTORS];
 extern const MotorPerifDef* motorMapBoltBrushless[NBR_OF_MOTORS];
 extern const MotorPerifDef* motorMapBolt11Brushless[NBR_OF_MOTORS];
+extern const MotorPerifDef* motorMapBolt11Brushed[NBR_OF_MOTORS];
 extern const MotorPerifDef* motorMapCF21Brushless[NBR_OF_MOTORS];
 
 /**
