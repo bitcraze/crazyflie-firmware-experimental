@@ -10,15 +10,15 @@ from cflib.localization import LighthouseConfigWriter
 
 
 uris = [
-    'radio://0/120/2M/E7E7E70101',
-    'radio://0/120/2M/E7E7E70102',
-    'radio://0/120/2M/E7E7E70103',
-    'radio://0/120/2M/E7E7E70104',
-    'radio://0/120/2M/E7E7E70105',
-    'radio://0/120/2M/E7E7E70106',
-    'radio://0/120/2M/E7E7E70107',
-    # 'radio://0/120/2M/E7E7E70108',
-    # 'radio://0/120/2M/E7E7E70109',
+    'radio://0/10/2M/E7E7E7E701',
+    'radio://0/10/2M/E7E7E7E702',
+    'radio://0/10/2M/E7E7E7E703',
+    'radio://0/10/2M/E7E7E7E704',
+    'radio://0/10/2M/E7E7E7E705',
+    'radio://0/10/2M/E7E7E7E706',
+    'radio://0/10/2M/E7E7E7E707',
+    'radio://0/10/2M/E7E7E7E708',
+    'radio://0/10/2M/E7E7E7E709',
 ]
 
 

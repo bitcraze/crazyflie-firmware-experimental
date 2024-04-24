@@ -30,6 +30,12 @@ EXTRA_CFLAGS += -DCONFIG_PARAM_SILENT_UPDATES
 # We override the default OOT_CONFIG here, we could also name our config
 # to oot-config and that would be the default.
 #
-OOT_CONFIG := $(PWD)/app-config
+BRUSHLESS ?= 0
+
+ifeq ($(BRUSHLESS),1)
+    OOT_CONFIG := $(PWD)/app-config-brushless
+else
+    OOT_CONFIG := $(PWD)/app-config
+endif
 
 include $(CRAZYFLIE_BASE)/tools/make/oot.mk

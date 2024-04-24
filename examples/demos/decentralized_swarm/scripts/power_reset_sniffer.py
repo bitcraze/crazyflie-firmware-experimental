@@ -3,7 +3,7 @@ from cflib.utils.power_switch import PowerSwitch
 from colorama import Fore
 
 uris = [
-    'radio://0/20/2M/E7E7E7E700',
+    'radio://0/10/2M/E7E7E7E700',
 ]
 
 for uri in uris:

@@ -223,15 +223,19 @@ static void stateTransition(xTimerHandle timer){
                 //do nothing, wait for the battery to be charged
             }
             else if (needMoreCopters(state)){
-                random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 DEBUG_PRINT("More copters needed, preparing for take off...\n");
-                state = STATE_PREPARING_FOR_TAKE_OFF;
+                if (supervisorRequestArming(true)){
+                    random_time_for_next_event_ms = get_next_random_timeout(now_ms);
+                    state = STATE_PREPARING_FOR_TAKE_OFF;
+                }
             }
             break;
         case STATE_PREPARING_FOR_TAKE_OFF:
             if (! needMoreCopters(state)) {
                 DEBUG_PRINT("Don't need more copters after all, going back to wait state\n");
-                state = STATE_WAIT_FOR_TAKE_OFF;
+                if (supervisorRequestArming(false)){
+                    state = STATE_WAIT_FOR_TAKE_OFF;
+                }
             }
             else if (now_ms > random_time_for_next_event_ms){
                 DEBUG_PRINT("Taking off...\n");
@@ -335,7 +339,9 @@ static void stateTransition(xTimerHandle timer){
             if (now_ms > landingTimeCheckCharge_ms) {
                 DEBUG_PRINT("isCharging: %d\n", isCharging());
                 if (isCharging()) {
-                    state = STATE_WAIT_FOR_TAKE_OFF;
+                    if (supervisorRequestArming(false)){
+                        state = STATE_WAIT_FOR_TAKE_OFF;
+                    }
                 } else if (noCopterFlyingAbove()){
                     DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
                     crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.1f , 1.0);
@@ -357,6 +363,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Crashed, running crash sequence\n");
                 ledseqRun(&seq_crash);
                 isCrashInitialized = true;
+                // maybe need to disarm here
             }
             break;
 
