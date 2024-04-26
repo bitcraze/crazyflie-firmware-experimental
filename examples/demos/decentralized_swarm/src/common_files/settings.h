@@ -123,7 +123,7 @@
 // Collision avoidance
 #define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.3f //maximum velocity to avoid collisions
+#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.5f //maximum velocity to avoid collisions
 
 #define COLLISION_AVOIDANCE_BBOX_MIN_X  MIN_X_BOX
 #define COLLISION_AVOIDANCE_BBOX_MAX_X  MAX_X_BOX
