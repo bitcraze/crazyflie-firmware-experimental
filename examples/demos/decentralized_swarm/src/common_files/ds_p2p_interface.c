@@ -183,7 +183,7 @@ void printOtherCopters(void){
 }
 
 static bool isFlyingState(enum State state) {
-    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_GOING_TO_PAD;
+    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD;
 }
 
 bool isCopterFlying(uint8_t copter_id){
