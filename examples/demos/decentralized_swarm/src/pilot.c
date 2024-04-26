@@ -272,12 +272,14 @@ static void stateTransition(xTimerHandle timer){
             if (reachedNextWaypoint(my_pos)) {
                 DEBUG_PRINT("Reached trajectory start\n");
                 startTrajectory(my_pos);
+                disableCollisionAvoidance();
                 state = STATE_EXECUTING_TRAJECTORY;
             }
             break;
         case STATE_EXECUTING_TRAJECTORY:
             if (crtpCommanderHighLevelIsTrajectoryFinished()) {
                 DEBUG_PRINT("Finished trajectory execution\n");
+                enableCollisionAvoidance();
                 state = STATE_HOVERING;
             }
             break;
