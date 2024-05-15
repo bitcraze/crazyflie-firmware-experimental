@@ -222,7 +222,22 @@ static void stateTransition(xTimerHandle timer){
             if (! chargedForTakeoff()){
                 //do nothing, wait for the battery to be charged
             }
-            else if (needMoreCopters(state)){
+            else if (needMoreQueuedCopters(state)){
+                DEBUG_PRINT("More copters needed, entering queue...\n");
+                if (supervisorRequestArming(true)){
+                    state = STATE_QUEUED_FOR_TAKE_OFF;
+                }
+            }
+            break;
+        case STATE_QUEUED_FOR_TAKE_OFF:
+            if (! chargedForTakeoff()){
+                state = STATE_WAIT_FOR_TAKE_OFF;
+            }
+            else if (needLessQueuedCopters(state)){
+                DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
+                state = STATE_WAIT_FOR_TAKE_OFF;
+            }
+            else if (needMoreCopters(state) && !isAnyOtherCopterExecutingTrajectory()){
                 DEBUG_PRINT("More copters needed, preparing for take off...\n");
                 if (supervisorRequestArming(true)){
                     random_time_for_next_event_ms = get_next_random_timeout(now_ms);
@@ -237,7 +252,7 @@ static void stateTransition(xTimerHandle timer){
                     state = STATE_WAIT_FOR_TAKE_OFF;
                 }
             }
-            else if (now_ms > random_time_for_next_event_ms){
+            else if (now_ms > random_time_for_next_event_ms  && !isAnyOtherCopterExecutingTrajectory()){
                 DEBUG_PRINT("Taking off...\n");
                 startTakeOffSequence();
                 state = STATE_TAKING_OFF;
@@ -294,7 +309,7 @@ static void stateTransition(xTimerHandle timer){
                 DEBUG_PRINT("Another copter landed, no need to land finally\n");
                 state = STATE_HOVERING;
             }
-            else if (now_ms > random_time_for_next_event_ms){
+            else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory()){
                 DEBUG_PRINT("Going to pad...\n");
                 gotoChargingPad(padX, padY, padZ);
                 state = STATE_GOING_TO_PAD;

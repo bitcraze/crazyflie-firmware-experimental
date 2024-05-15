@@ -190,6 +190,14 @@ bool isCopterFlying(uint8_t copter_id){
     return isAlive(copter_id) && isFlyingState(copters[copter_id].state);
 }
 
+static bool isQueueingState(enum State state) {
+    return state == STATE_QUEUED_FOR_TAKE_OFF || state == STATE_PREPARING_FOR_TAKE_OFF;
+}
+
+bool isCopterQueued(uint8_t copter_id) {
+    return isAlive(copter_id) && isQueueingState(copters[copter_id].state);
+}
+
 uint8_t getMinimumFlyingCopterId(void){
     uint8_t min_id = 11;
     for(int i = 1; i < MAX_ADDRESS; i++){
@@ -229,6 +237,23 @@ static int getNrOfFlyingCopters(enum State ownState) {
     return flying_copters;
 }
 
+static int getNrOfQueuedCopters(enum State ownState) {
+    uint8_t queued_copters = 0;
+
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isCopterQueued(i)) {
+            queued_copters ++;
+        }
+    }
+
+    if (isQueueingState(ownState)){
+        queued_copters += 1;
+    }
+
+    return queued_copters;
+
+}
+
 bool needMoreCopters(enum State ownState) {
     return getNrOfFlyingCopters(ownState) < desiredFlyingCopters;
 }
@@ -236,6 +261,15 @@ bool needMoreCopters(enum State ownState) {
 bool needLessCopters(enum State ownState){
     return getNrOfFlyingCopters(ownState) > desiredFlyingCopters;
 }
+
+bool needMoreQueuedCopters(enum State ownState) {
+    return getNrOfQueuedCopters(ownState) + getNrOfFlyingCopters(ownState) < desiredFlyingCopters;
+}
+
+bool needLessQueuedCopters(enum State ownState){
+    return getNrOfQueuedCopters(ownState) + getNrOfFlyingCopters(ownState) > desiredFlyingCopters;
+}
+
 
 uint8_t getDesiredFlyingCopters() {
     return desiredFlyingCopters;
