@@ -8,11 +8,11 @@ RED='\033[0;31m'            # Red
 for i in {1..6}; do
     make -j 8
     printf "${YELLOW}Flashing ${RED}CF${YELLOW} 0${i}${COLOR_RESET}\n"
-    CLOAD_CMDS="-w radio://0/10/2M/E7E7E7E70${i}" make cload
+    CLOAD_CMDS="-w radio://0/90/2M/E7E7E7E70${i}" make cload
 done
 
 for i in {7..9}; do
     make -j 8 BRUSHLESS=1
     printf "${YELLOW}Flashing ${RED}CF BRUSHLESS${YELLOW} 0${i}${COLOR_RESET}\n"
-    CLOAD_CMDS="-w radio://0/10/2M/E7E7E7E70${i}" make cload
+    CLOAD_CMDS="-w radio://0/90/2M/E7E7E7E70${i}" make cload
 done
