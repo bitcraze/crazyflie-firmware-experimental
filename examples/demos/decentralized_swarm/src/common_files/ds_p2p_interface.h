@@ -96,9 +96,13 @@ bool needMoreCopters(enum State ownState);
 
 bool needLessCopters(enum State ownState);
 
-bool needMoreQueuedCopters(enum State ownState);
+bool needMoreTakeoffQueuedCopters(enum State ownState);
 
-bool needLessQueuedCopters(enum State ownState);
+bool needLessTakeoffQueuedCopters(enum State ownState);
+
+bool needMoreLandingQueuedCopters(enum State ownState);
+
+bool needLessLandingQueuedCopters(enum State ownState);
 
 uint8_t getDesiredFlyingCopters();
 void setDesiredFlyingCopters(uint8_t desired);

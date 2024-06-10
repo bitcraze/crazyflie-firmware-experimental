@@ -238,7 +238,7 @@ static void stateTransition(xTimerHandle timer)
         {
             // do nothing, wait for the battery to be charged
         }
-        else if (needMoreQueuedCopters(state))
+        else if (needMoreTakeoffQueuedCopters(state))
         {
             DEBUG_PRINT("More copters needed, entering queue...\n");
             state = STATE_QUEUED_FOR_TAKE_OFF;
@@ -249,7 +249,7 @@ static void stateTransition(xTimerHandle timer)
         {
                 state = STATE_WAIT_FOR_TAKE_OFF;
         }
-        else if (needLessQueuedCopters(state))
+        else if (needLessTakeoffQueuedCopters(state))
         {
                 DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
                 state = STATE_WAIT_FOR_TAKE_OFF;
@@ -289,7 +289,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_HOVERING:
-        if (needLessCopters(state))
+        if (needMoreLandingQueuedCopters(state))
         {
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
@@ -337,7 +337,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_PREPARING_FOR_LAND:
-        if (!needLessCopters(state))
+        if (needLessLandingQueuedCopters(state))
         { // another copter landed , no need to land after all
             DEBUG_PRINT("Another copter landed, no need to land finally\n");
             state = STATE_HOVERING;
