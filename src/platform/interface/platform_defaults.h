@@ -7,7 +7,7 @@
  *
  * Crazyflie control firmware
  *
- * Copyright (C) 2022 Bitcraze AB
+ * Copyright (C) 2022-2024 Bitcraze AB
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,6 +33,9 @@
 
 #ifdef CONFIG_PLATFORM_CF2
     #include "platform_defaults_cf2.h"
+#endif
+#ifdef CONFIG_PLATFORM_CF21BL
+    #include "platform_defaults_cf21bl.h"
 #endif
 #ifdef CONFIG_PLATFORM_BOLT
     #include "platform_defaults_bolt.h"
@@ -117,12 +120,31 @@
     #define PID_VEL_Z_FILT_CUTOFF 20.0f
 #endif
 #ifndef PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD
-    #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7 f
+    #define PID_VEL_Z_FILT_CUTOFF_BARO_Z_HOLD 0.7f
 #endif
 
-// Tumble detection enabled by default
+// Tumble detection settings
 #ifndef SUPERVISOR_TUMBLE_CHECK_ENABLE
     #define SUPERVISOR_TUMBLE_CHECK_ENABLE true
+#endif
+
+// 60 degrees tilt (when stationary)
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_ACCZ
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_ACCZ 0.5f
+#endif
+
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_TIME
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_TILT_TIME 1000
+#endif
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_ACCZ
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_ACCZ -0.2f
+#endif
+
+
+#ifndef SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_TIME
+    #define SUPERVISOR_TUMBLE_CHECK_ACCEPTED_UPSIDEDOWN_TIME 100
 #endif
 
 // Landing timeout before disarming

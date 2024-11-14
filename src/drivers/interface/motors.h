@@ -223,6 +223,7 @@ typedef struct
   uint32_t      gpioPowerswitchPerif;
   GPIO_TypeDef* gpioPowerswitchPort;
   uint16_t      gpioPowerswitchPin;
+  bool          hasPC15ESCReset;
   uint32_t      timPerif;
   TIM_TypeDef*  tim;
   uint16_t      timPolarity;
@@ -322,9 +323,9 @@ void motorsBurstDshot();
 void motorsSetRatio(uint32_t id, uint16_t ratio);
 
 /**
- * Get the PWM ratio of the motor 'id'. Return -1 if wrong ID.
+ * Get the PWM ratio of the motor 'id'.
  */
-int motorsGetRatio(uint32_t id);
+uint16_t motorsGetRatio(uint32_t id);
 
 /**
  * FreeRTOS Task to test the Motors driver
