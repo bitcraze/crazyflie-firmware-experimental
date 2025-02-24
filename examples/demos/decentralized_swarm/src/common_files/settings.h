@@ -70,7 +70,7 @@
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
 #define LANDING_HEIGHT 0.13f
-#define LANDING_DURATION 1.0f //sec
+#define LANDING_DURATION 3.0f //sec
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 4000 //ms
