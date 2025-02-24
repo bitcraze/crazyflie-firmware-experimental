@@ -436,3 +436,9 @@ config DECK_CPX_HOST_ON_UART2
       forced, since this is intended to be used without actually having a proper
       deck attached (i.e there will be no 1-wire memory to automatically detect
       and start the driver).
+
+config DECK_HPRGBW
+  bool "Support for High Powered RGBW LED deck"
+  default n
+  help
+      Enables the support for High Powered RGBW LED deck.
