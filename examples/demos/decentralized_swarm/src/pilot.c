@@ -354,22 +354,6 @@ static void stateTransition(xTimerHandle timer)
         {
             DEBUG_PRINT("Over pad,starting lowering\n");
             disableCollisionAvoidance();
-            crtpCommanderHighLevelGoTo(padX, padY, padZ + LANDING_HEIGHT, 0.0, GO_TO_PAD_DURATION, false);
-            stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
-            state = STATE_WAITING_AT_PAD;
-        }
-        break;
-    case STATE_WAITING_AT_PAD:
-        if (now_ms > stabilizeEndTime_ms || ((fabs(padX - getX()) < MAX_PAD_ERR) &&
-                                             (fabs(padY - getY()) < MAX_PAD_ERR) &&
-                                             (fabs((padZ + LANDING_HEIGHT) - getZ()) < MAX_PAD_ERR)))
-        {
-            if (now_ms > stabilizeEndTime_ms)
-            {
-                DEBUG_PRINT("Warning: timeout!\n");
-            }
-
-            DEBUG_PRINT("Landing...\n");
             crtpCommanderHighLevelLand(padZ, LANDING_DURATION);
             state = STATE_LANDING;
         }
@@ -405,7 +389,7 @@ static void stateTransition(xTimerHandle timer)
             else if (noCopterFlyingAbove())
             {
                 DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + LANDING_HEIGHT + 0.1f, 1.0);
+                crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
                 state = STATE_REPOSITION_ON_PAD;
             }
         }
@@ -414,9 +398,9 @@ static void stateTransition(xTimerHandle timer)
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Over pad, stabilizing position\n");
-            gotoNextWaypoint(padX, padY, padZ + LANDING_HEIGHT, NO_YAW, 1.5);
+            gotoChargingPad(padX, padY, padZ);
             stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
-            state = STATE_WAITING_AT_PAD;
+            state = STATE_GOING_TO_PAD;
         }
         break;
     case STATE_CRASHED:
