@@ -55,9 +55,18 @@
 #include "common.h"
 #include "param_log_interface.h"
 #include "movement.h"
+#include "led_control.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
+
+#define RED_LED 0x60, 0x00, 0x00
+#define GREEN_LED 0x00, 0x60, 0x00
+#define BLUE_LED  0x00, 0x00, 0x60
+#define YELLOW_LED  0x60, 0x60, 0x00
+#define ORANGE_LED  0x60, 0x30, 0x00
+#define WHITE_LED 0x00, 0x00, 0x00, 0x60
+
 
 static xTimerHandle sendPosTimer;
 static xTimerHandle stateTransitionTimer;
@@ -207,6 +216,7 @@ static void stateTransition(xTimerHandle timer)
     if (supervisorIsTumbled())
     {
         state = STATE_CRASHED;
+        ledSetRGB(RED_LED);
     }
     else if (isBatLow() && (state == STATE_HOVERING ||
                             state == STATE_GOING_TO_RANDOM_POINT ||
@@ -215,6 +225,7 @@ static void stateTransition(xTimerHandle timer)
         DEBUG_PRINT("Battery low, landing\n");
         gotoChargingPad(padX, padY, padZ);
         state = STATE_GOING_TO_PAD;
+        ledSetRGB(RED_LED);
     }
 
     now_ms = T2M(xTaskGetTickCount());
@@ -225,8 +236,10 @@ static void stateTransition(xTimerHandle timer)
         resetLockData();
         position_lock_start_time_ms = now_ms;
         state = STATE_WAIT_FOR_POSITION_LOCK;
+        ledSetRGB(ORANGE_LED);
         break;
     case STATE_WAIT_FOR_POSITION_LOCK:
+        ledSetRGB(ORANGE_LED);
         if (hasLock())
         {
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
@@ -236,23 +249,27 @@ static void stateTransition(xTimerHandle timer)
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
         if (!chargedForTakeoff())
         {
+            ledSetRGB(RED_LED);
             // do nothing, wait for the battery to be charged
         }
         else if (needMoreTakeoffQueuedCopters(state))
         {
             DEBUG_PRINT("More copters needed, entering queue...\n");
             state = STATE_QUEUED_FOR_TAKE_OFF;
+            ledSetRGB(ORANGE_LED);
         }
         break;
     case STATE_QUEUED_FOR_TAKE_OFF:
         if (!chargedForTakeoff())
         {
-                state = STATE_WAIT_FOR_TAKE_OFF;
+            state = STATE_WAIT_FOR_TAKE_OFF;
+            ledSetRGB(RED_LED);
         }
         else if (needLessTakeoffQueuedCopters(state))
         {
-                DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
-                state = STATE_WAIT_FOR_TAKE_OFF;
+            DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
+            state = STATE_WAIT_FOR_TAKE_OFF;
+            ledSetRGB(RED_LED);
         }
         else if (needMoreCopters(state) && !isAnyOtherCopterExecutingTrajectory())
         {
@@ -261,16 +278,19 @@ static void stateTransition(xTimerHandle timer)
             {
                 random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 state = STATE_PREPARING_FOR_TAKE_OFF;
+                ledSetRGB(ORANGE_LED);
             }
         }
         break;
     case STATE_PREPARING_FOR_TAKE_OFF:
+        ledSetRGB(ORANGE_LED);
         if (!needMoreCopters(state))
         {
             DEBUG_PRINT("Don't need more copters after all, going back to wait state\n");
             if (supervisorRequestArming(false))
             {
                 state = STATE_WAIT_FOR_TAKE_OFF;
+                ledSetRGB(RED_LED);
             }
         }
         else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory() && noCopterFlyingAbove())
@@ -278,6 +298,7 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
             state = STATE_TAKING_OFF;
+            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_TAKING_OFF:
@@ -286,6 +307,7 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Hovering, waiting for command to start\n");
             enableCollisionAvoidance();
             state = STATE_HOVERING;
+            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_HOVERING:
@@ -294,6 +316,7 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
             state = STATE_PREPARING_FOR_LAND;
+            ledSetRGB(ORANGE_LED);
         }
         else
         {
@@ -302,6 +325,7 @@ static void stateTransition(xTimerHandle timer)
                 DEBUG_PRINT("Special trajectory\n");
                 gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                 state = STATE_GOING_TO_TRAJECTORY_START;
+                ledSetRGB(GREEN_LED);
             }
             else
             {
@@ -309,6 +333,7 @@ static void stateTransition(xTimerHandle timer)
                 DEBUG_PRINT("Normal new waypoint (%.2f, %.2f, %.2f)\n", (double)new_pos.x, (double)new_pos.y, (double)new_pos.z);
                 gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, new_pos.yaw, DELTA_DURATION);
                 state = STATE_GOING_TO_RANDOM_POINT;
+                ledSetRGB(GREEN_LED);
             }
         }
         break;
@@ -319,6 +344,7 @@ static void stateTransition(xTimerHandle timer)
             startTrajectory(my_pos);
             disableCollisionAvoidance();
             state = STATE_EXECUTING_TRAJECTORY;
+            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_EXECUTING_TRAJECTORY:
@@ -327,6 +353,7 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Finished trajectory execution\n");
             enableCollisionAvoidance();
             state = STATE_HOVERING;
+            ledSetRGB(BLUE_LED);
         }
         break;
     case STATE_GOING_TO_RANDOM_POINT:
@@ -334,6 +361,7 @@ static void stateTransition(xTimerHandle timer)
         {
             DEBUG_PRINT("Reached next waypoint\n");
             state = STATE_HOVERING;
+            ledSetColorFromXYZ(getX(), getY(), getZ());
         }
         break;
     case STATE_PREPARING_FOR_LAND:
@@ -341,12 +369,14 @@ static void stateTransition(xTimerHandle timer)
         { // another copter landed , no need to land after all
             DEBUG_PRINT("Another copter landed, no need to land finally\n");
             state = STATE_HOVERING;
+            ledSetRGB(ORANGE_LED);
         }
         else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory())
         {
             DEBUG_PRINT("Going to pad...\n");
             gotoChargingPad(padX, padY, padZ);
             state = STATE_GOING_TO_PAD;
+            ledSetRGB(ORANGE_LED);
         }
         break;
     case STATE_GOING_TO_PAD:
@@ -356,9 +386,11 @@ static void stateTransition(xTimerHandle timer)
             disableCollisionAvoidance();
             crtpCommanderHighLevelLand(padZ, LANDING_DURATION);
             state = STATE_LANDING;
+            ledSetRGB(RED_LED);
         }
         break;
     case STATE_LANDING:
+        ledSetRGB(RED_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             if (outOfBounds(my_pos))
@@ -376,6 +408,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CHECK_CHARGING:
+        ledSetRGB(RED_LED);
         if (now_ms > landingTimeCheckCharge_ms)
         {
             DEBUG_PRINT("isCharging: %d\n", isCharging());
@@ -395,6 +428,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_REPOSITION_ON_PAD:
+        ledSetRGB(RED_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Over pad, stabilizing position\n");
@@ -404,6 +438,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CRASHED:
+        ledSetRGB(RED_LED);
         if (!isCrashInitialized)
         {
             crtpCommanderHighLevelStop();
@@ -438,6 +473,8 @@ void appMain()
 
     initP2P();
     initOtherStates();
+    ledControlInit();
+    ledSetRGBW(WHITE_LED);
 
     srand(my_id); // provide a unique seed for the random number generator
 
