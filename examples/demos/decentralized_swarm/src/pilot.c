@@ -260,6 +260,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_QUEUED_FOR_TAKE_OFF:
+        ledSetRGB(ORANGE_LED);
         if (!chargedForTakeoff())
         {
             state = STATE_WAIT_FOR_TAKE_OFF;
@@ -302,21 +303,21 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_TAKING_OFF:
+        ledSetRGB(GREEN_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Hovering, waiting for command to start\n");
             enableCollisionAvoidance();
             state = STATE_HOVERING;
-            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_HOVERING:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (needMoreLandingQueuedCopters(state))
         {
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
             state = STATE_PREPARING_FOR_LAND;
-            ledSetRGB(ORANGE_LED);
         }
         else
         {
@@ -325,7 +326,6 @@ static void stateTransition(xTimerHandle timer)
                 DEBUG_PRINT("Special trajectory\n");
                 gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                 state = STATE_GOING_TO_TRAJECTORY_START;
-                ledSetRGB(GREEN_LED);
             }
             else
             {
@@ -333,60 +333,58 @@ static void stateTransition(xTimerHandle timer)
                 DEBUG_PRINT("Normal new waypoint (%.2f, %.2f, %.2f)\n", (double)new_pos.x, (double)new_pos.y, (double)new_pos.z);
                 gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, new_pos.yaw, DELTA_DURATION);
                 state = STATE_GOING_TO_RANDOM_POINT;
-                ledSetRGB(GREEN_LED);
             }
         }
         break;
     case STATE_GOING_TO_TRAJECTORY_START:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached trajectory start\n");
             startTrajectory(my_pos);
             disableCollisionAvoidance();
             state = STATE_EXECUTING_TRAJECTORY;
-            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_EXECUTING_TRAJECTORY:
+        ledSetColorFromXYZ(BLUE_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Finished trajectory execution\n");
             enableCollisionAvoidance();
             state = STATE_HOVERING;
-            ledSetRGB(BLUE_LED);
         }
         break;
     case STATE_GOING_TO_RANDOM_POINT:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached next waypoint\n");
             state = STATE_HOVERING;
-            ledSetColorFromXYZ(getX(), getY(), getZ());
         }
         break;
     case STATE_PREPARING_FOR_LAND:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (needLessLandingQueuedCopters(state))
         { // another copter landed , no need to land after all
             DEBUG_PRINT("Another copter landed, no need to land finally\n");
             state = STATE_HOVERING;
-            ledSetRGB(ORANGE_LED);
         }
         else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory())
         {
             DEBUG_PRINT("Going to pad...\n");
             gotoChargingPad(padX, padY, padZ);
             state = STATE_GOING_TO_PAD;
-            ledSetRGB(ORANGE_LED);
         }
         break;
     case STATE_GOING_TO_PAD:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Over pad,starting lowering\n");
             disableCollisionAvoidance();
             crtpCommanderHighLevelLand(padZ, LANDING_DURATION);
             state = STATE_LANDING;
-            ledSetRGB(RED_LED);
         }
         break;
     case STATE_LANDING:
