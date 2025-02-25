@@ -108,7 +108,7 @@
 #define MAX_Y_BOX (MAX_Y_BOUND - RANDOM_BOX_MARGIN)
 #define CENTER_Y_BOX ((MIN_Y_BOX + MAX_Y_BOX) / 2.0f)
 
-#define MIN_Z_BOX (TAKE_OFF_HEIGHT - 1.0f)
+#define MIN_Z_BOX (TAKE_OFF_HEIGHT - 0.2f)
 #define MAX_Z_BOX (TAKE_OFF_HEIGHT + 0.5f)
 
 // Random trajectory execution
@@ -121,8 +121,8 @@
 #define SNIFFER_PRINT_PERIOD_MS (1000 / SNIFFER_PRINT_FREQUENCY_HZ)
 
 // Collision avoidance
-#define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.3f //radius of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_HORIZON 1.5f //horizon of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.2f //radius of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_HORIZON 1f //horizon of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_MAX_VELOCITY 0.5f //maximum velocity to avoid collisions
 
 #define COLLISION_AVOIDANCE_BBOX_MIN_X  MIN_X_BOX
