@@ -420,7 +420,7 @@ static void stateTransition(xTimerHandle timer)
             else if (noCopterFlyingAbove())
             {
                 DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+                crtpCommanderHighLevelTakeoff(padZ + (TAKE_OFF_HEIGHT/2), 1.0);
                 state = STATE_REPOSITION_ON_PAD;
             }
         }
