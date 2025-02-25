@@ -30,7 +30,7 @@
 #define EXECUTE_TRAJ true
 
 // Flight Settings
-#define TAKE_OFF_HEIGHT 1.5f
+#define TAKE_OFF_HEIGHT 0.5f
 #define INITIAL_DESIRED_FLYING_COPTERS 0
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
@@ -52,7 +52,7 @@
 #define MAX_ADDRESS 10 //all copter addresses must be between 0 and max(MAX_ADDRESS,9)
 
 #define BROADCAST_FREQUENCY_HZ 10
-#define CALC_NEXT_FREQUENCY_HZ 3
+#define CALC_NEXT_FREQUENCY_HZ 10
 
 #define SNIFFER_PRINT_FREQUENCY_HZ 1
 
