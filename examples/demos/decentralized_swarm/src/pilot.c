@@ -273,7 +273,7 @@ static void stateTransition(xTimerHandle timer)
                 state = STATE_WAIT_FOR_TAKE_OFF;
             }
         }
-        else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory())
+        else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory() && noCopterFlyingAbove())
         {
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
