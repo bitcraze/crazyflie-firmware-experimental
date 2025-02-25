@@ -74,7 +74,7 @@
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
 #define STABILIZE_TIMEOUT 4000 //ms
-#define REACHED_CHARGING_PAD_TIMEOUT 10000 //ms
+#define REACHED_CHARGING_PAD_TIMEOUT 20000 //ms
 
 // BOUNDS DEFINITIONS
 #define MIN_X_BOUND -1.5f
