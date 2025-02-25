@@ -8,7 +8,7 @@ RED='\033[0;31m'            # Red
 # Change the defconfig to match the platform
 for i in {1..9}; do
     make cf21bl_defconfig
-    make -j 8
+    make -j 8 BRUSHLESS=1
     printf "${YELLOW}Flashing ${RED}CF BRUSHLESS${YELLOW} 0${i}${COLOR_RESET}\n"
     CLOAD_CMDS="-w radio://0/80/2M/ABAD1DEA0${i}" make cload
 done
