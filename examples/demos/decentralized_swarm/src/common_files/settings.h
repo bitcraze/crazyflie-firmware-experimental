@@ -69,7 +69,7 @@
 //Landing to charging pad
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
-#define LANDING_HEIGHT 0.13f
+#define LANDING_HEIGHT 0.2f
 #define LANDING_DURATION 3.0f //sec
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
@@ -122,8 +122,8 @@
 
 // Collision avoidance
 #define COLLISION_AVOIDANCE_ELLIPSOID_XY_RADIUS 0.2f //radius of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_HORIZON 1f //horizon of the ellipsoid used to avoid collisions
-#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.5f //maximum velocity to avoid collisions
+#define COLLISION_AVOIDANCE_HORIZON 1.0f //horizon of the ellipsoid used to avoid collisions
+#define COLLISION_AVOIDANCE_MAX_VELOCITY 0.2f //maximum velocity to avoid collisions
 
 #define COLLISION_AVOIDANCE_BBOX_MIN_X  MIN_X_BOX
 #define COLLISION_AVOIDANCE_BBOX_MAX_X  MAX_X_BOX

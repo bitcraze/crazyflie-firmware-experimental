@@ -49,7 +49,7 @@ void gotoNextWaypoint(float x, float y, float z, float yaw, float duration){
 }
 
 void gotoChargingPad(float x,float y,float z){
-    goToWayPointPositionBased(x, y, z + TAKE_OFF_HEIGHT, NO_YAW, GO_TO_PAD_DURATION, REACHED_CHARGING_PAD_TIMEOUT);
+    goToWayPointPositionBased(x, y, z + LANDING_HEIGHT, NO_YAW, GO_TO_PAD_DURATION, REACHED_CHARGING_PAD_TIMEOUT);
 }
 
 bool reachedNextWaypoint(Position my_pos){
