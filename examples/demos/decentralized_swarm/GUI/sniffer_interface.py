@@ -172,6 +172,8 @@ class SnifferInterface:
         commands_map = {
             "more": self.more,
             "less": self.less,
+            "zero": self.zero,
+            "all": self.all,
         }
 
         try:
@@ -193,6 +195,12 @@ class SnifferInterface:
 
     def less(self):
         self.cf.param.set_value('app.less', 1)
+
+    def zero(self):
+        self.cf.param.set_value('app.zero', 1)
+
+    def all(self):
+        self.cf.param.set_value('app.all', 1)
 
 class snifferThread(threading.Thread):
     def __init__(self, *args, **kwargs):

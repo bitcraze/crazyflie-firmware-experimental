@@ -94,6 +94,15 @@ static void moreCopters() {
     broadcastDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
 }
 
+static uint8_t zeroCoptersVal;
+static void zeroCopters() {
+    broadcastDesiredFlyingCopters(0);
+}
+
+static uint8_t allCoptersVal;
+static void allCopters() {
+    broadcastDesiredFlyingCopters(255);
+}
 
 void appMain()
 {
@@ -115,6 +124,8 @@ void appMain()
 PARAM_GROUP_START(app)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, more, &moreCoptersVal, &moreCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, less, &lessCoptersVal, &lessCopters)
+PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, zero, &zeroCoptersVal, &zeroCopters)
+PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, all, &allCoptersVal, &allCopters)
 PARAM_GROUP_STOP(app)
 
 

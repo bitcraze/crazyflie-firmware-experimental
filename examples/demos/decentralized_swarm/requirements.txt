@@ -1,3 +1,6 @@
+cflib
 tk
 colorama
 zmq
+pynput
+playsound

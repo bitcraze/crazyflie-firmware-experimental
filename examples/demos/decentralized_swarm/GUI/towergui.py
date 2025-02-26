@@ -6,6 +6,8 @@ from tkinter import Label, HORIZONTAL
 import tkinter.ttk as ttk
 from colorama import Fore
 from typing import List
+from pynput import keyboard
+from playsound import playsound, PlaysoundException
 
 import zmq
 import threading
@@ -183,6 +185,20 @@ class ButtonsFrame(ttk.Frame):
     def more_copters(self):
         self._send_command("more")
 
+    def zero_copters(self):
+        self._send_command("zero")
+        try:
+            playsound("stop.mp3")
+        except PlaysoundException as e:
+            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
+
+    def all_copters(self):
+        self._send_command("all")
+        try:
+            playsound("nine.mp3")
+        except PlaysoundException as e:
+            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
+
 
 sniffer_thread = snifferThread()
 sniffer_thread.start()
@@ -276,6 +292,35 @@ def receive_thread():
                 cfs[i].set_state("idle")
                 cfs[i].set_battery(0)
 
+def on_plus_key():
+    buttons.more_copters()
+
+def on_minus_key():
+    buttons.less_copters()
+
+def on_0_key():
+    buttons.zero_copters()
+
+def on_9_key():
+    buttons.all_copters()
+
+def on_press(key):
+    global key_pressed
+    try:
+        if key.char == '+':
+            on_plus_key()  # Call the function once
+        elif key.char == '-':
+            on_minus_key()
+        elif key.char == '0':
+            on_0_key()
+        elif key.char == '9':
+            on_9_key()
+    except AttributeError:
+        pass  # Ignore special keys
+
+# Start the key listener
+listener = keyboard.Listener(on_press=on_press)
+listener.start()
 
 receiving_thread = threading.Thread(target=receive_thread, daemon=True)
 receiving_thread.start()
