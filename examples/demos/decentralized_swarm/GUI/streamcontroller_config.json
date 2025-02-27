@@ -1,0 +1,296 @@
+{
+    "brightness": {
+        "value": 75
+    },
+    "keys": {
+        "0x0": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "top": {
+                            "text": "",
+                            "color": [
+                                224,
+                                27,
+                                36,
+                                255
+                            ]
+                        },
+                        "center": {
+                            "text": "Stop",
+                            "color": [
+                                255,
+                                255,
+                                255,
+                                255
+                            ],
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 20.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            224,
+                            27,
+                            36,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::EasyHotkey",
+                            "settings": {
+                                "hotkey": ")",
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        },
+        "2x0": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "center": {
+                            "text": "More",
+                            "color": [
+                                255,
+                                255,
+                                255,
+                                255
+                            ],
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 20.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            53,
+                            132,
+                            228,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::Hotkey",
+                            "settings": {
+                                "keys": [
+                                    [
+                                        42,
+                                        1
+                                    ],
+                                    [
+                                        13,
+                                        1
+                                    ],
+                                    [
+                                        13,
+                                        0
+                                    ],
+                                    [
+                                        42,
+                                        0
+                                    ]
+                                ],
+                                "repeat": false,
+                                "hold_until_release": false,
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        },
+        "1x1": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "center": {
+                            "text": "9",
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 35.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            255,
+                            120,
+                            0,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::EasyHotkey",
+                            "settings": {
+                                "hotkey": "(",
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        },
+        "1x0": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "top": {
+                            "text": ""
+                        },
+                        "center": {
+                            "text": "Fewer",
+                            "color": [
+                                0,
+                                0,
+                                0,
+                                255
+                            ],
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 20.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            51,
+                            209,
+                            122,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::EasyHotkey",
+                            "settings": {
+                                "hotkey": "-",
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        },
+        "2x1": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "center": {
+                            "text": "9",
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 35.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            255,
+                            120,
+                            0,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::EasyHotkey",
+                            "settings": {
+                                "hotkey": "(",
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        },
+        "0x1": {
+            "states": {
+                "0": {
+                    "labels": {
+                        "center": {
+                            "text": "9",
+                            "outline_width": 0,
+                            "font-family": "DejaVu Sans",
+                            "style": "normal",
+                            "font-size": 35.0,
+                            "font-weight": 400
+                        }
+                    },
+                    "background": {
+                        "color": [
+                            255,
+                            120,
+                            0,
+                            255
+                        ]
+                    },
+                    "actions": [
+                        {
+                            "id": "com_core447_OSPlugin::EasyHotkey",
+                            "settings": {
+                                "hotkey": "(",
+                                "delay": 0.0
+                            }
+                        }
+                    ],
+                    "image-control-action": null,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": null
+                }
+            }
+        }
+    }
+}
