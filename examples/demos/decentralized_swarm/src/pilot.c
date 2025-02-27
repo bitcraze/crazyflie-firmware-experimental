@@ -289,7 +289,7 @@ static void stateTransition(xTimerHandle timer)
         break;
     case STATE_PREPARING_FOR_TAKE_OFF:
         ledSetRGB(ORANGE_LED);
-        supervisorRequestArming(true) // since copters flying above can delay take-off a lot, make sure we remain armed
+        supervisorRequestArming(true); // since copters flying above can delay take-off a lot, make sure we remain armed
         if (!needMoreCopters(state))
         {
             DEBUG_PRINT("Don't need more copters after all, going back to wait state\n");
