@@ -213,6 +213,10 @@ static void stateTransition(xTimerHandle timer)
 {
     // In the following checks , sequence of checks is important
 
+    my_pos.x = getX();
+    my_pos.y = getY();
+    my_pos.z = getZ();
+
     if (supervisorIsTumbled())
     {
         state = STATE_CRASHED;
