@@ -42,8 +42,8 @@
 #define LED_CRASH                  LED_GREEN_R
 
 // Go to next waypoint
-#define WP_THRESHOLD              0.1f  //distance threshold to consider a waypoint reached
-#define WP_VEL_THRESHOLD          0.4f //velocity threshold to consider a waypoint reached
+#define WP_THRESHOLD              0.01f  //distance threshold to consider a waypoint reached
+#define WP_VEL_THRESHOLD          0.05f //velocity threshold to consider a waypoint reached
 #define REACHED_WP_TIMEOUT        4000 //ms
 #define COPTER_FLYING_ABOVE_THRESHOLD TAKE_OFF_HEIGHT //radius of cylinder that defines if a copter is flying above
 
