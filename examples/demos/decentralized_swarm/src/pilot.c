@@ -276,7 +276,7 @@ static void stateTransition(xTimerHandle timer)
             state = STATE_WAIT_FOR_TAKE_OFF;
             ledSetRGB(RED_LED);
         }
-        else if (needMoreCopters(state) && !isAnyOtherCopterExecutingTrajectory())
+        else if (needMoreCopters(state))
         {
             DEBUG_PRINT("More copters needed, preparing for take off...\n");
             if (supervisorRequestArming(true))
@@ -298,7 +298,7 @@ static void stateTransition(xTimerHandle timer)
                 ledSetRGB(RED_LED);
             }
         }
-        else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory() && noCopterFlyingAbove())
+        else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove())
         {
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
