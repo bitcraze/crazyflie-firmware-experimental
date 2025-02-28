@@ -11,7 +11,7 @@ for arg in "$@"; do
     flags="$flags $arg"
 done
 
-make -j 8 $flags
+make -j 8 $flags BRUSHLESS=1
 # Bash ranges can be continious like in {1..9} or non continious like in 2 {4..5}
 # Change the defconfig to match the platform
 printf "${YELLOW}Flashing ${RED}CF BRUSHLESS${YELLOW} 01${COLOR_RESET}\n"

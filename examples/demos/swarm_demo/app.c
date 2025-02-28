@@ -305,7 +305,7 @@ static void appTimer(xTimerHandle timer) {
 
   //out of bounds check
   if (getX() > OUT_OF_BOUNDS_X || getX() < -OUT_OF_BOUNDS_X || getY() > OUT_OF_BOUNDS_Y || getY() < -OUT_OF_BOUNDS_Y || getZ() > OUT_OF_BOUNDS_Z || getZ() < -OUT_OF_BOUNDS_Z) {
-    if (state>=STATE_TAKING_OFF && state<=STATE_REPOSITION_ON_PAD) {
+    if (state>=STATE_TAKING_OFF && state<=STATE_WAITING_AT_PAD) {
       safety_land_flag = 1;
       state=STATE_CRASHED;
     }   

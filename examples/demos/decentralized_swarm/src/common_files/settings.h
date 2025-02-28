@@ -42,10 +42,10 @@
 #define LED_CRASH                  LED_GREEN_R
 
 // Go to next waypoint
-#define WP_THRESHOLD              0.01f  //distance threshold to consider a waypoint reached
-#define WP_VEL_THRESHOLD          0.05f //velocity threshold to consider a waypoint reached
+#define WP_THRESHOLD              0.02f  //distance threshold to consider a waypoint reached
+#define WP_VEL_THRESHOLD          0.2f //velocity threshold to consider a waypoint reached
 #define REACHED_WP_TIMEOUT        4000 //ms
-#define COPTER_FLYING_ABOVE_THRESHOLD TAKE_OFF_HEIGHT //radius of cylinder that defines if a copter is flying above
+#define COPTER_FLYING_ABOVE_THRESHOLD 0.5f //radius of cylinder that defines if a copter is flying above
 
 
 // P2P Interface
@@ -69,7 +69,7 @@
 //Landing to charging pad
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
-#define LANDING_HEIGHT 0.2f
+#define LANDING_HEIGHT 0.6f
 #define LANDING_DURATION 3.0f //sec
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
@@ -83,7 +83,7 @@
 #define MIN_Y_BOUND -1.5f
 #define MAX_Y_BOUND 1.5f
 
-#define MIN_Z_BOUND -0.3f
+#define MIN_Z_BOUND 0.3f
 #define MAX_Z_BOUND  2.2f
 
 // getRandomPositionOnCircle or getRandomPositionOnBox

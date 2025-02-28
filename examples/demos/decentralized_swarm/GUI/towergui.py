@@ -184,18 +184,22 @@ class ButtonsFrame(ttk.Frame):
 
     def more_copters(self):
         self._send_command("more")
+        try:
+            playsound("more.mp3", block=False)
+        except PlaysoundException as e:
+            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
     def zero_copters(self):
         self._send_command("zero")
         try:
-            playsound("stop.mp3")
+            playsound("stop.mp3", block=False)
         except PlaysoundException as e:
             print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
     def all_copters(self):
         self._send_command("all")
         try:
-            playsound("nine.mp3")
+            playsound("nine.mp3", block=False)
         except PlaysoundException as e:
             print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
@@ -307,7 +311,7 @@ def on_9_key():
 def on_press(key):
     global key_pressed
     try:
-        if key.char == '+':
+        if key.char == '=':
             on_plus_key()  # Call the function once
         elif key.char == '-':
             on_minus_key()

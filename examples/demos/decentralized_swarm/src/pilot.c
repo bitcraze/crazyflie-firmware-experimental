@@ -299,7 +299,7 @@ static void stateTransition(xTimerHandle timer)
                 ledSetRGB(RED_LED);
             }
         }
-        else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove())
+        else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove(my_pos))
         {
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
@@ -375,7 +375,7 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Another copter landed, no need to land finally\n");
             state = STATE_HOVERING;
         }
-        else if (now_ms > random_time_for_next_event_ms && !isAnyOtherCopterExecutingTrajectory())
+        else if (now_ms > random_time_for_next_event_ms)
         {
             DEBUG_PRINT("Going to pad...\n");
             gotoChargingPad(padX, padY, padZ);
@@ -396,13 +396,14 @@ static void stateTransition(xTimerHandle timer)
         ledSetRGB(RED_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
-            if (outOfBounds(my_pos))
-            {
-                DEBUG_PRINT("Landed because of out of bounds, going to crashed state \n");
-                state = STATE_CRASHED;
-            }
-            else
-            {
+            // if (outOfBounds(my_pos))
+            // {
+            //     DEBUG_PRINT("Landed because of out of bounds, going to crashed state \n");
+            //     state = STATE_CRASHED;
+            // }
+            // else
+            // {
+            if (supervisorRequestArming(false)){
                 DEBUG_PRINT("Landed. Feed me!\n");
                 crtpCommanderHighLevelStop();
                 landingTimeCheckCharge_ms = now_ms + 4000;
@@ -422,16 +423,18 @@ static void stateTransition(xTimerHandle timer)
                     state = STATE_WAIT_FOR_TAKE_OFF;
                 }
             }
-            else if (noCopterFlyingAbove())
+            else if (noCopterFlyingAbove(my_pos))
             {
+                if (supervisorRequestArming(true)){
+                vTaskDelay(500);
                 DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
                 crtpCommanderHighLevelTakeoff(padZ + (TAKE_OFF_HEIGHT/2), 1.0);
                 state = STATE_REPOSITION_ON_PAD;
             }
         }
+        }
         break;
     case STATE_REPOSITION_ON_PAD:
-        ledSetRGB(RED_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Over pad, stabilizing position\n");

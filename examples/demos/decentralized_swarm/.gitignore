@@ -3,3 +3,4 @@ cf2.*
 flash-sniffer.sh
 STM32F405.svd
 src/common_files/*.d
+venv

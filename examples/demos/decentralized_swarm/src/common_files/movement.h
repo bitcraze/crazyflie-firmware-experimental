@@ -60,7 +60,7 @@ bool hasLock();
 
 bool chargedForTakeoff();
 
-bool noCopterFlyingAbove();
+bool noCopterFlyingAbove(Position my_pos);
 
 void startTrajectory(Position my_pos);
 
