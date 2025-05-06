@@ -69,7 +69,7 @@
 //Landing to charging pad
 #define NUMBER_OF_PAD_SAMPLES 10 //number of samples to take to estimate the landing pad
 #define MAX_PAD_ERR 0.01
-#define LANDING_HEIGHT 0.6f
+#define LANDING_HEIGHT 0.3f
 #define LANDING_DURATION 3.0f //sec
 #define GO_TO_PAD_HEIGHT 0.5f
 #define GO_TO_PAD_DURATION 3.0f //sec duration to go to charging pad
@@ -77,14 +77,14 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 20000 //ms
 
 // BOUNDS DEFINITIONS
-#define MIN_X_BOUND -1.5f
-#define MAX_X_BOUND 1.5f
+#define MIN_X_BOUND -0.9f
+#define MAX_X_BOUND 1.7f
 
-#define MIN_Y_BOUND -1.5f
-#define MAX_Y_BOUND 1.5f
+#define MIN_Y_BOUND -0.8f
+#define MAX_Y_BOUND 0.9f
 
 #define MIN_Z_BOUND 0.3f
-#define MAX_Z_BOUND  2.2f
+#define MAX_Z_BOUND  2.3f
 
 // getRandomPositionOnCircle or getRandomPositionOnBox
 // #define RANDOMIZATION_METHOD getRandomPositionOnCircle
@@ -98,7 +98,7 @@
 // Uses the bounds definition with a margin
 #define NUMBER_OF_RANDOM_POINTS_ON_BOX 5
 #define RANDOM_BOX_MARGIN 0.20f
-#define MIN_BOX_DISTANCE 0.8f   // Minimum distance from current position when randomizing positions
+#define MIN_BOX_DISTANCE 0.5f   // Minimum distance from current position when randomizing positions
 
 #define MIN_X_BOX (MIN_X_BOUND + RANDOM_BOX_MARGIN)
 #define MAX_X_BOX (MAX_X_BOUND - RANDOM_BOX_MARGIN)

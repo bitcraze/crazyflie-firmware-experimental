@@ -428,7 +428,7 @@ static void stateTransition(xTimerHandle timer)
                 if (supervisorRequestArming(true)){
                 vTaskDelay(500);
                 DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + (TAKE_OFF_HEIGHT/2), 1.0);
+                crtpCommanderHighLevelTakeoff(padZ + (LANDING_HEIGHT), 1.0);
                 state = STATE_REPOSITION_ON_PAD;
             }
         }
