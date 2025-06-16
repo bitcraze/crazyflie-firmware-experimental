@@ -70,21 +70,32 @@ static uint8_t limitUint8(int32_t value)
 void ledControlInit(void)
 {
     idLEDDeck = paramGetVarId("hprgbw", "rgbw8888");
-    paramSetInt(idLEDDeck, 0x00000000); 
+    if (idLEDDeck.id != 0xffffu)
+    {
+      paramSetInt(idLEDDeck, 0x00000000);
+    }
 }
 
 void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
 {
+  if (idLEDDeck.id != 0xffffu)
+  {
     paramSetInt(idLEDDeck, (r << 24) | (g << 16) | (b << 8)); 
+  }
 }
 
 void ledSetRGBW(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
+  if (idLEDDeck.id != 0xffffu)
+  {
     paramSetInt(idLEDDeck, (r << 24) | (g << 16) | (b << 8) | w); 
+  }
 }
 
 void ledSetColorFromXYZ(float x, float y, float z)
 {
+  if (idLEDDeck.id != 0xffffu)
+  {
     uint8_t r, g, b;
     float rf, gf, bf;
     float removeWhite;
@@ -106,4 +117,5 @@ void ledSetColorFromXYZ(float x, float y, float z)
     b = limitUint8(bf * 255.0f / (rf + gf + bf));
 
     ledSetRGB(gamma8[r],  gamma8[g],  gamma8[b]);
+  }
 }
