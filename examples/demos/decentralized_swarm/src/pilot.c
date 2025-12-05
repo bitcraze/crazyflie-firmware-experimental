@@ -109,8 +109,6 @@ static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
 
-static bool isCrashInitialized = false;
-
 // LEDs Interface
 ledseqStep_t seq_flashing_def[] = {
     {true, LEDSEQ_WAITMS(50)},
@@ -217,10 +215,9 @@ static void stateTransition(xTimerHandle timer)
     my_pos.y = getY();
     my_pos.z = getZ();
 
-    if (supervisorIsTumbled())
+    if (supervisorIsCrashed())
     {
         state = STATE_CRASHED;
-        ledSetRGB(RED_LED);
     }
     else if (isBatLow() && (state == STATE_HOVERING ||
                             state == STATE_GOING_TO_RANDOM_POINT ||
@@ -444,14 +441,12 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CRASHED:
-        ledSetRGB(RED_LED);
-        if (!isCrashInitialized)
+        if (!(supervisorIsCrashed()))
         {
-            crtpCommanderHighLevelStop();
-            DEBUG_PRINT("Crashed, running crash sequence\n");
-            ledseqRun(&seq_crash);
-            isCrashInitialized = true;
-            // maybe need to disarm here
+            DEBUG_PRINT("Crash recovery successful, going to wait for position lock\n");
+            resetLockData();
+            position_lock_start_time_ms = now_ms;
+            state = STATE_WAIT_FOR_POSITION_LOCK;
         }
         break;
 
