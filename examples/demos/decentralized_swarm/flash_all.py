@@ -7,11 +7,13 @@ selected drones with the appropriate firmware (pilot or sniffer app).
 """
 
 import argparse
+import contextlib
 import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -265,13 +267,16 @@ class SwarmFlasher:
                 from cflib.bootloader import Target
                 targets = [Target('cf2', 'stm32', 'fw', [], [])]
 
-                bootloader.flash_full(
-                    cf=None,
-                    filename=firmware_path,
-                    warm=True,
-                    targets=targets,
-                    progress_cb=progress_cb
-                )
+                # Redirect stdout to prevent cflib's print statements from disrupting the progress bar
+                captured_output = StringIO()
+                with contextlib.redirect_stdout(captured_output):
+                    bootloader.flash_full(
+                        cf=None,
+                        filename=firmware_path,
+                        warm=True,
+                        targets=targets,
+                        progress_cb=progress_cb
+                    )
 
                 pbar.close()
                 print(f"{Fore.GREEN}  ✓ Successfully flashed ID {drone.id:02d}")
