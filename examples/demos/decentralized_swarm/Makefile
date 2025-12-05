@@ -20,11 +20,27 @@ CRAZYFLIE_BASE := ../../..
 EXTRA_CFLAGS += -I$(PWD)/src/common_files
 
 #
-# Setting  CONFIG_PARAM_SILENT_UPDATES will prevent the firmware from sending 
+# Setting  CONFIG_PARAM_SILENT_UPDATES will prevent the firmware from sending
 # an update message to the cfclient which is only useful when there is communication between them
-#  
+#
 EXTRA_CFLAGS += -DCONFIG_PARAM_SILENT_UPDATES
 
+#
+# App type selection: pass APP_TYPE=sniffer or APP_TYPE=pilot
+#
+APP_TYPE ?= pilot
+ifeq ($(APP_TYPE),pilot)
+    EXTRA_CFLAGS += -DBUILD_PILOT_APP
+else ifeq ($(APP_TYPE),sniffer)
+    EXTRA_CFLAGS += -DBUILD_SNIFFER_APP
+endif
+
+# Write APP_TYPE to file to trigger rebuilds when it changes
+# Only update the file if the content is different to avoid unnecessary rebuilds
+$(shell mkdir -p $(PWD)/build && \
+  if [ ! -f $(PWD)/build/.app_type ] || [ "$$(cat $(PWD)/build/.app_type 2>/dev/null)" != "$(APP_TYPE)" ]; then \
+    echo "$(APP_TYPE)" > $(PWD)/build/.app_type; \
+  fi)
 
 #
 # We override the default OOT_CONFIG here, we could also name our config
@@ -33,9 +49,9 @@ EXTRA_CFLAGS += -DCONFIG_PARAM_SILENT_UPDATES
 BRUSHLESS ?= 0
 
 ifeq ($(BRUSHLESS),1)
-    OOT_CONFIG := $(PWD)/app-config-brushless
+    OOT_CONFIG := $(PWD)/config/app-config-brushless
 else
-    OOT_CONFIG := $(PWD)/app-config
+    OOT_CONFIG := $(PWD)/config/app-config
 endif
 
 include $(CRAZYFLIE_BASE)/tools/make/oot.mk

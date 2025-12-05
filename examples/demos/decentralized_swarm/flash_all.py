@@ -158,7 +158,8 @@ class SwarmFlasher:
         print(f"{Fore.YELLOW}Building firmware for {Fore.RED}{platform.upper()}{Fore.YELLOW} with {Fore.CYAN}{app_type.upper()}{Fore.YELLOW} app...")
 
         platform_config = self.platforms[platform]
-        firmware_dir = self.firmware_base.resolve()
+        # Build in the current directory (demo directory) not firmware base
+        firmware_dir = Path.cwd()
 
         # Step 1: Run defconfig
         print(f"{Fore.CYAN}  → Running {platform_config.defconfig}...")
@@ -177,16 +178,35 @@ class SwarmFlasher:
         # Step 2: Build firmware with appropriate flags
         make_flags = platform_config.make_flags.copy()
 
-        # Add app type flag
-        if app_type == 'pilot':
-            make_flags.append('CFLAGS=-DBUILD_PILOT_APP')
-        elif app_type == 'sniffer':
-            make_flags.append('CFLAGS=-DBUILD_SNIFFER_APP')
+        # Add app type flag using APP_TYPE variable in Makefile
+        make_flags.append(f'APP_TYPE={app_type}')
 
         if extra_flags:
             make_flags.extend(extra_flags)
 
         print(f"{Fore.CYAN}  → Building with flags: {' '.join(make_flags)}")
+
+        # Write APP_TYPE to a file that Kbuild can track for dependency changes
+        # This forces rebuilds when APP_TYPE changes even though source files haven't changed
+        build_dir = Path.cwd() / 'build'
+        build_dir.mkdir(exist_ok=True)
+        app_type_file = build_dir / '.app_type'
+
+        # Read previous app type if it exists
+        prev_app_type = None
+        if app_type_file.exists():
+            prev_app_type = app_type_file.read_text().strip()
+
+        # Write current app type
+        app_type_file.write_text(f"{app_type}\n")
+
+        if prev_app_type and prev_app_type != app_type:
+            print(f"{Fore.CYAN}  → APP_TYPE changed from {prev_app_type} to {app_type}, forcing rebuild")
+
+        # Get timestamp of binary before build (if it exists)
+        binary_name = f'{platform}.bin'
+        build_binary_path = Path.cwd() / 'build' / binary_name
+        pre_build_mtime = build_binary_path.stat().st_mtime if build_binary_path.exists() else None
 
         build_cmd = ['make', f'-j{self.build_jobs}'] + make_flags
         try:
@@ -203,12 +223,14 @@ class SwarmFlasher:
             print(f"{Fore.RED}{e.stderr}")
             raise RuntimeError(f"Failed to build firmware for {platform} ({app_type})")
 
-        # The firmware binary is built in the current directory's build folder
-        # Binary name matches the platform (cf2.bin for cf2, cf21bl.bin for cf21bl)
-        binary_name = f'{platform}.bin'
-        build_binary_path = Path.cwd() / 'build' / binary_name
+        # Verify the firmware binary exists and was actually rebuilt
         if not build_binary_path.exists():
             raise RuntimeError(f"Firmware binary not found at {build_binary_path}")
+
+        post_build_mtime = build_binary_path.stat().st_mtime
+        if pre_build_mtime is not None and post_build_mtime <= pre_build_mtime:
+            print(f"{Fore.YELLOW}  ⚠ Warning: Binary timestamp unchanged - build may have been skipped")
+            print(f"{Fore.YELLOW}    Consider running 'make clean' if you suspect stale binaries")
 
         # Copy the binary to a unique name including app_type to avoid overwrites
         # when building multiple variants of the same platform

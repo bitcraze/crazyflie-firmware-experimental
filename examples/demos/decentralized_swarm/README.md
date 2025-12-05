@@ -87,9 +87,28 @@ python flash_all.py --range 1-6
 
 The script automatically:
 - Builds firmware with correct app flags (`BUILD_PILOT_APP` or `BUILD_SNIFFER_APP`)
+- Detects when app type changes and triggers smart rebuilds
 - Handles different platforms (cf2, cf21bl)
 - Flashes via radio with warm boot
 - Shows progress bars
+
+### Manual Building
+
+For manual builds, use the `APP_TYPE` variable:
+```bash
+# Build pilot firmware for cf21bl
+make cf21bl_defconfig
+make APP_TYPE=pilot
+
+# Build sniffer firmware for cf2
+make cf2_defconfig
+make APP_TYPE=sniffer
+```
+
+The build system automatically:
+- Tracks `APP_TYPE` changes and rebuilds only when necessary
+- Writes APP_TYPE to `build/.app_type` to trigger proper dependency tracking
+- Skips unnecessary rebuilds when APP_TYPE hasn't changed
 
 ## GUI
 

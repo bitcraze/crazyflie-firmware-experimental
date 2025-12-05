@@ -1,3 +1,8 @@
+# Force rebuild when APP_TYPE changes by depending on the .app_type file
+# The file is created/updated by the Makefile based on APP_TYPE value
+$(obj)/pilot.o: $(src)/../build/.app_type
+$(obj)/sniffer.o: $(src)/../build/.app_type
+
 obj-y += pilot.o
 obj-y += sniffer.o
 obj-y += common_files/
