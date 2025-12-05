@@ -3,16 +3,15 @@ from cflib.utils.power_switch import PowerSwitch
 from colorama import init,Fore, Back, Style
 
 uris = [
-    'radio://0/90/2M/E7E7E7E700',
-    'radio://0/90/2M/E7E7E7E701',
-    'radio://0/90/2M/E7E7E7E702',
-    'radio://0/90/2M/E7E7E7E703',
-    'radio://0/90/2M/E7E7E7E704',
-    'radio://0/90/2M/E7E7E7E705',
-    'radio://0/90/2M/E7E7E7E706',
-    'radio://0/90/2M/E7E7E7E707',
-    'radio://0/90/2M/E7E7E7E708',
-    'radio://0/90/2M/E7E7E7E709'
+    'radio://0/80/2M/ABAD1DEA01',
+    'radio://0/80/2M/ABAD1DEA02',
+    'radio://0/80/2M/ABAD1DEA03',
+    'radio://0/80/2M/ABAD1DEA04',
+    'radio://0/80/2M/ABAD1DEA05',
+    'radio://0/80/2M/ABAD1DEA06',
+    'radio://0/80/2M/ABAD1DEA07',
+    'radio://0/80/2M/ABAD1DEA08',
+    'radio://0/80/2M/ABAD1DEA09',
 ]
 
 for uri in uris:

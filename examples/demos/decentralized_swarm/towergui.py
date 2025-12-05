@@ -7,14 +7,13 @@ import tkinter.ttk as ttk
 from colorama import Fore
 from typing import List
 from pynput import keyboard
-from playsound import playsound, PlaysoundException
 
 import zmq
 import threading
 import time
-from common import MAX_COPTERS, state_dict
+from GUI.common import MAX_COPTERS, state_dict
 
-from sniffer_interface import snifferThread
+from GUI.sniffer_interface import snifferThread
 from queue import Queue
 
 COPTER_ALIVE_TIMEOUT = 2  # sec
@@ -184,24 +183,12 @@ class ButtonsFrame(ttk.Frame):
 
     def more_copters(self):
         self._send_command("more")
-        try:
-            playsound("more.mp3", block=False)
-        except PlaysoundException as e:
-            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
     def zero_copters(self):
         self._send_command("zero")
-        try:
-            playsound("stop.mp3", block=False)
-        except PlaysoundException as e:
-            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
     def all_copters(self):
         self._send_command("all")
-        try:
-            playsound("nine.mp3", block=False)
-        except PlaysoundException as e:
-            print(Fore.RED + "Error playing sound: {}".format(e), Fore.RESET)
 
 
 sniffer_thread = snifferThread()

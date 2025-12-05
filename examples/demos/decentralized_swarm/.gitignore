@@ -4,3 +4,6 @@ flash-sniffer.sh
 STM32F405.svd
 src/common_files/*.d
 venv
+build
+__pycache__
+.venv

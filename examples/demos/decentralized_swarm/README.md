@@ -35,36 +35,80 @@ The structure of each P2P packet is as follows:
 A GUI is also provided to control and monitor the swarm.The communication with it is achieved through a static Crazyflie which acts as a sniffer for all the P2P packets sent by the copters.Keep in mind that the sniffer must be connected through USB to the PC in order not to interfere with the P2P radio communication.The user can also command the take off and the termination through the GUI and monitor the state and voltage of each copter.
 
 
-## Building the Demo
-Make sure that you are in the decentralized_swarm folder (not the main folder of the crazyflie firmware). **It is assumed that the sniffer has a radio address ending in '00' and all the swarm copters from '01' to '09'**.
+## Project Structure
 
-If you want to build the sniffer app the `BUILD_SNIFFER_APP` flag must be defined in the `choose_app.h` header file and then type the following to build and flash it while the crazyflie is put into bootloader mode:
 ```
-make clean
-make 
-make cload
-```
-
-If you want to build the pilot app for the swarm copters the `BUILD_PILOT_APP` flag must be defined in the `choose_app.h` header file and then the standard flashing procedure can be used for each crazyflie or use the `cload-all.sh` script to flash all the copters automatically:
-```
-./cload-all.sh
-```
-
-
-If you want to use the GUI for monitoring the state of each copter and controlling the swarm ,the python libraries in requirements.txt must be installed by running the following command:
-```
-pip install -r requirements.txt
+.
+├── config/
+│   ├── drones_config.yaml      # Swarm configuration (drones, URIs, platforms)
+│   ├── CageGeoEst.yaml         # Lighthouse geometry
+│   ├── app-config              # App config for CF2
+│   └── app-config-brushless    # App config for CF21BL
+├── scripts/                    # Utility scripts
+├── flash_all.py                # Mass flashing tool
+├── towergui.py                 # GUI for monitoring/control
+└── src/                        # Firmware source
 ```
 
-and then executing the script `towergui.py` in the folder GUI.
+## Setup
+
+Install dependencies (creates virtual environment):
+```bash
+source .venv/bin/activate  # or: .venv/bin/python
+```
+
+## Configuration
+
+Edit `config/drones_config.yaml` to define your swarm:
+- Drone IDs and URIs
+- Platform types (cf2, cf21bl)
+- App types (pilot, sniffer)
+
+**Default**: Sniffer on ID 0 (`...EA00`), pilots on IDs 1-9 (`...EA01` to `...EA09`)
+
+## Building and Flashing
+
+The `flash_all.py` script handles building and flashing with automatic app selection:
+
+```bash
+# Flash all drones
+python flash_all.py --all
+
+# Flash specific drones
+python flash_all.py --ids 1 2 3
+
+# Flash by type
+python flash_all.py --app-type sniffer
+python flash_all.py --platform cf21bl
+
+# Flash a range
+python flash_all.py --range 1-6
+```
+
+The script automatically:
+- Builds firmware with correct app flags (`BUILD_PILOT_APP` or `BUILD_SNIFFER_APP`)
+- Handles different platforms (cf2, cf21bl)
+- Flashes via radio with warm boot
+- Shows progress bars
+
+## GUI
+
+Run the tower GUI for swarm monitoring and control:
+```bash
+python towergui.py
+```
+
+The GUI connects to the sniffer drone (USB) to monitor P2P packets and control takeoff/termination.
 ## Resources
 You can find on Bitcraze's website the [API documentation for P2P](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/functional-areas/p2p_api/) as well as the [App layer API guide](https://www.bitcraze.io/documentation/repository/crazyflie-firmware/master/userguides/app_layer/)
 
 Further information bout the collision avoidance algorithm can be found on the original [paper](https://web.stanford.edu/~schwager/MyPapers/ZhouEtAlRAL17CollisionAvoidance.pdf) and on the file  ``collision_avoidance.h``
 
+## Utility Scripts
+
+- `scripts/power_reset.py` - Power cycle all drones
+- `scripts/turn_off.py` - Turn off all drones
+
 ## Limitations
 
-Since P2P communication happens asynchronously on the radio, this example does not work well when connecting a PC to the Crazyflies via the Radio.This is a fundamental limitation of the current P2P implementation.You should only connect the Crazyflies to start and terminate the swarm but the suggested way of interaction with the swarm is through the sniffer and GUI.
-
-## Limitations
-In case a reset of the copters is needed, the script `power_reset.py` can be used to power reset all the copters automatically.
+Since P2P communication happens asynchronously on the radio, this example does not work well when connecting a PC to the Crazyflies via the Radio. This is a fundamental limitation of the current P2P implementation. You should only connect the Crazyflies to start and terminate the swarm but the suggested way of interaction with the swarm is through the sniffer and GUI.

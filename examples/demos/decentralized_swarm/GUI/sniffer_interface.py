@@ -7,7 +7,7 @@ from cflib.crazyflie.log import LogConfig
 from colorama import Fore
 import cflib.crtp
 import zmq
-from common import MAX_COPTERS
+from .common import MAX_COPTERS
 
 
 class Copter():
@@ -36,7 +36,7 @@ class SnifferInterface:
         self.uri = uri
         self.copters: List[Copter] = None
 
-        self.cf = Crazyflie(rw_cache='./cache')
+        self.cf = Crazyflie(rw_cache='./GUI/cache')
 
         self.cf.fully_connected.add_callback(self._connected)
         self.cf.disconnected.add_callback(self._disconnected)

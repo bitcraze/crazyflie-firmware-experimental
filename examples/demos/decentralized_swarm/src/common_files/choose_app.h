@@ -26,8 +26,15 @@
  *
  */
 
-#define BUILD_PILOT_APP
-// #define BUILD_SNIFFER_APP
+// App selection can be controlled via compile-time flags:
+// - Pass -DBUILD_PILOT_APP to build the pilot app
+// - Pass -DBUILD_SNIFFER_APP to build the sniffer app
+// If no flag is passed, default to pilot app
+
+#if !defined(BUILD_PILOT_APP) && !defined(BUILD_SNIFFER_APP)
+    // Default to pilot app if no flag is specified
+    #define BUILD_PILOT_APP
+#endif
 
 // check if both apps are defined
 #if defined(BUILD_PILOT_APP) && defined(BUILD_SNIFFER_APP)

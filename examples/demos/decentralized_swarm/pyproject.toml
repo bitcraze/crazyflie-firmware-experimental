@@ -1,0 +1,15 @@
+[project]
+name = "decentralized-swarm"
+version = "0.1.0"
+description = "A decentralized swarm observation/control system for Crazyflie drones."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "cfclient>=2025.9",
+    "colorama>=0.4.6",
+    "pynput>=1.8.1",
+    "setuptools>=80.9.0",
+    "tdqm>=0.0.1",
+    "tk>=0.1.0",
+    "zmq>=0.0.0",
+]

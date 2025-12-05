@@ -1,0 +1,75 @@
+# Central configuration file for the decentralized swarm
+# This file defines all drones in the swarm and can be reused across multiple scripts
+
+# Firmware base path (relative to the project root directory where scripts are run)
+firmware_base: ../../../
+build_jobs: 8
+
+# Platform-specific build configurations
+platforms:
+  cf21bl:
+    defconfig: cf21bl_defconfig
+    make_flags:
+      - BRUSHLESS=1
+    app_config: app-config-brushless
+
+  cf2:
+    defconfig: cf2_defconfig
+    make_flags: []
+    app_config: app-config
+
+# Drone definitions
+# Each drone has: id, uri, platform (cf2/cf21bl), and app_type (pilot/sniffer)
+drones:
+  # Sniffer drone (ID 0)
+  - id: 0
+    uri: radio://0/90/2M/ABAD1DEA00
+    platform: cf2
+    app_type: sniffer
+
+  # Brushless pilot drones (IDs 1-6)
+  - id: 1
+    uri: radio://0/90/2M/ABAD1DEA01
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 2
+    uri: radio://0/90/2M/ABAD1DEA02
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 3
+    uri: radio://0/90/2M/ABAD1DEA03
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 4
+    uri: radio://0/90/2M/ABAD1DEA04
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 5
+    uri: radio://0/90/2M/ABAD1DEA05
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 6
+    uri: radio://0/90/2M/ABAD1DEA06
+    platform: cf21bl
+    app_type: pilot
+
+  # Standard pilot drones (IDs 7-9)
+  - id: 7
+    uri: radio://0/90/2M/ABAD1DEA07
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 8
+    uri: radio://0/90/2M/ABAD1DEA08
+    platform: cf21bl
+    app_type: pilot
+
+  - id: 9
+    uri: radio://0/90/2M/ABAD1DEA09
+    platform: cf21bl
+    app_type: pilot
