@@ -109,6 +109,10 @@ static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
 
+// Trajectory slot state
+static uint8_t claimed_trajectory_slot = 0;  // 0 = no slot claimed, 1 = slot 1 claimed
+static uint32_t claimed_start_time_global = 0;  // When we plan to start trajectory (global time)
+
 // LED blink synchronization tracking
 static bool led_blink_active = false;
 
@@ -199,6 +203,10 @@ static void broadcastData(xTimerHandle timer)
     fullState.position.y = getY();
     fullState.position.z = getZ();
 
+    // Trajectory slot synchronization
+    fullState.trajectory_slot = claimed_trajectory_slot;
+    fullState.trajectory_start_time_global = claimed_start_time_global;
+
     broadcastToPeers(&fullState, nowMs);
 }
 
@@ -225,21 +233,57 @@ static void startTakeOffSequence()
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
 
-static bool shouldFlySpecialTrajectory()
-{
-    int random_number = -1;
+// Check if slot 1 is currently claimed by anyone
+static bool isSlot1Claimed() {
+    uint32_t current_global_time = getGlobalTime();
 
-    if (SPECIAL_TRAJ_PROBABILITY > 0.0f)
-    {
-        int special_traj_prob_length = (int)(1.0f / SPECIAL_TRAJ_PROBABILITY);
-        random_number = rand() % special_traj_prob_length;
-        // DEBUG_PRINT("special_traj_prob_length %i\n", special_traj_prob_length);
-        // DEBUG_PRINT("Random number: %i\n", random_number);
+    for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && copters[i].trajectory_slot == 1) {
+            // Check if their claim is still active (start time hasn't passed yet + some buffer)
+            int32_t time_until_start = (int32_t)(copters[i].trajectory_start_time_global - current_global_time);
+            if (time_until_start > -1000) {  // Still active if within 1s after start
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// Attempt to claim a trajectory slot
+// Returns true if slot was successfully claimed
+static bool tryClaimTrajectorySlot()
+{
+    if (!EXECUTE_TRAJ) {
+        return false;
     }
 
-    uint8_t minimumFlyingCopterId = getMinimumFlyingCopterId();
-    bool noOneElseIsFlyingTrajectory = !isAnyOtherCopterExecutingTrajectory();
-    return (EXECUTE_TRAJ && (random_number == 0) && (my_id <= minimumFlyingCopterId) && noOneElseIsFlyingTrajectory);
+    // Don't claim if already claimed
+    if (claimed_trajectory_slot != 0) {
+        return false;
+    }
+
+    // Probabilistic decision to attempt trajectory
+    if (SPECIAL_TRAJ_PROBABILITY > 0.0f) {
+        int special_traj_prob_length = (int)(1.0f / SPECIAL_TRAJ_PROBABILITY);
+        int random_number = rand() % special_traj_prob_length;
+        if (random_number != 0) {
+            return false;  // Probability check failed
+        }
+    }
+
+    // Check if slot 1 is available
+    if (isSlot1Claimed()) {
+        return false;  // Slot 1 already taken
+    }
+
+    // Claim slot 1 (only slot for now)
+    claimed_trajectory_slot = 1;
+    claimed_start_time_global = getGlobalTime() + TRAJECTORY_CLAIM_DELAY_MS;
+
+    DEBUG_PRINT("Claimed slot 1, start time: %lu (in %d ms)\n",
+                claimed_start_time_global, TRAJECTORY_CLAIM_DELAY_MS);
+
+    return true;
 }
 
 static void stateTransition(xTimerHandle timer)
@@ -351,9 +395,9 @@ static void stateTransition(xTimerHandle timer)
         }
         else
         {
-            if (shouldFlySpecialTrajectory())
+            if (tryClaimTrajectorySlot())
             {
-                DEBUG_PRINT("Special trajectory\n");
+                DEBUG_PRINT("Claimed trajectory slot, going to start position\n");
                 gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                 state = STATE_GOING_TO_TRAJECTORY_START;
             }
@@ -367,9 +411,46 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_GOING_TO_TRAJECTORY_START:
-        if (reachedNextWaypoint(my_pos))
+        // Check for slot conflicts - only one drone can have slot 1
         {
-            DEBUG_PRINT("Reached trajectory start\n");
+            bool has_conflict = false;
+            uint8_t conflicting_id = 0;
+
+            for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+                if (i == my_id || !isAlive(i)) {
+                    continue;
+                }
+
+                // Someone else also claimed slot 1
+                if (copters[i].trajectory_slot == claimed_trajectory_slot && claimed_trajectory_slot != 0) {
+                    has_conflict = true;
+                    conflicting_id = i;
+                    break;
+                }
+            }
+
+            if (has_conflict) {
+                if (my_id < conflicting_id) {
+                    // We win (lower ID), keep going
+                    DEBUG_PRINT("Slot conflict with ID %d, we win\n", conflicting_id);
+                } else {
+                    // We lose (higher ID), drop claim and back off
+                    DEBUG_PRINT("Slot conflict with ID %d, we lose, backing off\n", conflicting_id);
+                    claimed_trajectory_slot = 0;
+                    claimed_start_time_global = 0;
+                    state = STATE_HOVERING;
+                    break;
+                }
+            }
+        }
+
+        // Check if we've reached the waypoint AND the agreed start time
+        uint32_t current_global_time = getGlobalTime();
+        bool reached_start_time = (int32_t)(current_global_time - claimed_start_time_global) >= 0;
+
+        if (reachedNextWaypoint(my_pos) && reached_start_time)
+        {
+            DEBUG_PRINT("Reached trajectory start at global time %lu\n", current_global_time);
             startTrajectory(my_pos);
             disableCollisionAvoidance();
             state = STATE_EXECUTING_TRAJECTORY;
@@ -380,6 +461,9 @@ static void stateTransition(xTimerHandle timer)
         {
             DEBUG_PRINT("Finished trajectory execution\n");
             enableCollisionAvoidance();
+            // Release trajectory slot
+            claimed_trajectory_slot = 0;
+            claimed_start_time_global = 0;
             state = STATE_HOVERING;
         }
         break;

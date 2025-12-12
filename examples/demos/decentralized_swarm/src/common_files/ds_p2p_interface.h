@@ -57,6 +57,10 @@ typedef struct {
 
     // Clock synchronization
     int32_t clock_offset; // Offset from our local time (ms): peer_time - local_time
+
+    // Trajectory synchronization
+    uint8_t trajectory_slot;  // 0 = not flying trajectory, 1-N = slot number
+    uint32_t trajectory_start_time_global;  // When trajectory starts, in global time
 } copter_full_state_t;
 
 typedef struct {

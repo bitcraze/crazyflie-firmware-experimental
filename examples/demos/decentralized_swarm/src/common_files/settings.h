@@ -115,6 +115,10 @@
 #define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory
 #define SPECIAL_TRAJ_START_HEIGHT 0.7f
 
+// Trajectory slot synchronization
+#define MAX_TRAJECTORY_SLOTS 1  // Number of simultaneous trajectory slots (set to 1 for now)
+#define TRAJECTORY_CLAIM_DELAY_MS 3000  // Time between claiming and starting trajectory (ms)
+
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)
