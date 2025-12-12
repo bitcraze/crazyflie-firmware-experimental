@@ -32,6 +32,7 @@ static float lockData[LOCK_LENGTH][3];
 static uint32_t lockWriteIndex;
 static uint32_t timeOfReachingWaypointTimeoutms;
 const uint8_t traj_id = 0;
+const uint8_t trajectory_timescale = 2;
 
 static void goToWayPointPositionBased(float x, float y, float z, float yaw, float duration, uint32_t reach_wp_timeout){
   next_wp.x = x;
@@ -183,16 +184,19 @@ static float getSequenceTime(struct poly4d sequence[], int count) {
   	return totalDuration;
 }
 
-void startTrajectory(Position my_pos){
-	const uint8_t timescale = 2;
+uint32_t getTrajectoryDurationMs() {
+	float duration = getSequenceTime(sequence, sizeof(sequence) / sizeof(struct poly4d));
+	return (uint32_t)(duration * 1000.0f * trajectory_timescale);
+}
 
+void startTrajectory(Position my_pos){
 	memcpy(&next_wp, &my_pos, sizeof(Position));
 	float duration = getSequenceTime(sequence,sizeof(sequence) / sizeof(struct poly4d));
 	timeOfReachingWaypointTimeoutms = T2M(xTaskGetTickCount()) + duration + 6*1000 ;
 	DEBUG_PRINT("Starting trajectory with duration %f\n", (double) duration);
 
   const bool relative = true;
-	crtpCommanderHighLevelStartTrajectory(traj_id, timescale, relative, false);
+	crtpCommanderHighLevelStartTrajectory(traj_id, trajectory_timescale, relative, false);
 }
 
 

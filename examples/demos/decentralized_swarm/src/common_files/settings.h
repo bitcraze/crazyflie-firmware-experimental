@@ -112,11 +112,12 @@
 #define MAX_Z_BOX (TAKE_OFF_HEIGHT + 0.5f)
 
 // Random trajectory execution
-#define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory
+#define SPECIAL_TRAJ_PROBABILITY 0.1f  // Probability of starting a trajectory when none are active
+#define SPECIAL_TRAJ_JOIN_PROBABILITY 0.5f  // Probability of joining when slots are already claimed
 #define SPECIAL_TRAJ_START_HEIGHT 0.7f
 
 // Trajectory slot synchronization
-#define MAX_TRAJECTORY_SLOTS 1  // Number of simultaneous trajectory slots (set to 1 for now)
+#define MAX_TRAJECTORY_SLOTS 2  // Number of simultaneous trajectory slots
 #define TRAJECTORY_CLAIM_DELAY_MS 3000  // Time between claiming and starting trajectory (ms)
 
 //utils

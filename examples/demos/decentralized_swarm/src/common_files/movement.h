@@ -68,4 +68,6 @@ Position getTrajectoryStart();
 
 void defineTrajectory();
 
+uint32_t getTrajectoryDurationMs();
+
 #endif // MOVEMENT_H

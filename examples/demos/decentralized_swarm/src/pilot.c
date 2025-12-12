@@ -233,20 +233,30 @@ static void startTakeOffSequence()
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
 
-// Check if slot 1 is currently claimed by anyone
-static bool isSlot1Claimed() {
-    uint32_t current_global_time = getGlobalTime();
+// Get the start time of a specific slot if it exists
+// Returns 0 if slot is not claimed
+static uint32_t getSlotStartTime(uint8_t slot_number) {
+    for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && copters[i].trajectory_slot == slot_number) {
+            return copters[i].trajectory_start_time_global;
+        }
+    }
+    return 0;
+}
+
+// Find the highest claimed slot number
+// Returns 0 if no slots are claimed
+static uint8_t getHighestClaimedSlot() {
+    uint8_t highest_slot = 0;
 
     for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
-        if (isAlive(i) && copters[i].trajectory_slot == 1) {
-            // Check if their claim is still active (start time hasn't passed yet + some buffer)
-            int32_t time_until_start = (int32_t)(copters[i].trajectory_start_time_global - current_global_time);
-            if (time_until_start > -1000) {  // Still active if within 1s after start
-                return true;
+        if (isAlive(i) && copters[i].trajectory_slot > 0) {
+            if (copters[i].trajectory_slot > highest_slot) {
+                highest_slot = copters[i].trajectory_slot;
             }
         }
     }
-    return false;
+    return highest_slot;
 }
 
 // Attempt to claim a trajectory slot
@@ -262,26 +272,64 @@ static bool tryClaimTrajectorySlot()
         return false;
     }
 
+    uint32_t current_global_time = getGlobalTime();
+    uint32_t traj_duration_ms = getTrajectoryDurationMs();
+
+    // Find the highest claimed slot
+    uint8_t highest_slot = getHighestClaimedSlot();
+
     // Probabilistic decision to attempt trajectory
-    if (SPECIAL_TRAJ_PROBABILITY > 0.0f) {
-        int special_traj_prob_length = (int)(1.0f / SPECIAL_TRAJ_PROBABILITY);
-        int random_number = rand() % special_traj_prob_length;
+    // Use different probabilities for starting vs joining
+    float probability_to_use = (highest_slot == 0) ? SPECIAL_TRAJ_PROBABILITY : SPECIAL_TRAJ_JOIN_PROBABILITY;
+
+    if (probability_to_use > 0.0f && probability_to_use < 1.0f) {
+        int prob_length = (int)(1.0f / probability_to_use);
+        int random_number = rand() % prob_length;
         if (random_number != 0) {
             return false;  // Probability check failed
         }
     }
 
-    // Check if slot 1 is available
-    if (isSlot1Claimed()) {
-        return false;  // Slot 1 already taken
+    // Determine which slot to claim: highest + 1, or slot 1 if none claimed
+    uint8_t slot_to_claim = (highest_slot == 0) ? 1 : (highest_slot + 1);
+
+    // Check if we can claim more slots
+    if (slot_to_claim > MAX_TRAJECTORY_SLOTS) {
+        return false;  // All slots are taken
     }
 
-    // Claim slot 1 (only slot for now)
-    claimed_trajectory_slot = 1;
-    claimed_start_time_global = getGlobalTime() + TRAJECTORY_CLAIM_DELAY_MS;
+    // Calculate start time for this slot
+    uint32_t slot_start_time;
 
-    DEBUG_PRINT("Claimed slot 1, start time: %lu (in %d ms)\n",
-                claimed_start_time_global, TRAJECTORY_CLAIM_DELAY_MS);
+    if (slot_to_claim == 1) {
+        // First slot: start after claim delay
+        slot_start_time = current_global_time + TRAJECTORY_CLAIM_DELAY_MS;
+    } else {
+        // Subsequent slots: get previous slot's start time and add offset
+        uint32_t prev_slot_start_time = getSlotStartTime(slot_to_claim - 1);
+
+        if (prev_slot_start_time == 0) {
+            // Previous slot doesn't exist (shouldn't happen, but safety check)
+            return false;
+        }
+
+        // Calculate offset: trajectory_duration / N
+        uint32_t slot_offset = traj_duration_ms / MAX_TRAJECTORY_SLOTS;
+        slot_start_time = prev_slot_start_time + slot_offset;
+
+        // Check if we have enough time to reach the start position
+        int32_t time_until_start = (int32_t)(slot_start_time - current_global_time);
+        if (time_until_start < (int32_t)TRAJECTORY_CLAIM_DELAY_MS) {
+            return false;  // Not enough time to reach start position
+        }
+    }
+
+    claimed_trajectory_slot = slot_to_claim;
+    claimed_start_time_global = slot_start_time;
+
+    int32_t time_until = (int32_t)(slot_start_time - current_global_time);
+    DEBUG_PRINT("Claimed slot %d, start time: %lu (in %ld ms)\n",
+                slot_to_claim, slot_start_time, time_until);
 
     return true;
 }
@@ -393,13 +441,28 @@ static void stateTransition(xTimerHandle timer)
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
             state = STATE_PREPARING_FOR_LAND;
         }
-        else
+        else if (claimed_trajectory_slot != 0)
         {
-            if (tryClaimTrajectorySlot())
+            // We have a claimed slot, check if it's time to go to the start position
+            uint32_t current_global_time = getGlobalTime();
+            int32_t time_until_start = (int32_t)(claimed_start_time_global - current_global_time);
+
+            if (time_until_start <= (int32_t)TRAJECTORY_CLAIM_DELAY_MS)
             {
-                DEBUG_PRINT("Claimed trajectory slot, going to start position\n");
+                DEBUG_PRINT("Time to go to trajectory start (slot %d, %ld ms until start)\n",
+                            claimed_trajectory_slot, time_until_start);
                 gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                 state = STATE_GOING_TO_TRAJECTORY_START;
+            }
+            // Otherwise, keep hovering with claimed slot until it's time to move
+        }
+        else
+        {
+            // Try to claim a slot (but don't move yet)
+            if (tryClaimTrajectorySlot())
+            {
+                DEBUG_PRINT("Claimed trajectory slot %d, waiting to move to start\n", claimed_trajectory_slot);
+                // Stay in HOVERING state until it's time to move
             }
             else
             {
