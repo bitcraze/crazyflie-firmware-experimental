@@ -54,6 +54,9 @@ typedef struct {
     uint8_t battery_voltage; //normalized to 0-255 (0-3.3V)
     uint32_t timestamp;
     Position position;
+
+    // Clock synchronization
+    int32_t clock_offset; // Offset from our local time (ms): peer_time - local_time
 } copter_full_state_t;
 
 typedef struct {
@@ -106,5 +109,12 @@ bool needLessLandingQueuedCopters(enum State ownState);
 
 uint8_t getDesiredFlyingCopters();
 void setDesiredFlyingCopters(uint8_t desired);
+
+// Clock synchronization
+uint32_t getGlobalTime();
+int32_t getMedianClockOffset();
+
+// External access to peer states
+extern copter_full_state_t copters[MAX_ADDRESS];
 
 #endif // P2P_INTERFACE_H

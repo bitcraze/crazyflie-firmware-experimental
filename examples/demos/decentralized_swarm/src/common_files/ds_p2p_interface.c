@@ -77,6 +77,10 @@ static void p2pcallbackHandler(P2PPacket *p) {
     memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
     copters[received_id].timestamp = nowMs;
 
+    // Calculate clock offset: peer_time - local_time
+    // This tells us how much ahead or behind the peer is
+    copters[received_id].clock_offset = (int32_t)rxMessage.fullState.timestamp - (int32_t)nowMs;
+
     if (rxMessage.isControlDataValid) {
         int32_t newControlDataTimeMs = nowMs - rxMessage.ageOfControlDataMs;
         if ( ! isControlDataSetYet || newControlDataTimeMs > controlDataTimeMs) {
@@ -310,6 +314,36 @@ void setDesiredFlyingCopters(uint8_t desired) {
     desiredFlyingCopters = desired;
     isControlDataSetYet = true;
     controlDataTimeMs = T2M(xTaskGetTickCount());
+}
+
+// Clock synchronization implementation
+
+int32_t getMedianClockOffset() {
+    int64_t sum = 0;
+    uint8_t count = 0;
+
+    // Collect and sum offsets from all alive peers
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i)) {
+            sum += copters[i].clock_offset;
+            count++;
+        }
+    }
+
+    if (count == 0) {
+        return 0; // No peers, no offset
+    }
+
+    int32_t average = (int32_t)(sum / count);
+
+    // Return average (helps convergence through gossip)
+    return average;
+}
+
+uint32_t getGlobalTime() {
+    uint32_t local_time = T2M(xTaskGetTickCount());
+    int32_t median_offset = getMedianClockOffset();
+    return local_time + median_offset;
 }
 
 //LOGS

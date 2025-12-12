@@ -109,6 +109,9 @@ static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
 
+// LED blink synchronization tracking
+static bool led_blink_active = false;
+
 // LEDs Interface
 ledseqStep_t seq_flashing_def[] = {
     {true, LEDSEQ_WAITMS(50)},
@@ -148,6 +151,38 @@ uint32_t get_next_random_timeout(uint32_t now_ms)
     return timeout;
 }
 
+// Update LED color based on current state
+static void updateLedForState(void)
+{
+    switch(state) {
+        case STATE_WAIT_FOR_POSITION_LOCK:
+        case STATE_PREPARING_FOR_TAKE_OFF:
+        case STATE_QUEUED_FOR_TAKE_OFF:
+            ledSetRGB(ORANGE_LED);
+            break;
+        case STATE_WAIT_FOR_TAKE_OFF:
+        case STATE_LANDING:
+        case STATE_CHECK_CHARGING:
+            ledSetRGB(RED_LED);
+            break;
+        case STATE_TAKING_OFF:
+            ledSetRGB(GREEN_LED);
+            break;
+        case STATE_EXECUTING_TRAJECTORY:
+            ledSetRGB(BLUE_LED);
+            break;
+        case STATE_HOVERING:
+        case STATE_GOING_TO_TRAJECTORY_START:
+        case STATE_GOING_TO_RANDOM_POINT:
+        case STATE_PREPARING_FOR_LAND:
+        case STATE_GOING_TO_PAD:
+            ledSetColorFromXYZ(getX(), getY(), getZ());
+            break;
+        default:
+            break;
+    }
+}
+
 // timers
 static void broadcastData(xTimerHandle timer)
 {
@@ -159,7 +194,7 @@ static void broadcastData(xTimerHandle timer)
     // fullState.counter - set when transmitted
     fullState.state = state;
     fullState.battery_voltage = compressVoltage(getVoltage());
-    fullState.timestamp = nowMs;
+    fullState.timestamp = getGlobalTime();  // Send our global time (not local!) for consensus
     fullState.position.x = getX();
     fullState.position.y = getY();
     fullState.position.z = getZ();
@@ -215,6 +250,13 @@ static void stateTransition(xTimerHandle timer)
     my_pos.y = getY();
     my_pos.z = getZ();
 
+    // LED blink synchronization test: blink every 10 seconds based on global time
+    uint32_t global_time = getGlobalTime();
+    uint32_t time_in_cycle = global_time % 10000;  // Position within 10-second cycle
+
+    // Set flag if we're in blink window (200ms at start of each 10-second cycle)
+    led_blink_active = (time_in_cycle < 200);
+
     if (supervisorIsCrashed())
     {
         state = STATE_CRASHED;
@@ -226,7 +268,6 @@ static void stateTransition(xTimerHandle timer)
         DEBUG_PRINT("Battery low, landing\n");
         gotoChargingPad(padX, padY, padZ);
         state = STATE_GOING_TO_PAD;
-        ledSetRGB(RED_LED);
     }
 
     now_ms = T2M(xTaskGetTickCount());
@@ -237,10 +278,8 @@ static void stateTransition(xTimerHandle timer)
         resetLockData();
         position_lock_start_time_ms = now_ms;
         state = STATE_WAIT_FOR_POSITION_LOCK;
-        ledSetRGB(ORANGE_LED);
         break;
     case STATE_WAIT_FOR_POSITION_LOCK:
-        ledSetRGB(ORANGE_LED);
         if (hasLock())
         {
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
@@ -250,28 +289,23 @@ static void stateTransition(xTimerHandle timer)
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
         if (!chargedForTakeoff())
         {
-            ledSetRGB(RED_LED);
             // do nothing, wait for the battery to be charged
         }
         else if (needMoreTakeoffQueuedCopters(state))
         {
             DEBUG_PRINT("More copters needed, entering queue...\n");
             state = STATE_QUEUED_FOR_TAKE_OFF;
-            ledSetRGB(ORANGE_LED);
         }
         break;
     case STATE_QUEUED_FOR_TAKE_OFF:
-        ledSetRGB(ORANGE_LED);
         if (!chargedForTakeoff())
         {
             state = STATE_WAIT_FOR_TAKE_OFF;
-            ledSetRGB(RED_LED);
         }
         else if (needLessTakeoffQueuedCopters(state))
         {
             DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
             state = STATE_WAIT_FOR_TAKE_OFF;
-            ledSetRGB(RED_LED);
         }
         else if (needMoreCopters(state))
         {
@@ -280,12 +314,10 @@ static void stateTransition(xTimerHandle timer)
             {
                 random_time_for_next_event_ms = get_next_random_timeout(now_ms);
                 state = STATE_PREPARING_FOR_TAKE_OFF;
-                ledSetRGB(ORANGE_LED);
             }
         }
         break;
     case STATE_PREPARING_FOR_TAKE_OFF:
-        ledSetRGB(ORANGE_LED);
         supervisorRequestArming(true); // since copters flying above can delay take-off a lot, make sure we remain armed
         if (!needMoreCopters(state))
         {
@@ -293,7 +325,6 @@ static void stateTransition(xTimerHandle timer)
             if (supervisorRequestArming(false))
             {
                 state = STATE_WAIT_FOR_TAKE_OFF;
-                ledSetRGB(RED_LED);
             }
         }
         else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove(my_pos))
@@ -301,11 +332,9 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
             state = STATE_TAKING_OFF;
-            ledSetRGB(GREEN_LED);
         }
         break;
     case STATE_TAKING_OFF:
-        ledSetRGB(GREEN_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Hovering, waiting for command to start\n");
@@ -314,7 +343,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_HOVERING:
-        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (needMoreLandingQueuedCopters(state))
         {
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
@@ -339,7 +367,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_GOING_TO_TRAJECTORY_START:
-        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached trajectory start\n");
@@ -349,7 +376,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_EXECUTING_TRAJECTORY:
-        ledSetColorFromXYZ(BLUE_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Finished trajectory execution\n");
@@ -358,7 +384,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_GOING_TO_RANDOM_POINT:
-        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached next waypoint\n");
@@ -366,7 +391,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_PREPARING_FOR_LAND:
-        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (needLessLandingQueuedCopters(state))
         { // another copter landed , no need to land after all
             DEBUG_PRINT("Another copter landed, no need to land finally\n");
@@ -380,7 +404,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_GOING_TO_PAD:
-        ledSetColorFromXYZ(getX(), getY(), getZ());
         if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Over pad,starting lowering\n");
@@ -390,7 +413,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_LANDING:
-        ledSetRGB(RED_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             // if (outOfBounds(my_pos))
@@ -409,7 +431,6 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CHECK_CHARGING:
-        ledSetRGB(RED_LED);
         if (now_ms > landingTimeCheckCharge_ms)
         {
             DEBUG_PRINT("isCharging: %d\n", isCharging());
@@ -452,6 +473,13 @@ static void stateTransition(xTimerHandle timer)
 
     default:
         break;
+    }
+
+    // Update LED: white flash if in blink window, otherwise state-based color
+    if (led_blink_active) {
+        ledSetRGB(0xFF, 0xFF, 0xFF);  // White flash for sync test
+    } else {
+        updateLedForState();
     }
 }
 
