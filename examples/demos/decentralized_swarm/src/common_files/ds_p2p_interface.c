@@ -41,6 +41,7 @@ copter_full_state_t copters[MAX_ADDRESS];
 
 // Higher level control
 static uint8_t desiredFlyingCopters = INITIAL_DESIRED_FLYING_COPTERS;
+static uint8_t forceTakeoff = INITIAL_FORCE_TAKEOFF;
 static bool isControlDataSetYet = false;
 static int32_t controlDataTimeMs = 0;  // Valid if isControlDataSetYet == true
 
@@ -86,6 +87,7 @@ static void p2pcallbackHandler(P2PPacket *p) {
         if ( ! isControlDataSetYet || newControlDataTimeMs > controlDataTimeMs) {
             controlDataTimeMs = newControlDataTimeMs;
             desiredFlyingCopters = rxMessage.desiredFlyingCopters;
+            forceTakeoff = rxMessage.forceTakeoff;
             isControlDataSetYet = true;
         }
     }
@@ -130,6 +132,7 @@ void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
     txMessage.isControlDataValid = isControlDataSetYet;
     if (isControlDataSetYet) {
         txMessage.desiredFlyingCopters = desiredFlyingCopters;
+        txMessage.forceTakeoff = forceTakeoff;
         txMessage.ageOfControlDataMs = nowMs - controlDataTimeMs;
     }
 
@@ -312,6 +315,16 @@ uint8_t getDesiredFlyingCopters() {
 
 void setDesiredFlyingCopters(uint8_t desired) {
     desiredFlyingCopters = desired;
+    isControlDataSetYet = true;
+    controlDataTimeMs = T2M(xTaskGetTickCount());
+}
+
+bool isForceTakeoffEnabled() {
+    return forceTakeoff != 0;
+}
+
+void setForceTakeoff(uint8_t force) {
+    forceTakeoff = force;
     isControlDataSetYet = true;
     controlDataTimeMs = T2M(xTaskGetTickCount());
 }

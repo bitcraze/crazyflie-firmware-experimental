@@ -174,6 +174,7 @@ class SnifferInterface:
             "less": self.less,
             "zero": self.zero,
             "all": self.all,
+            "force_takeoff": self.toggle_force_takeoff,
         }
 
         try:
@@ -201,6 +202,9 @@ class SnifferInterface:
 
     def all(self):
         self.cf.param.set_value('app.all', 1)
+
+    def toggle_force_takeoff(self):
+        self.cf.param.set_value('app.forceTakeoff', 1)
 
 class snifferThread(threading.Thread):
     def __init__(self, *args, **kwargs):

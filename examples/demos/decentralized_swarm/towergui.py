@@ -162,6 +162,17 @@ class ButtonsFrame(ttk.Frame):
 
         self.more_button.grid(row=0, column=2, padx=self.PADX, pady=self.PADY)
 
+        # Force takeoff checkbox
+        self.force_takeoff_var = tk.BooleanVar()
+        self.force_takeoff_check = tk.Checkbutton(
+            buttons_frame,
+            text="Force all drones to take-off",
+            variable=self.force_takeoff_var,
+            command=self.toggle_force_takeoff,
+            font=("ubuntu", 12)
+        )
+        self.force_takeoff_check.grid(row=1, column=0, columnspan=3, pady=(self.PADY, 0))
+
         # insert buttons frame in the content
         buttons_frame.grid(row=3 + 1, column=0, columnspan=3)
 
@@ -189,6 +200,9 @@ class ButtonsFrame(ttk.Frame):
 
     def all_copters(self):
         self._send_command("all")
+
+    def toggle_force_takeoff(self):
+        self._send_command("force_takeoff")
 
 
 sniffer_thread = snifferThread()

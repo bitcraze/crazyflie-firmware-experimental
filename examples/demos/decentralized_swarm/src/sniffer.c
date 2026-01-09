@@ -104,6 +104,13 @@ static void allCopters() {
     broadcastDesiredFlyingCopters(255);
 }
 
+static uint8_t forceTakeoffVal;
+static void toggleForceTakeoff() {
+    uint8_t current = isForceTakeoffEnabled() ? 0 : 1;
+    setForceTakeoff(current);
+    endBroadcastTime = T2M(xTaskGetTickCount()) + 1000;
+}
+
 void appMain()
 {
     DEBUG_PRINT("Running Decentralized swarm sniffer ...\n");
@@ -126,6 +133,7 @@ PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, more, &moreCoptersVal, &moreCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, less, &lessCoptersVal, &lessCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, zero, &zeroCoptersVal, &zeroCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, all, &allCoptersVal, &allCopters)
+PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, forceTakeoff, &forceTakeoffVal, &toggleForceTakeoff)
 PARAM_GROUP_STOP(app)
 
 

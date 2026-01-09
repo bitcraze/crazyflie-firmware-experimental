@@ -128,6 +128,9 @@ bool hasLock() {
 }
 
 bool chargedForTakeoff() {
+  if (isForceTakeoffEnabled()) {
+    return !isBatLow();
+  }
   return getVoltage() > CHARGED_FOR_TAKEOFF_VOLTAGE;
 }
 
