@@ -55,6 +55,7 @@
 #include "common.h"
 #include "param_log_interface.h"
 #include "movement.h"
+#include "trajectory_lut.h"
 #include "led_control.h"
 
 #define DEBUG_MODULE "P2P"
@@ -657,6 +658,7 @@ void appMain()
     initCollisionAvoidance();
     enableHighlevelCommander();
     defineTrajectory();
+    initializeTrajectoryLUT(); // Initialize trajectory lookup table for predictive collision avoidance
 
     previous[0] = 0.0f;
     previous[1] = 0.0f;

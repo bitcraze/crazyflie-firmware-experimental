@@ -237,3 +237,12 @@ void defineTrajectory() {
   crtpCommanderHighLevelWriteTrajectory(0, sizeof(sequence), (uint8_t*)sequence);
   crtpCommanderHighLevelDefineTrajectory(traj_id, CRTP_CHL_TRAJECTORY_TYPE_POLY4D, 0, polyCount);
 }
+
+// Accessor functions for trajectory LUT
+struct poly4d* getTrajectorySequence() {
+  return sequence;
+}
+
+uint8_t getTrajectoryTimescale() {
+  return trajectory_timescale;
+}

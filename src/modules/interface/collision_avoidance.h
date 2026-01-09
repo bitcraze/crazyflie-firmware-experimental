@@ -129,6 +129,7 @@ typedef struct collision_avoidance_state_s
 //   setpoint: Setpoint from commander that will be mutated.
 //   sensorData: Not currently used, but kept for API similarity with sitAw.
 //   state: Current state estimate.
+//   bufferMultipliers: Optional array of buffer multipliers for each position (NULL for default 1.0).
 //
 void collisionAvoidanceUpdateSetpointCore(
   collision_avoidance_params_t const *params,
@@ -136,7 +137,8 @@ void collisionAvoidanceUpdateSetpointCore(
   int nOthers,
   float const *otherPositions,
   float *workspace,
-  setpoint_t *setpoint, sensorData_t const *sensorData, state_t const *state);
+  setpoint_t *setpoint, sensorData_t const *sensorData, state_t const *state,
+  float const *bufferMultipliers);
 
 // For ease of use, in a firmware build we include this wrapper that handles
 // the interaction with peer_localization and gets all parameter values via the

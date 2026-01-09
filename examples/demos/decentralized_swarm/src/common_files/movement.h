@@ -71,4 +71,8 @@ void defineTrajectory();
 
 uint32_t getTrajectoryDurationMs();
 
+// Get access to the trajectory sequence for LUT initialization
+struct poly4d* getTrajectorySequence();
+uint8_t getTrajectoryTimescale();
+
 #endif // MOVEMENT_H

@@ -100,7 +100,8 @@ void collisionAvoidanceUpdateSetpointCore(
   int nOthers,
   float const *otherPositions,
   float *workspace,
-  setpoint_t *setpoint, sensorData_t const *sensorData, state_t const *state)
+  setpoint_t *setpoint, sensorData_t const *sensorData, state_t const *state,
+  float const *bufferMultipliers)
 {
   //
   // Part 1: Construct the polytope inequalities in A, b.
@@ -124,7 +125,12 @@ void collisionAvoidanceUpdateSetpointCore(
     struct vec const toPeerStretched = veltmul(vsub(peerPos, ourPos), radiiInv);
     float const dist = vmag(toPeerStretched);
     struct vec const a = vdiv(veltmul(toPeerStretched, radiiInv), dist);
-    float const b = dist / 2.0f - 1.0f;
+
+    // Use per-position buffer multiplier (1.0 for normal, SPIRAL_BUFFER_MULTIPLIER for predictions)
+    // The bufferMultipliers array is populated by collisionAvoidanceUpdateSetpoint()
+    float buffer = (bufferMultipliers != NULL) ? bufferMultipliers[i] : 1.0f;
+    float const b = dist / 2.0f - buffer;
+
     float scale = 1.0f / vmag(a);
     vstoref(vscl(scale, a), A + 3 * i);
     B[i] = scale * b;
@@ -267,6 +273,11 @@ void collisionAvoidanceUpdateSetpointCore(
 #include "param.h"
 #include "log.h"
 
+// Trajectory LUT for predictive collision avoidance
+#include "trajectory_lut.h"
+#include "ds_p2p_interface.h"
+#include "settings.h"
+
 
 static uint8_t collisionAvoidanceEnable = 0;
 
@@ -299,11 +310,16 @@ bool collisionAvoidanceTest()
 // The algorithm for projecting a point into a convex polytope requires 3 more
 // floats of working space per face. The six extra faces come from the overall
 // flight area bounding box.
-#define MAX_CELL_ROWS (PEER_LOCALIZATION_MAX_NEIGHBORS + 6)
+// Additional space for predicted trajectory positions (up to 20 predictions per drone)
+#define MAX_TRAJECTORY_PREDICTIONS 20
+#define MAX_CELL_ROWS (PEER_LOCALIZATION_MAX_NEIGHBORS + MAX_TRAJECTORY_PREDICTIONS + 6)
 static float workspace[7 * MAX_CELL_ROWS];
 
 // Latency counter for logging.
 static uint32_t latency = 0;
+
+// Buffer multipliers for each position (1.0 = normal, SPIRAL_BUFFER_MULTIPLIER for predictions)
+static float bufferMultipliers[MAX_CELL_ROWS];
 
 void collisionAvoidanceUpdateSetpoint(
   setpoint_t *setpoint, sensorData_t const *sensorData, state_t const *state, stabilizerStep_t stabilizerStep)
@@ -333,10 +349,44 @@ void collisionAvoidanceUpdateSetpoint(
     workspace[3 * nOthers + 0] = otherPos->pos.x;
     workspace[3 * nOthers + 1] = otherPos->pos.y;
     workspace[3 * nOthers + 2] = otherPos->pos.z;
+    bufferMultipliers[nOthers] = 1.0f; // Normal buffer for actual positions
     ++nOthers;
   }
 
-  collisionAvoidanceUpdateSetpointCore(&params, &collisionState, nOthers, workspace, workspace, setpoint, sensorData, state);
+  // Add predicted positions for drones executing trajectories
+  for (int i = 0; i < PEER_LOCALIZATION_MAX_NEIGHBORS; ++i) {
+    peerLocalizationOtherPosition_t const *otherPos = peerLocalizationGetPositionByIdx(i);
+
+    if (otherPos == NULL || otherPos->id == 0) {
+      continue;
+    }
+
+    // Check if this peer is executing a trajectory
+    if (isPeerExecutingTrajectory(otherPos->id)) {
+      // Get predicted positions from LUT
+      TrajectoryPosition predictions[MAX_TRAJECTORY_PREDICTIONS];
+      int prediction_count = 0;
+
+      float t_elapsed = getElapsedTrajectoryTime(otherPos->id);
+      if (getTrajectoryPredictedPositions(t_elapsed, predictions, MAX_TRAJECTORY_PREDICTIONS, &prediction_count)) {
+        // Add each predicted position as a separate constraint
+        for (int j = 0; j < prediction_count; ++j) {
+          if (nOthers >= MAX_CELL_ROWS - 6) {
+            // Out of space in workspace array
+            break;
+          }
+
+          workspace[3 * nOthers + 0] = predictions[j].x;
+          workspace[3 * nOthers + 1] = predictions[j].y;
+          workspace[3 * nOthers + 2] = predictions[j].z;
+          bufferMultipliers[nOthers] = SPIRAL_BUFFER_MULTIPLIER; // Larger buffer for predictions
+          ++nOthers;
+        }
+      }
+    }
+  }
+
+  collisionAvoidanceUpdateSetpointCore(&params, &collisionState, nOthers, workspace, workspace, setpoint, sensorData, state, bufferMultipliers);
 
   latency = xTaskGetTickCount() - time;
 }

@@ -131,6 +131,10 @@
 #define COLLISION_AVOIDANCE_HORIZON 1.0f //horizon of the ellipsoid used to avoid collisions
 #define COLLISION_AVOIDANCE_MAX_VELOCITY 0.2f //maximum velocity to avoid collisions
 
+// Buffer multiplier for spiraling drones (how much extra space to give them)
+// In stretched coordinate space: 1.0 = normal buffer (~0.3m), 2.0 = double buffer (~0.6m)
+#define SPIRAL_BUFFER_MULTIPLIER 2.0f
+
 #define COLLISION_AVOIDANCE_BBOX_MIN_X  MIN_X_BOX
 #define COLLISION_AVOIDANCE_BBOX_MAX_X  MAX_X_BOX
 

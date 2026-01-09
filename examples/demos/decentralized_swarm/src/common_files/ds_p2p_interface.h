@@ -122,6 +122,10 @@ void setForceTakeoff(uint8_t force);
 uint32_t getGlobalTime();
 int32_t getMedianClockOffset();
 
+// Trajectory query functions
+bool isPeerExecutingTrajectory(uint8_t peer_id);
+float getElapsedTrajectoryTime(uint8_t peer_id);
+
 // External access to peer states
 extern copter_full_state_t copters[MAX_ADDRESS];
 

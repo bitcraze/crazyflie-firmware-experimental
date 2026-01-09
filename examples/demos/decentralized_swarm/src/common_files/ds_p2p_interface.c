@@ -380,3 +380,32 @@ add_copter_log(9)
 LOG_GROUP_START(ds)
 LOG_ADD(LOG_UINT8, desired, &desiredFlyingCopters)
 LOG_GROUP_STOP(ds)
+
+// Trajectory query functions
+bool isPeerExecutingTrajectory(uint8_t peer_id) {
+    if (peer_id < 1 || peer_id >= MAX_ADDRESS) {
+        return false;
+    }
+    return copters[peer_id].trajectory_slot != 0;
+}
+
+float getElapsedTrajectoryTime(uint8_t peer_id) {
+    if (peer_id < 1 || peer_id >= MAX_ADDRESS) {
+        return 0.0f;
+    }
+
+    if (!isPeerExecutingTrajectory(peer_id)) {
+        return 0.0f;
+    }
+
+    uint32_t start_time = copters[peer_id].trajectory_start_time_global;
+    uint32_t current_time = getGlobalTime();
+
+    // Handle wraparound case
+    if (current_time < start_time) {
+        return 0.0f;
+    }
+
+    // Convert milliseconds to seconds
+    return (current_time - start_time) / 1000.0f;
+}
