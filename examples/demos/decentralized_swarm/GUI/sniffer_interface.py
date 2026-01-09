@@ -217,7 +217,7 @@ class snifferThread(threading.Thread):
         self._stop_thread.set()
 
     def stopped(self):
-        return self._stop_thread.isSet()
+        return self._stop_thread.is_set()
 
     def run(self):
         cflib.crtp.init_drivers(enable_debug_driver=False)
