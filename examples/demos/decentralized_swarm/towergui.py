@@ -166,7 +166,7 @@ class ButtonsFrame(ttk.Frame):
         self.force_takeoff_var = tk.BooleanVar()
         self.force_takeoff_check = tk.Checkbutton(
             buttons_frame,
-            text="Force all drones to take-off",
+            text="Bypass battery charge requirement",
             variable=self.force_takeoff_var,
             command=self.toggle_force_takeoff,
             font=("ubuntu", 12)
