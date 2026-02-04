@@ -9,6 +9,9 @@ You'll need to use either the [Crazyflie VM](https://github.com/bitcraze/bitcraz
 [the toolbelt](https://github.com/bitcraze/toolbelt) or
 install some ARM toolchain.
 
+There is also experimental support for [building with nix](./nix.md).
+This allows to build the firmware in a reproducable way.
+
 ### Install a toolchain
 
 #### Toolchain and compiler version policy
@@ -22,9 +25,10 @@ $ sudo apt-get install make gcc-arm-none-eabi
 ```
 
 ##### macOS
+The required toolchain on macOS can be installed using [homebrew](https://brew.sh/)
+
 ```
-$ brew tap PX4/homebrew-px4
-$ brew install gcc-arm-none-eabi
+$ brew install gcc-arm-embedded
 ```
 
 ##### Windows
@@ -155,15 +159,15 @@ bindings_python : Build the python bindings for firmware wrappers
 
 ### Noteable Kbuild targets
 ```
-menuconfig      : Open up a terminal user interface to set configuration options
-defconfig       : Generate a `.config` with the default configuration options
-cf2_defconfig   : Merge configuration options from `configs/cf2_defconfig` with default
-cf21bl_defconfig: Merge configuration options from `configs/cf21bl_defconfig` with default
-tag_defconfig   : Merge configuration options from `configs/tag_defconfig` with default
-bolt_defconfig   : Merge configuration options from `configs/bolt_defconfig` with default
-allyesconfig    : Generate a `.config` with the all configuration options enabled
-allnoconfig     : Generate a `.config` with the all configuration options disabled
-randconfig      : Generate a `.config` with random valid values to all configuration options
+menuconfig         : Open up a terminal user interface to set configuration options
+defconfig          : Generate a `.config` with the default configuration options
+cf2_defconfig      : Merge configuration options from `configs/cf2_defconfig` with default
+cf21bl_defconfig   : Merge configuration options from `configs/cf21bl_defconfig` with default
+tag_defconfig      : Merge configuration options from `configs/tag_defconfig` with default
+bolt_defconfig     : Merge configuration options from `configs/bolt_defconfig` with default
+allyesconfig       : Generate a `.config` with the all configuration options enabled
+allnoconfig        : Generate a `.config` with the all configuration options disabled
+randconfig         : Generate a `.config` with random valid values to all configuration options
 ```
 
 ## Flashing
@@ -175,7 +179,7 @@ The supported way to flash when developping for the Crazyflie is to use the Craz
 
 #### Prerequisites
 * A Crazyradio with drivers installed
-* [Crazyflie Client installed](https://github.com/bitcraze/crazyflie-clients-python) with Python's pip (so not by Snap (Ubuntu) or the .exe (Windows))
+* [Crazyflie Client](https://github.com/bitcraze/crazyflie-clients-python) installed in a Python virtual environment, either via pip or by cloning from source.
   * Note than when developping in WSL on Windows, the client needs to be installed on Windows. See the [Windows build instruction](#windows) above.
 * The firmware has been built
 * The current working directory is the root of the crazyflie-firmware project
@@ -192,13 +196,13 @@ $ make cload
 
 It will try to find a Crazyflie in bootloader mode and flash the binary to it.
 
-Warning: if multiple Crazyflies within range are in bootloader mode the result is unpredictable. This method is not suitable in classroom situation where it is likely that several students are flashing at the same time. Also remember that the Crazyradio PA often reaches into the next room.
+Warning: if multiple Crazyflies within range are in bootloader mode the result is unpredictable. This method is not suitable in classroom situation where it is likely that several students are flashing at the same time. Also remember that the Crazyradio often reaches into the next room.
 
 #### Automatically enter bootloader mode
 * Make sure the Crazyflie is on
 * In your terminal, run `CLOAD_CMDS="-w [CRAZYFLIE_URI]" make cload`
-* or run `cfloader flash build/cf2.bin stm32-fw -w [CRAZYFLIE_URI]`
-with [CRAZYFLIE_URI] being the uri of the crazyflie.
+* or run `cfloader flash build/[BINARY_FILE] stm32-fw -w [CRAZYFLIE_URI]`
+with [BINARY_FILE] being the binary file (**cf2.bin** for Crazyflie 2.x, **cf21bl.bin** for Crazyflie 2.1 Brushless etc.) and [CRAZYFLIE_URI] being the uri of the Crazyflie.
 
 It will connect to the Crazyflie with the specified address, put it in bootloader mode and flash the binary. This method is suitable for classroom situations.
 

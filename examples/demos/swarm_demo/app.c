@@ -448,7 +448,7 @@ static void appTimer(xTimerHandle timer) {
       start_trajectory=0;
       DEBUG_PRINT("Starting traj of id: %d with remain traj: %d\n", latestTrajectoryId ,remainingTrajectories);
 
-      start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false);
+      start_trajectory_result = crtpCommanderHighLevelStartTrajectory(latestTrajectoryId, SEQUENCE_SPEED, false, false, false);
       prevTrajectoryId = latestTrajectoryId; 
       state = STATE_RUNNING_TRAJECTORY;
       

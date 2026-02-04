@@ -192,7 +192,7 @@ void startTrajectory(Position my_pos){
 	DEBUG_PRINT("Starting trajectory with duration %f\n", (double) duration);
 
   const bool relative = true;
-	crtpCommanderHighLevelStartTrajectory(traj_id, timescale, relative, false);
+	crtpCommanderHighLevelStartTrajectory(traj_id, timescale, relative, false, false);
 }
 
 

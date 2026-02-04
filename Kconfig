@@ -48,13 +48,6 @@ config DEBUG_PRINT_ON_UART1_BAUDRATE
       Set the baudrate of the debug output   
 
 
-config DEBUG_DECK_IGNORE_OW
-    bool "Do not enumerate OW based expansion decks"
-    default n
-    help
-      Do not enumerate decks discovered by OneWire memory. This might be useful
-      if one deck memory is very wrong. One could use the Crazyflie as a
-      passive onewire memory writer.
 
 endmenu
 
@@ -89,6 +82,59 @@ config PLATFORM_FLAPPER
     select SENSORS_BMI088_SPI
 
 endchoice
+
+config ENABLE_THRUST_BAT_COMPENSATED
+    bool "Enable battery thrust compensation"
+    depends on PLATFORM_CF2 || PLATFORM_CF21BL
+    default y
+    help
+        Compensate thrust depending on battery voltage so it will produce about the same
+        amount of thrust independent of the battery voltage.
+        The compensation is based on thrust measurements, which are only valid for the specific type.
+        If you are using a Crazyflie 2.X platform, please select your platform setup.
+
+choice
+    prompt "Crazyflie 2.X platform setup"
+    depends on PLATFORM_CF2 && ENABLE_THRUST_BAT_COMPENSATED
+    default CRAZYFLIE_21_PLUS
+    help
+        Select your Crazyflie 2.X platform setup.
+        Thrust compensation will be applied based on the selected setup.
+
+config CRAZYFLIE_LEGACY_PROPELLERS
+    bool "Legacy Propellers"
+
+config CRAZYFLIE_21_PLUS
+    bool "2.1+ Propellers"
+
+config CRAZYFLIE_THRUST_UPGRADE_KIT
+    bool "Thrust Upgrade Kit"
+
+endchoice
+
+config THRUST_BAT_COMPENSATION_MAX_THRUST
+    int "Maximum thrust per motor in (mN)."
+    depends on PLATFORM_CF21BL && ENABLE_THRUST_BAT_COMPENSATED
+    range 150 250
+    default 200
+    help
+        The maximum thrust is a trade-off between consistency of thrust over all battery levels and maximum performance
+        with a full battery. Increase this value at your own risk. Note that the entered value is in milliNewtons.
+
+config MODIFY_CF_MASS
+    bool "Modify the default mass"
+    default n
+    help
+        Currently, the mass of the platform is only used by these non-default
+        controllers: Mellinger, Brescianini and Lee. If you are not using
+        one of these controllers, modifying the mass has no impact on the flight.
+    
+config MODIFIED_CF_MASS
+    int "Enter the total mass of the platform in milligrams"
+    depends on MODIFY_CF_MASS
+    default 29000 if PLATFORM_CF2
+    default 39300 if PLATFORM_CF21BL
+    default 29000
 
 config BOLT11_BRUSHED
     bool "Bolt 1.1: Use brushed motor driver (HW mod required)"
@@ -198,13 +244,13 @@ endmenu
 
 menu "Expansion deck configuration"
 
-config DECK_FORCE
-    string "Force load specified custom deck driver"
-    default "none"
-    help
-        A colon seperated list of custom drivers to force load or "none".
+menu "Deck discovery backends"
+    source "src/deck/backends/Kconfig"
+endmenu
 
-source src/deck/drivers/src/Kconfig
+menu "Deck drivers"
+    source "src/deck/drivers/src/Kconfig"
+endmenu
 
 endmenu
 

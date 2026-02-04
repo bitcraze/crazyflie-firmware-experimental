@@ -220,7 +220,6 @@ int crtpCommanderHighLevelGoTo2(const float x, const float y, const float z, con
  * @param dz          altitude gain (m), positive to climb, negative to descent
  * @param duration_s  time it should take to reach the end of the spiral (s)
  * @param sideways    true if crazyflie should spiral sideways instead of forward
- * @param clockwise   true if crazyflie should spiral clockwise instead of counter-clockwise
  * @return zero if the command succeeded, an error code otherwise
  */
 int crtpCommanderHighLevelSpiral(const float phi, const float r0, const float rf, const float dz, const float duration_s, const bool sideways);
@@ -235,15 +234,16 @@ bool crtpCommanderHighLevelIsTrajectoryDefined(uint8_t trajectoryId);
 /**
  * @brief starts executing a specified trajectory
  *
- * @param trajectoryId id of the trajectory (previously defined by define_trajectory)
- * @param timeScale    time factor; 1.0 = original speed;
- *                                  >1.0: slower;
- *                                  <1.0: faster
- * @param relative     set to True, if trajectory should be shifted to current setpoint
- * @param reversed     set to True, if trajectory should be executed in reverse
- * @return zero if the command succeeded, an error code otherwise
+ * @param trajectoryId     id of the trajectory (previously defined by define_trajectory)
+ * @param timeScale        time factor; 1.0 = original speed;
+ *                                      >1.0: slower;
+ *                                      <1.0: faster
+ * @param relativePosition set to True, if trajectory should be shifted to current setpoint
+ * @param relativeYaw      set to True, if trajectory should be aligned to current yaw
+ * @param reversed         set to True, if trajectory should be executed in reverse
+ * @return                 zero if the command succeeded, an error code otherwise
  */
-int crtpCommanderHighLevelStartTrajectory(const uint8_t trajectoryId, const float timeScale, const bool relative, const bool reversed);
+int crtpCommanderHighLevelStartTrajectory(const uint8_t trajectoryId, const float timeScale, const bool relativePosition, const bool relativeYaw, const bool reversed);
 
 /**
  * @brief Define a trajectory that has previously been uploaded to memory.
@@ -269,7 +269,7 @@ uint32_t crtpCommanderHighLevelTrajectoryMemSize();
  *
  * @param offset    offset in uploaded memory (bytes)
  * @param length    Length of the data (bytes) to copy to the trajectory memory
- * @param data[in]  pointer to the trajectory data source
+ * @param data  pointer to the trajectory data source
  *
  * @return true   If data was copied
  * @return false  If data is too large
@@ -294,5 +294,14 @@ bool crtpCommanderHighLevelReadTrajectory(const uint32_t offset, const uint32_t 
  * @return false  The trejectory is still running
  */
 bool crtpCommanderHighLevelIsTrajectoryFinished();
+
+
+/**
+ * @brief Query the current state of the planner in high level control
+ *
+ * @return trajectory state enum defined in planner.h
+ */
+
+enum trajectory_state crtpCommanderHighLevelGetPlannerState();
 
 #endif /* CRTP_COMMANDER_HIGH_LEVEL_H_ */

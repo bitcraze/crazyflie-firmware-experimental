@@ -85,6 +85,13 @@ config DECK_BIGQUAD_ENABLE_PM
     bool "Enable Bigquad deck PM"
     default n
 
+config DECK_BIGQUAD_ENABLE_CPPM
+    depends on DECK_BIGQUAD
+    bool "Enable Bigquad deck CPPM"
+    default n
+    help
+      This enables external CPPM input.
+
 config DECK_BUZZ
     bool "Support the Buzzer deck"
     default y
@@ -302,6 +309,7 @@ config DECK_LOCO
   config DECK_LOCO_NR_OF_ANCHORS
   int "The number of anchors in use"
   default 8
+  range 4 8
   depends on DECK_LOCO
   help
       The number of anchors in your Loco setup. See documentation on
@@ -494,9 +502,18 @@ config DECK_LOADCELL
     default n
     help
         Enables the support for the NAU7802 loadcell.
-      
-config DECK_HPRGBW
-  bool "Support for High Powered RGBW LED deck"
-  default n
-  help
-      Enables the support for High Powered RGBW LED deck.
+  
+config DECK_DECKCTRL_DEVBOARD
+    depends on DECK_BACKEND_DECKCTRL
+    bool "Support for the deckctrl devboard deck"
+    default n
+    help
+        Enables the support for the deckctrl devboard deck.
+        This deck is used for the deckctrl development.
+
+config DECK_COLORLED
+    depends on DECK_BACKEND_DECKCTRL
+    bool "Support for Color LED deck"
+    default y
+    help
+        Enables the support for Color LED deck.

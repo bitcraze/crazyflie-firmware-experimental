@@ -54,8 +54,32 @@
     #define ARM_LENGTH  0.046f
 #endif
 #ifndef CF_MASS
-    // kg
-    #define CF_MASS     0.027f
+    #if defined(CONFIG_MODIFY_CF_MASS) && defined(CONFIG_MODIFIED_CF_MASS) && (CONFIG_MODIFIED_CF_MASS >= 0)
+        #define CF_MASS (CONFIG_MODIFIED_CF_MASS / 1000000.0f)
+    #else
+        #define CF_MASS    0.029f
+    #endif
+#endif
+#ifndef VMOTOR2THRUST0
+    #define VMOTOR2THRUST0  0.0f
+#endif
+#ifndef VMOTOR2THRUST1
+    #define VMOTOR2THRUST1  0.0f
+#endif
+#ifndef VMOTOR2THRUST2
+    #define VMOTOR2THRUST2  0.0f
+#endif
+#ifndef VMOTOR2THRUST3
+    #define VMOTOR2THRUST3  0.0f
+#endif
+#ifndef THRUST_MIN
+    #define THRUST_MIN      0.02f
+#endif
+#ifndef THRUST_MAX
+    #define THRUST_MAX      0.1125f
+#endif
+#ifndef THRUST2TORQUE
+    #define THRUST2TORQUE   0.005964552f
 #endif
 
 // IMU alignment on the airframe 
@@ -186,3 +210,17 @@
 #endif
 
 
+// This is the threshold for a propeller/motor to pass. It calculates the
+// variance of the accelerometer X+Y when the propeller is spinning.
+#ifndef HEALTH_PROPELLER_TEST_THRESHOLD
+    #define HEALTH_PROPELLER_TEST_THRESHOLD  0.0f
+#endif
+
+// For safety, when the BigQuad deck is enabled, the user should
+// know when the platform is ready to fly.
+#ifdef CONFIG_DECK_BIGQUAD
+    #define CONFIG_MOTORS_REQUIRE_ARMING 1
+    #ifndef CONFIG_MOTORS_DEFAULT_IDLE_THRUST
+        #define CONFIG_MOTORS_DEFAULT_IDLE_THRUST 7000
+    #endif
+#endif

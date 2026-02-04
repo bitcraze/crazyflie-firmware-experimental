@@ -67,6 +67,15 @@ config ESTIMATOR_KALMAN_TDOA_OUTLIERFILTER_FALLBACK
     help
         Use the 'old' TDoA outlier filter instead of the default one. Deprecated, will be removed after September 2023.
 
+config ESTIMATOR_KALMAN_GENERAL_PURPOSE
+    bool "Configure the Kalman estimator for general purpose use"
+    default n
+    depends on ESTIMATOR_KALMAN_ENABLE
+    help
+        Configure the Kalman estimator for general purpose use and not for flying. In this mode the estimator will not
+        use any drone specific information for state estimation, this is useful when using the Crazyflie as a general
+        positioning tag (tracker).
+
 config ESTIMATOR_UKF_ENABLE
     bool "Enable error-state UKF estimator"
     select ESTIMATOR_OUTLIER_FILTERS
@@ -149,6 +158,21 @@ config MOTORS_DSHOT_PWM_600KHZ
 
 endchoice
 
+config MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+  bool "Enable bi-directional DSHOT (RPM measurements)"
+  depends on MOTORS_ESC_PROTOCOL_DSHOT
+  default y
+    help
+        This requires 300 kHz DHOT PWM to work with Bluejay ESC FW.
+        
+config MOTORS_NBR_OF_POLES
+  int "Number of poles on the brushless motors"
+  depends on MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+  range 2 24
+  default 12
+    help
+        This is used for RPM calculation and requires bi-directional DSHOT.
+
 config MOTORS_REQUIRE_ARMING
     bool "Require arming to be able to start motors and take off"
     default n
@@ -156,6 +180,15 @@ config MOTORS_REQUIRE_ARMING
         When enabled, system must be armed to be able to take off. Arming can
         be done in several ways, e.g. though cfclient or external transmitter.
 
+config MOTORS_DEFAULT_IDLE_THRUST
+    int "Idle thrust for the armed motors"
+    depends on MOTORS_REQUIRE_ARMING
+    range 0 15000
+    default 7000
+    help
+        Sets the baseline motor power level when they are armed. Setting this
+        value above 7000 may cause the platform to move unintentionally, while
+        setting it too low might not provide enough power to spin the motors.
 
 config MOTORS_DEFAULT_PROP_TEST_PWM_RATIO
     int "Override default PWM ratio to use during motor tests"
@@ -204,15 +237,6 @@ config POWER_DISTRIBUTION_FLAPPER_REVB
     default n
     help
         Power distribution function for Flapper Nimble+ with revB PCB
-
-config ENABLE_THRUST_BAT_COMPENSATED
-    bool "Enable battery thrust compensation"
-    default y
-    help
-        Compensate thrust depending on battery voltage so it will produce about the same
-        amount of thrust independent of the battery voltage.
-        The compensation is based on thrust measurements, which are only valid for CF2.1 stock configuration.
-        Not applied for brushless motor setup.
 
 config LOG_MOTOR_CAP_WARNING
     bool "Log a warning if the motor thrust is capped"
