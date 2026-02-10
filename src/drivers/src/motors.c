@@ -25,6 +25,13 @@
  * motors.c - Motor driver
  *
  * This code mainly interfacing the PWM peripheral lib of ST.
+ * 
+ * Bidirectional DSHOT telemetry driver based on code from:
+ *     R. Busetto, E. Cereda, M. Forgione, G. Maroni, D. Piga, D. Palossi,
+ *     "Nonlinear System Identification Nano-drone Benchmark",
+ *     arXiv preprint arXiv:2512.14450, 2025. https://arxiv.org/abs/2512.14450
+ * If you find it useful for your research, academic citations are appreciated.
+ * 
  */
 #define DEBUG_MODULE "MTR-DRV"
 
@@ -51,10 +58,10 @@
 static uint8_t motorSetEnable = 0;
 static uint16_t motorPowerSet[] = {0, 0, 0, 0}; // user-requested PWM signals (overrides)
 static uint16_t motor_ratios[] = {0, 0, 0, 0};  // actual PWM signals
+static uint16_t timPolarity;
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static DMA_InitTypeDef DMA_InitStructureShare;
-static bool doResetESCs = true;
 // Memory buffer for DSHOT bits
 static uint32_t dshotDmaBuffer[NBR_OF_MOTORS][DSHOT_DMA_BUFFER_SIZE];
 static void motorsDshotSetup();
@@ -62,7 +69,7 @@ static void motorsDshotOutputSetup(int id);
 static volatile uint32_t dmaWait;
 
 #define DSHOT_TELEMETRY_INVALID         (UINT16_MAX)
-#define DSHOT_ERPM_INVALID              (UINT32_MAX)
+#define DSHOT_ERPM_INVALID              (UINT16_MAX)
 
 typedef enum {
   DSHOT_STATE_IDLE = 0,
@@ -81,7 +88,7 @@ static uint32_t dshotDmaInputBuffer[NBR_OF_MOTORS][DSHOT_TELEMETRY_MAX_GCR_EDGES
 static uint16_t dshotTelemetryPackets[NBR_OF_MOTORS] = {
   DSHOT_TELEMETRY_INVALID, DSHOT_TELEMETRY_INVALID, DSHOT_TELEMETRY_INVALID, DSHOT_TELEMETRY_INVALID
 };
-static uint32_t motorRPMs[NBR_OF_MOTORS] = {
+static uint16_t motorRPMs[NBR_OF_MOTORS] = {
   DSHOT_ERPM_INVALID, DSHOT_ERPM_INVALID, DSHOT_ERPM_INVALID, DSHOT_ERPM_INVALID
 };
 #endif
@@ -186,11 +193,11 @@ float motorsCompensateBatteryVoltage(uint32_t id, float iThrust, float supplyVol
   */
   if (supplyVoltage < 2.0f)
   {
-      return 0.0f; // iThrust;
-    }
+    return 0.0f;
+  }
 
   float thrust = (iThrust / 65535.0f) * THRUST_MAX; // rescaling integer thrust to N
-  if (thrust < THRUST_MIN)                          // Make sure sqrt function gets positive values
+  if (thrust < THRUST_MIN)                          // Make sure inversion is unique
   {
     return 0.0f;
   }
@@ -224,6 +231,7 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
   //Init structures
   GPIO_InitTypeDef GPIO_InitStructure;
   TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+  TIM_OCInitTypeDef  TIM_OCInitStructure;
 
   if (isInit)
   {
@@ -233,7 +241,9 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
 
   motorMap = motorMapSelect;
 
-  DEBUG_PRINT("Using %s motor driver\n", motorMap[0]->drvType == BRUSHED ? "brushed" : "brushless");
+  DEBUG_PRINT("Using %s motor driver: %s\n", 
+    motorMap[0]->drvType == BRUSHED ? "brushed" : "brushless", 
+    MOTORS_PROTOCOL_STRING);
 
   if (motorMap[MOTOR_M1]->hasPC15ESCReset)
   {
@@ -284,7 +294,23 @@ void motorsInit(const MotorPerifDef** motorMapSelect)
     TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
     TIM_TimeBaseInit(motorMap[i]->tim, &TIM_TimeBaseStructure);
 
-    TIM_ARRPreloadConfig(motorMap[i]->tim, DISABLE);
+    TIM_ARRPreloadConfig(motorMap[i]->tim, DISABLE); //TODO: Why?
+
+    timPolarity = motorMap[i]->timPolarity;
+  #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+      // For bidirectional DSHOT we need active high PWM
+      timPolarity = (timPolarity == TIM_OCPolarity_High) ? TIM_OCPolarity_Low : TIM_OCPolarity_High;
+  #endif
+    // PWM channels configuration (All identical!)
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_Pulse = 0;
+    TIM_OCInitStructure.TIM_OCPolarity = timPolarity;
+    TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
+
+    // Configure Output Compare for PWM
+    motorMap[i]->ocInit(motorMap[i]->tim, &TIM_OCInitStructure);
+    motorMap[i]->preloadConfig(motorMap[i]->tim, TIM_OCPreload_Enable);
 
     // Map timers to alternate functions
     MOTORS_GPIO_AF_CFG(motorMap[i]->gpioPort, motorMap[i]->gpioPinSource, motorMap[i]->gpioAF);
@@ -365,6 +391,20 @@ void motorsStop()
 #endif
 }
 
+void motorsResetESCs(void)
+{
+  // Due to complicated ESC startup behavior, it is best to have the DHOT output
+  // running when we release the reset so it doesn't enter bootloader mode so
+  // that it detects the DHOT signal correct (inverted or none-inverted). So we
+  // wait and do the reset first when the stabalizer task is running.
+  if (motorMap[0]->hasPC15ESCReset)
+  {
+    GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_RESET);
+    vTaskDelay(M2T(1));
+    GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_SET);
+  }
+}
+
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static void motorsDshotSetup()
 {
@@ -373,7 +413,7 @@ static void motorsDshotSetup()
   /* DMA clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
 
-  // Preparation of common things in DMA setup struct that will the same every time
+  // Preparation of common things in DMA setup struct that will be the same every time
   DMA_InitStructureShare.DMA_MemoryInc = DMA_MemoryInc_Enable;
   DMA_InitStructureShare.DMA_MemoryBurst = DMA_MemoryBurst_Single;
   DMA_InitStructureShare.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;
@@ -388,7 +428,7 @@ static void motorsDshotSetup()
   for (int i = 0; i < NBR_OF_MOTORS; i++)
   {
 #ifndef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-    motorsDshotOutputSetup(i);
+//    motorsDshotOutputSetup(i);
 #endif
     NVIC_InitStructure.NVIC_IRQChannel = motorMap[i]->DMA_IRQChannel;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = NVIC_MOTORS_PRI;
@@ -406,42 +446,25 @@ static void motorsDshotSetup()
 
 static void motorsDshotOutputSetup(int id)
 {
-  TIM_OCInitTypeDef TIM_OCInitStructure;
-
-  // Due to complicated ESC startup behavior, it is best to have the DHOT output
-  // running when we release the reset so it doesn't enter bootloader mode
-  // and that it detect the DHOT signal correct (inverted or none-inverted)
-  if (doResetESCs && motorMap[id]->hasPC15ESCReset) 
-  {
-      GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_RESET);
-      vTaskDelay(M2T(1));
-      GPIO_WriteBit(GPIOC, GPIO_Pin_15, Bit_SET);
-      doResetESCs = false;
-  }
 
   TIM_Cmd(motorMap[id]->tim, DISABLE);
   motorMap[id]->tim->ARR = motorMap[id]->timPeriod;
   motorMap[id]->tim->CNT = 0;
-  TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+  TIM_ClearITPendingBit(motorMap[id]->tim, TIM_IT_Update);
   TIM_ITConfig(motorMap[id]->tim, TIM_IT_Update, DISABLE);
   TIM_Cmd(motorMap[id]->tim, ENABLE);
 
-  uint16_t timPolarity = motorMap[id]->timPolarity;
-
-  #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-      // For bidirectional DSHOT we need active high PWM
-      timPolarity = (timPolarity == TIM_OCPolarity_High) ? TIM_OCPolarity_Low : TIM_OCPolarity_High;
-  #endif
-
+#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+  TIM_OCInitTypeDef TIM_OCInitStructure;
   TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;
   TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
   TIM_OCInitStructure.TIM_Pulse = 0;
   TIM_OCInitStructure.TIM_OCPolarity = timPolarity;
   TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
-
   // Configure Output Compare for PWM
   motorMap[id]->ocInit(motorMap[id]->tim, &TIM_OCInitStructure);
   motorMap[id]->preloadConfig(motorMap[id]->tim, TIM_OCPreload_Enable);
+#endif
 
   DMA_InitStructureShare.DMA_BufferSize = DSHOT_DMA_BUFFER_SIZE;
   DMA_InitStructureShare.DMA_DIR = DMA_DIR_MemoryToPeripheral;
@@ -456,19 +479,26 @@ static void motorsDshotInputSetup(int id)
 {
   dshotState[id] = DSHOT_STATE_INPUT;
 
-  bool timerIdle = true;
-  for (int i = 0; i < NBR_OF_MOTORS; i++) {
-    timerIdle &= (dshotState[i] == DSHOT_STATE_IDLE || dshotState[i] == DSHOT_STATE_INPUT);
+  if (dshotState[0] == DSHOT_STATE_INPUT &&
+      dshotState[2] == DSHOT_STATE_INPUT &&
+      dshotState[3] == DSHOT_STATE_INPUT) {
+    // Reconfigure timer for input capture when M1,M3 and M4 has sent their telemetry.
+    TIM_Cmd(motorMap[1]->tim, DISABLE);
+    motorMap[id]->tim->ARR = TIM_CLOCK_HZ / 10000; // 100us max interval
+    motorMap[id]->tim->CNT = 0;
+    // Special case for M2 to trigger interrupt after 100us to start its cycle.
+    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    TIM_ITConfig(motorMap[1]->tim, TIM_IT_Update, ENABLE);
+    TIM_Cmd(motorMap[1]->tim, ENABLE);
   }
 
-  if (timerIdle) {
-    TIM_Cmd(motorMap[id]->tim, DISABLE);
-    motorMap[id]->tim->ARR = TIM_CLOCK_HZ / 10000; // 100us max interval, TODO: compute based on DSHOT wait time + telemetry max time
-    motorMap[id]->tim->CNT = 0;
-    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-    TIM_ITConfig(motorMap[id]->tim, TIM_IT_Update, ENABLE);
-    TIM_Cmd(motorMap[id]->tim, ENABLE);
-  }
+  if (dshotState[1] == DSHOT_STATE_INPUT) {
+    // Reconfigure timer for input capture, without interrupt.
+    TIM_Cmd(motorMap[1]->tim, DISABLE);
+    motorMap[1]->tim->ARR = TIM_CLOCK_HZ / 10000; // 100us max interval
+    motorMap[1]->tim->CNT = 0;
+    TIM_Cmd(motorMap[1]->tim, ENABLE);
+   }
 
   TIM_ICInitTypeDef TIM_ICInitStructure;
   
@@ -486,10 +516,9 @@ static void motorsDshotInputSetup(int id)
   DMA_InitStructureShare.DMA_Memory0BaseAddr = (uint32_t)dshotDmaInputBuffer[id];
   DMA_InitStructureShare.DMA_Channel = motorMap[id]->DMA_Channel;
   DMA_Init(motorMap[id]->DMA_stream, &DMA_InitStructureShare);
-
-  motorMap[id]->DMA_stream->NDTR = DSHOT_TELEMETRY_MAX_GCR_EDGES;
-  /* Enable TIM DMA Requests M1*/
+  /* Enable TIM DMA Requests*/
   TIM_DMACmd(motorMap[id]->tim, motorMap[id]->TIM_DMASource, ENABLE);
+  DMA_ITConfig(motorMap[id]->DMA_stream, DMA_IT_TC, ENABLE);
   /* Enable DMA TIM Stream */
   DMA_Cmd(motorMap[id]->DMA_stream, ENABLE);
 }
@@ -541,7 +570,7 @@ static uint16_t dshotDecodeTelemetryPacket(const uint32_t *buffer, uint32_t gcrE
   return decodedValue >> 4;
 }
 
-static uint32_t dshotDecodeTelemetryERPM(uint16_t valueGCR)
+static uint16_t dshotDecodeTelemetryERPM(uint16_t valueGCR)
 {
   uint16_t period;
   uint16_t rpm;
@@ -572,6 +601,14 @@ static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
   uint16_t dshotRatio;
 
   ASSERT(id < NBR_OF_MOTORS);
+
+  // Stop any ongoing DMA transfer
+  DMA_Cmd(motorMap[id]->DMA_stream, DISABLE);  
+  // Wait for DMA to be free. Can happen at startup but doesn't seem to wait afterwards.
+  while(DMA_GetCmdStatus(motorMap[id]->DMA_stream) != DISABLE)
+  {
+    dmaWait++;
+  }
 
   // Scale 16 -> 11 bits
   dshotRatio = (ratio >> 5);
@@ -607,26 +644,6 @@ static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
   }
   dshotDmaBuffer[id][16] = 0; // Set to 0 gives low output afterwards
 
-#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  DMA_Cmd(motorMap[id]->DMA_stream, DISABLE);
-  TIM_DMACmd(motorMap[id]->tim, motorMap[id]->TIM_DMASource, DISABLE);
-#endif
-
-  // Wait for DMA to be free. Can happen at startup but doesn't seem to wait afterwards.
-  while(DMA_GetCmdStatus(motorMap[id]->DMA_stream) != DISABLE)
-  {
-    dmaWait++;
-  }
-  
-#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  uint32_t gcrEdges = DSHOT_TELEMETRY_MAX_GCR_EDGES - motorMap[id]->DMA_stream->NDTR;
-  if (gcrEdges > DSHOT_TELEMETRY_MIN_GCR_EDGES) {
-    dshotTelemetryPackets[id] = dshotDecodeTelemetryPacket(dshotDmaInputBuffer[id], gcrEdges);
-    motorRPMs[id] = dshotDecodeTelemetryERPM(dshotTelemetryPackets[id]);
-  }
-  DMA_ClearITPendingBit(motorMap[id]->DMA_stream, motorMap[id]->DMA_ITFlag_TC);
-  motorsDshotOutputSetup(id);
-#endif
 }
 
 /**
@@ -636,34 +653,43 @@ static void motorsPrepareDshot(uint32_t id, uint16_t ratio)
  */
 void motorsBurstDshot()
 {
-    dshotState[0] = DSHOT_STATE_OUTPUT;
-    motorMap[0]->DMA_stream->NDTR = DSHOT_DMA_BUFFER_SIZE;
-    /* Enable TIM DMA Requests M1*/
-    TIM_DMACmd(motorMap[0]->tim, motorMap[0]->TIM_DMASource, ENABLE);
-    DMA_ITConfig(motorMap[0]->DMA_stream, DMA_IT_TC, ENABLE);
-    /* Enable DMA TIM Stream */
-    DMA_Cmd(motorMap[0]->DMA_stream, ENABLE);
-    
-    motorMap[1]->DMA_stream->NDTR = DSHOT_DMA_BUFFER_SIZE;
-    /* Enable TIM DMA Requests M2*/
-    DMA_ITConfig(motorMap[1]->DMA_stream, DMA_IT_TC, ENABLE);
-    // TIM DMA Request and DMA stream for M2 will be started by M1 DMA IRQ handler
 
-    dshotState[2] = DSHOT_STATE_OUTPUT;
-    motorMap[2]->DMA_stream->NDTR = DSHOT_DMA_BUFFER_SIZE;
-    /* Enable TIM DMA Requests M3*/
-    TIM_DMACmd(motorMap[2]->tim, motorMap[2]->TIM_DMASource, ENABLE);
-    DMA_ITConfig(motorMap[2]->DMA_stream, DMA_IT_TC, ENABLE);
-    /* Enable DMA TIM Stream */
-    DMA_Cmd(motorMap[2]->DMA_stream, ENABLE);
+  // Reset state
+  dshotState[0] = DSHOT_STATE_OUTPUT;
+  dshotState[1] = DSHOT_STATE_OUTPUT;
+  dshotState[2] = DSHOT_STATE_OUTPUT;
+  dshotState[3] = DSHOT_STATE_OUTPUT;
 
-    dshotState[3] = DSHOT_STATE_OUTPUT;
-    motorMap[3]->DMA_stream->NDTR = DSHOT_DMA_BUFFER_SIZE;
-    /* Enable TIM DMA Requests M4*/
-    TIM_DMACmd(motorMap[3]->tim, motorMap[3]->TIM_DMASource, ENABLE);
-    DMA_ITConfig(motorMap[3]->DMA_stream, DMA_IT_TC, ENABLE);
-    /* Enable DMA TIM Stream */
-    DMA_Cmd(motorMap[3]->DMA_stream, ENABLE);
+  // Configure timer and DMA for all motors first.
+  motorsDshotOutputSetup(0);
+  motorsDshotOutputSetup(1);
+  motorsDshotOutputSetup(2);
+  motorsDshotOutputSetup(3);
+
+
+  DMA_ClearITPendingBit(motorMap[0]->DMA_stream, motorMap[0]->DMA_ITFlag_TC);
+  /* Enable TIM DMA Requests M1*/
+  TIM_DMACmd(motorMap[0]->tim, motorMap[0]->TIM_DMASource, ENABLE);
+  DMA_ITConfig(motorMap[0]->DMA_stream, DMA_IT_TC, ENABLE);
+
+  // TIM DMA Request and DMA stream for M2 will be started delayed
+  DMA_ClearITPendingBit(motorMap[1]->DMA_stream, motorMap[1]->DMA_ITFlag_TC);
+  DMA_ITConfig(motorMap[1]->DMA_stream, DMA_IT_TC, ENABLE);
+
+  DMA_ClearITPendingBit(motorMap[2]->DMA_stream, motorMap[2]->DMA_ITFlag_TC);
+  /* Enable TIM DMA Requests M3*/
+  TIM_DMACmd(motorMap[2]->tim, motorMap[2]->TIM_DMASource, ENABLE);
+  DMA_ITConfig(motorMap[2]->DMA_stream, DMA_IT_TC, ENABLE);
+
+  DMA_ClearITPendingBit(motorMap[3]->DMA_stream, motorMap[3]->DMA_ITFlag_TC);
+  /* Enable TIM DMA Requests M4*/
+  TIM_DMACmd(motorMap[3]->tim, motorMap[3]->TIM_DMASource, ENABLE);
+  DMA_ITConfig(motorMap[3]->DMA_stream, DMA_IT_TC, ENABLE);
+
+  /* Enable DMA TIM Stream at once*/
+  DMA_Cmd(motorMap[0]->DMA_stream, ENABLE);
+  DMA_Cmd(motorMap[2]->DMA_stream, ENABLE);
+  DMA_Cmd(motorMap[3]->DMA_stream, ENABLE);
 }
 
 #endif
@@ -884,27 +910,16 @@ const MotorHealthTestDef* motorsGetHealthTestSettings(uint32_t id)
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT
 static void motorsDshotTransferEnded(int id)
 {
+#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
+  if (dshotState[id] == DSHOT_STATE_INPUT) {
+    uint32_t gcrEdges = DSHOT_TELEMETRY_MAX_GCR_EDGES - motorMap[id]->DMA_stream->NDTR;
+    if (gcrEdges > DSHOT_TELEMETRY_MIN_GCR_EDGES) {
+      dshotTelemetryPackets[id] = dshotDecodeTelemetryPacket(dshotDmaInputBuffer[id], gcrEdges);
+      motorRPMs[id] = dshotDecodeTelemetryERPM(dshotTelemetryPackets[id]);
+    }
+  }
+#endif
   dshotState[id] = DSHOT_STATE_IDLE;
-
-  bool allIdle = true;
-  for (int i = 0; i < NBR_OF_MOTORS; i++) {
-    allIdle &= (dshotState[i] == DSHOT_STATE_IDLE);
-  }
-
-  if (allIdle) {
-    TIM_Cmd(motorMap[1]->tim, DISABLE);
-    motorMap[1]->tim->ARR = motorMap[1]->timPeriod;
-    motorMap[1]->tim->CNT = 0;
-    TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-    TIM_ITConfig(motorMap[1]->tim, TIM_IT_Update, DISABLE);
-    TIM_Cmd(motorMap[1]->tim, ENABLE);
-
-    dshotState[1] = DSHOT_STATE_OUTPUT;
-    /* Enable TIM DMA Requests M1*/
-    TIM_DMACmd(motorMap[1]->tim, motorMap[1]->TIM_DMASource, ENABLE);
-    /* Enable DMA TIM Stream */
-    DMA_Cmd(motorMap[1]->DMA_stream, ENABLE);
-  }
 }
 
 void __attribute__((used)) DMA1_Stream1_IRQHandler(void)  // M4
@@ -915,7 +930,11 @@ void __attribute__((used)) DMA1_Stream1_IRQHandler(void)  // M4
   DMA_ClearITPendingBit(DMA1_Stream1, DMA_IT_TCIF1);
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  motorsDshotInputSetup(3);
+  if (dshotState[3] == DSHOT_STATE_OUTPUT) {
+    motorsDshotInputSetup(3);
+  } else {
+    motorsDshotTransferEnded(3);
+  }
 #else
   motorsDshotTransferEnded(3);
 #endif
@@ -929,7 +948,11 @@ void __attribute__((used)) DMA1_Stream5_IRQHandler(void)  // M3
   DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  motorsDshotInputSetup(2);
+  if (dshotState[2] == DSHOT_STATE_OUTPUT) {
+    motorsDshotInputSetup(2);
+  } else {
+    motorsDshotTransferEnded(2);
+  }
 #else
   motorsDshotTransferEnded(2);
 #endif
@@ -943,12 +966,19 @@ void __attribute__((used)) DMA1_Stream6_IRQHandler(void) // M1
   DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  motorsDshotInputSetup(0);
+  if (dshotState[0] == DSHOT_STATE_OUTPUT) {
+    motorsDshotInputSetup(0);
+  } else {
+    motorsDshotTransferEnded(0);
+  }
 #else
   motorsDshotTransferEnded(0);
+  /* Special case: Enable TIM DMA Requests M2 and stream*/
+  TIM_DMACmd(motorMap[1]->tim, motorMap[1]->TIM_DMASource, ENABLE);
+  DMA_Cmd(motorMap[1]->DMA_stream, ENABLE);
 #endif
 }
-
+// The problematic DMA channel due to request sharing with M4
 void __attribute__((used)) DMA1_Stream7_IRQHandler(void)  // M2
 {
   TIM_DMACmd(TIM2, TIM_DMA_CC4, DISABLE);
@@ -957,56 +987,36 @@ void __attribute__((used)) DMA1_Stream7_IRQHandler(void)  // M2
   DMA_ClearITPendingBit(DMA1_Stream7, DMA_IT_TCIF7);
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  motorsDshotInputSetup(1);
+  if (dshotState[1] == DSHOT_STATE_OUTPUT) {
+    motorsDshotInputSetup(1);
+  } else {
+    motorsDshotTransferEnded(1);
+  }
 #else
-  dshotState[1] = DSHOT_STATE_IDLE;
+  motorsDshotTransferEnded(1);
 #endif
 }
 
+// Used to start M2 and timeout terminate receiving for M1, M3 and M4.
 void __attribute__((used)) TIM2_IRQHandler(void)
 {
   TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+  TIM_ITConfig(motorMap[1]->tim, TIM_IT_Update, DISABLE);
 
-#ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
-  if (dshotState[0] == DSHOT_STATE_INPUT) {
-    TIM_DMACmd(TIM2, TIM_DMA_CC2, DISABLE);
-    DMA_ITConfig(DMA1_Stream6, DMA_IT_TC, DISABLE);
-    DMA_Cmd(DMA1_Stream6, DISABLE);
-    DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);
-    
-    motorsDshotTransferEnded(0);
-  }
+  // Stop any ongoing input DMA transfer
+  DMA_Cmd(motorMap[0]->DMA_stream, DISABLE);  
+  DMA_Cmd(motorMap[2]->DMA_stream, DISABLE);  
+  DMA_Cmd(motorMap[3]->DMA_stream, DISABLE);  
 
-  if (dshotState[1] == DSHOT_STATE_INPUT) {
-    TIM_DMACmd(TIM2, TIM_DMA_CC4, DISABLE);
-    DMA_ITConfig(DMA1_Stream7, DMA_IT_TC, DISABLE);
-    DMA_Cmd(DMA1_Stream7, DISABLE);
-    DMA_ClearITPendingBit(DMA1_Stream7, DMA_IT_TCIF7);
-
-    dshotState[1] = DSHOT_STATE_IDLE;
-  }
-  
-  if (dshotState[2] == DSHOT_STATE_INPUT) {
-    TIM_DMACmd(TIM2, TIM_DMA_CC1, DISABLE);
-    DMA_ITConfig(DMA1_Stream5, DMA_IT_TC, DISABLE);
-    DMA_Cmd(DMA1_Stream5, DISABLE);
-    DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
-    
-    motorsDshotTransferEnded(2);
-  }
-
-  if (dshotState[3] == DSHOT_STATE_INPUT) {
-    TIM_DMACmd(TIM2, TIM_DMA_CC3, DISABLE);
-    DMA_ITConfig(DMA1_Stream1, DMA_IT_TC, DISABLE);
-    DMA_Cmd(DMA1_Stream1, DISABLE);
-    DMA_ClearITPendingBit(DMA1_Stream1, DMA_IT_TCIF1);
-    
-    motorsDshotTransferEnded(3);
-  }
+  motorsDshotOutputSetup(1);
+  /* Enable special case TIM DMA Requests M2*/
+  TIM_DMACmd(motorMap[1]->tim, motorMap[1]->TIM_DMASource, ENABLE);
+  DMA_ITConfig(motorMap[1]->DMA_stream, DMA_IT_TC, ENABLE);
+  /* Enable DMA TIM Stream */
+  DMA_Cmd(motorMap[1]->DMA_stream, ENABLE);
 #endif
 }
 
-#endif
 
 /**
  * Override power distribution to motors.
@@ -1064,19 +1074,19 @@ LOG_ADD_CORE(LOG_UINT16, m4, &motor_ratios[MOTOR_M4])
 
 #ifdef CONFIG_MOTORS_ESC_PROTOCOL_DSHOT_BIDIRECTIONAL
 /**
- * @brief Motor RPM telemetry for M1
+ * @brief Motor RPM telemetry for M1. UINT16_MAX is invalid or no value.
  */
 LOG_ADD(LOG_UINT16, m1_rpm, &motorRPMs[MOTOR_M1])
 /**
- * @brief Motor RPM telemetry for M2
+ * @brief Motor RPM telemetry for M2. UINT16_MAX is invalid or no value.
  */
 LOG_ADD(LOG_UINT16, m2_rpm, &motorRPMs[MOTOR_M2])
 /**
- * @brief Motor RPM telemetry for M3
+ * @brief Motor RPM telemetry for M3. UINT16_MAX is invalid or no value.
  */
 LOG_ADD(LOG_UINT16, m3_rpm, &motorRPMs[MOTOR_M3])
 /**
- * @brief Motor RPM telemetry for M4
+ * @brief Motor RPM telemetry for M4. UINT16_MAX is invalid or no value.
  */
 LOG_ADD(LOG_UINT16, m4_rpm, &motorRPMs[MOTOR_M4])
 #endif
