@@ -14,8 +14,8 @@
 
 #define GRASP_DIST 0.3f
 #define GRASP_THRESHOLD 30.0f
-#define BUILD_RATE 2.0f
-#define LOSS_TIMEOUT_MS 3000
+#define BUILD_RATE 3.0f
+#define LOSS_TIMEOUT_MS 1500
 
 typedef struct {
     uint8_t id;

@@ -58,6 +58,7 @@
 #include "movement.h"
 #include "led_control.h"
 #include "wand_interface.h"
+#include "physicalConstants.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -112,6 +113,9 @@ static float padZ = 0.0;
 static float wandLastCommandedX = 0.0f;
 static float wandLastCommandedY = 0.0f;
 static float wandLastCommandedZ = 0.0f;
+static bool wandGraspedFromGround = false;
+static float wandHeldYaw = 0.0f;
+static logVarId_t idYaw;
 
 #define WAND_POSITION_UPDATE_THRESHOLD 0.05f
 #define WAND_LANDING_HEIGHT ((MIN_Z_BOUND + 0.15f >= 0.2f) ? (MIN_Z_BOUND + 0.15f) : 0.3f)
@@ -295,17 +299,25 @@ static void stateTransition(xTimerHandle timer)
         }
         else if (wandIsGrasped())
         {
-            DEBUG_PRINT("Wand grasp detected, taking control...\n");
+            DEBUG_PRINT("Wand grasp detected from ground, taking control...\n");
             if (supervisorRequestArming(true))
             {
                 updatePadPosition();
-            disableCollisionAvoidance();
+                disableCollisionAvoidance();
                 setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
+                wandGraspedFromGround = true;
+                wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
                 wandLastCommandedX = FLT_MAX;
                 wandLastCommandedY = FLT_MAX;
                 wandLastCommandedZ = FLT_MAX;
                 state = STATE_WAND_GRASPED;
                 ledSetRGB(GREEN_LED);
+            }
+            else
+            {
+                DEBUG_PRINT("Wand grasped but arming denied (charged=%d, vbat=%.2f, armed=%d, flying=%d, hlBlocked=%d, batLow=%d, desired=%u, state=%u)\n",
+                            chargedForTakeoff(), (double)getVoltage(), supervisorIsArmed(), supervisorIsFlying(),
+                            crtpCommanderHighLevelIsBlocked(), isBatLow(), getDesiredFlyingCopters(), (unsigned)state);
             }
         }
         else if (needMoreTakeoffQueuedCopters(state))
@@ -371,7 +383,19 @@ static void stateTransition(xTimerHandle timer)
         break;
     case STATE_HOVERING:
         ledSetColorFromXYZ(getX(), getY(), getZ());
-        if (needMoreLandingQueuedCopters(state))
+        if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand grasp detected while hovering, taking control...\n");
+            disableCollisionAvoidance();
+            wandGraspedFromGround = false;
+            wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+            wandLastCommandedX = FLT_MAX;
+            wandLastCommandedY = FLT_MAX;
+            wandLastCommandedZ = FLT_MAX;
+            state = STATE_WAND_GRASPED;
+            ledSetRGB(GREEN_LED);
+        }
+        else if (needMoreLandingQueuedCopters(state))
         {
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
@@ -398,7 +422,19 @@ static void stateTransition(xTimerHandle timer)
         break;
     case STATE_GOING_TO_TRAJECTORY_START:
         ledSetColorFromXYZ(getX(), getY(), getZ());
-        if (reachedNextWaypoint(my_pos))
+        if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand grasp detected while flying, taking control...\n");
+            disableCollisionAvoidance();
+            wandGraspedFromGround = false;
+            wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+            wandLastCommandedX = FLT_MAX;
+            wandLastCommandedY = FLT_MAX;
+            wandLastCommandedZ = FLT_MAX;
+            state = STATE_WAND_GRASPED;
+            ledSetRGB(GREEN_LED);
+        }
+        else if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached trajectory start\n");
             startTrajectory(my_pos);
@@ -408,7 +444,19 @@ static void stateTransition(xTimerHandle timer)
         break;
     case STATE_EXECUTING_TRAJECTORY:
         ledSetColorFromXYZ(BLUE_LED);
-        if (crtpCommanderHighLevelIsTrajectoryFinished())
+        if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand grasp detected while flying, taking control...\n");
+            disableCollisionAvoidance();
+            wandGraspedFromGround = false;
+            wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+            wandLastCommandedX = FLT_MAX;
+            wandLastCommandedY = FLT_MAX;
+            wandLastCommandedZ = FLT_MAX;
+            state = STATE_WAND_GRASPED;
+            ledSetRGB(GREEN_LED);
+        }
+        else if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Finished trajectory execution\n");
             enableCollisionAvoidance();
@@ -417,7 +465,19 @@ static void stateTransition(xTimerHandle timer)
         break;
     case STATE_GOING_TO_RANDOM_POINT:
         ledSetColorFromXYZ(getX(), getY(), getZ());
-        if (reachedNextWaypoint(my_pos))
+        if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand grasp detected while flying, taking control...\n");
+            disableCollisionAvoidance();
+            wandGraspedFromGround = false;
+            wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+            wandLastCommandedX = FLT_MAX;
+            wandLastCommandedY = FLT_MAX;
+            wandLastCommandedZ = FLT_MAX;
+            state = STATE_WAND_GRASPED;
+            ledSetRGB(GREEN_LED);
+        }
+        else if (reachedNextWaypoint(my_pos))
         {
             DEBUG_PRINT("Reached next waypoint\n");
             state = STATE_HOVERING;
@@ -542,7 +602,7 @@ static void stateTransition(xTimerHandle timer)
 
         if (dist > WAND_POSITION_UPDATE_THRESHOLD)
         {
-            crtpCommanderHighLevelGoTo(wx, wy, wz, NO_YAW, 0.3f, false);
+            crtpCommanderHighLevelGoTo(wx, wy, wz, wandHeldYaw, 0.3f, false);
             wandLastCommandedX = wx;
             wandLastCommandedY = wy;
             wandLastCommandedZ = wz;
@@ -555,6 +615,10 @@ static void stateTransition(xTimerHandle timer)
         if (wandIsGrasped())
         {
             DEBUG_PRINT("Wand re-grasped, resuming control...\n");
+            wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+            wandLastCommandedX = FLT_MAX;
+            wandLastCommandedY = FLT_MAX;
+            wandLastCommandedZ = FLT_MAX;
             state = STATE_WAND_GRASPED;
             break;
         }
@@ -562,7 +626,12 @@ static void stateTransition(xTimerHandle timer)
         if (getZ() < WAND_LANDING_HEIGHT)
         {
             enableCollisionAvoidance();
-            setDesiredFlyingCopters(getDesiredFlyingCopters() - 1);
+            uint8_t desired = getDesiredFlyingCopters();
+            if (desired > 0)
+            {
+                setDesiredFlyingCopters(desired - 1);
+            }
+            wandGraspedFromGround = false;
             gotoChargingPad(padX, padY, padZ);
             state = STATE_GOING_TO_PAD;
         }
@@ -592,6 +661,7 @@ void appMain()
     // Get log and param ids
     initParamLogInterface();
     getTotalFlightsFromStorage();
+    idYaw = logGetVarId("stateEstimate", "yaw");
 
     ledseqRegisterSequence(&seq_estim_stuck);
     ledseqRegisterSequence(&seq_crash);
