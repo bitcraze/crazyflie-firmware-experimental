@@ -86,6 +86,10 @@ void assertFail(char *exp, char *file, int line)
   motorsStop();
   ledShowFaultPattern();
 
+  // while (1) {
+  //   // Loop forever, waiting for a reset
+  // }
+
   if(!(CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk))
   {
     // Only reset if debugger is not connected

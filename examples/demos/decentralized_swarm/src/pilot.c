@@ -54,12 +54,14 @@
 #include "positions.h"
 #include "common.h"
 #include "param_log_interface.h"
+#include "persistant_log.h"
 #include "movement.h"
 #include "led_control.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
 
+#define CRG_LED 0x10, 0x00, 0x00
 #define RED_LED 0x60, 0x00, 0x00
 #define GREEN_LED 0x00, 0x60, 0x00
 #define BLUE_LED  0x00, 0x00, 0x60
@@ -229,6 +231,7 @@ static void stateTransition(xTimerHandle timer)
         ledSetRGB(RED_LED);
     }
 
+    updateAliveTime();
     now_ms = T2M(xTaskGetTickCount());
     switch (state)
     {
@@ -250,7 +253,7 @@ static void stateTransition(xTimerHandle timer)
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
         if (!chargedForTakeoff())
         {
-            ledSetRGB(RED_LED);
+            ledSetRGB(CRG_LED);
             // do nothing, wait for the battery to be charged
         }
         else if (needMoreTakeoffQueuedCopters(state))
@@ -300,6 +303,7 @@ static void stateTransition(xTimerHandle timer)
         {
             DEBUG_PRINT("Taking off...\n");
             startTakeOffSequence();
+            updateTakeOffTime();
             state = STATE_TAKING_OFF;
             ledSetRGB(GREEN_LED);
         }
@@ -409,12 +413,13 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CHECK_CHARGING:
-        ledSetRGB(RED_LED);
+        ledSetRGB(CRG_LED);
         if (now_ms > landingTimeCheckCharge_ms)
         {
             DEBUG_PRINT("isCharging: %d\n", isCharging());
             if (isCharging())
             {
+                updateFlightTime();
                 if (supervisorRequestArming(false))
                 {
                     state = STATE_WAIT_FOR_TAKE_OFF;
@@ -468,6 +473,7 @@ void appMain()
     DEBUG_PRINT("Waiting for activation ...\n");
     // Get log and param ids
     initParamLogInterface();
+    getTotalFlightsFromStorage();
 
     ledseqRegisterSequence(&seq_estim_stuck);
     ledseqRegisterSequence(&seq_crash);

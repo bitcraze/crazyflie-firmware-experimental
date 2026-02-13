@@ -21,6 +21,7 @@
 #include "pptraj.h"
 #include "lighthouse_position_est.h"
 #include "lighthouse_core.h"
+#include "persistant_log.h"
 
 #define DEBUG_MODULE "APP"
 #include "debug.h"
@@ -269,6 +270,8 @@ void appMain() {
 
   paramIdLedBitMask = paramGetVarId("led", "bitmask");
 
+  getTotalFlightsFromStorage();
+
   timer = xTimerCreate("AppTimer", M2T(20), pdTRUE, NULL, appTimer);
   xTimerStart(timer, 20);
 
@@ -290,6 +293,8 @@ static void appTimer(xTimerHandle timer) {
   uint32_t previous = now;
   now = xTaskGetTickCount();
   uint32_t delta = now - previous;
+
+  updateAliveTime();
 
   if(supervisorIsTumbled()) {
     state = STATE_CRASHED;
@@ -376,6 +381,7 @@ static void appTimer(xTimerHandle timer) {
 
         terminateTrajectoryAndLand = false;
         crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
+        updateTakeOffTime();
         state = STATE_TAKING_OFF;
       }
       break;
@@ -531,6 +537,7 @@ static void appTimer(xTimerHandle timer) {
         DEBUG_PRINT("isCharging: %d\n", isCharging());
         if (isCharging()) {
           // ledseqRun(&seq_lock);
+          updateFlightTime();
           state = STATE_IDLE;
         } else {
           DEBUG_PRINT("Not charging. Try to reposition on pad.\n");

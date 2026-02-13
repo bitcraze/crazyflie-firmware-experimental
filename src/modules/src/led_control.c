@@ -69,7 +69,7 @@ static uint8_t limitUint8(int32_t value)
 
 void ledControlInit(void)
 {
-    idLEDDeck = paramGetVarId("hprgbw", "rgbw8888");
+    idLEDDeck = paramGetVarId("colorLedBot", "wrgb8888");
     if (idLEDDeck.id != 0xffffu)
     {
       paramSetInt(idLEDDeck, 0x00000000);
@@ -80,7 +80,7 @@ void ledSetRGB(uint8_t r, uint8_t g, uint8_t b)
 {
   if (idLEDDeck.id != 0xffffu)
   {
-    paramSetInt(idLEDDeck, (r << 24) | (g << 16) | (b << 8)); 
+    paramSetInt(idLEDDeck, (r << 16) | (g << 8) | b); 
   }
 }
 
@@ -88,7 +88,7 @@ void ledSetRGBW(uint8_t r, uint8_t g, uint8_t b, uint8_t w)
 {
   if (idLEDDeck.id != 0xffffu)
   {
-    paramSetInt(idLEDDeck, (r << 24) | (g << 16) | (b << 8) | w); 
+    paramSetInt(idLEDDeck, (w << 24) | (r << 16) | (g << 8) | b); 
   }
 }
 

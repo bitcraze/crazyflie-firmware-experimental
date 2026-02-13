@@ -7,3 +7,4 @@ venv
 build
 __pycache__
 .venv
+*.d
