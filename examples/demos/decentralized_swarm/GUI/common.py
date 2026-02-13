@@ -22,6 +22,8 @@ class State:
     STATE_REPOSITION_ON_PAD = 15
     STATE_CRASHED = 16
     STATE_SNIFFING = 17
+    STATE_WAND_GRASPED = 18
+    STATE_WAND_RELEASED = 19
     STATE_UNKNOWN = 255
 
 
@@ -44,4 +46,6 @@ state_dict = {
     State.STATE_REPOSITION_ON_PAD: ["REPOSITION ON PAD", "yellow"],
     State.STATE_CRASHED: ["CRASHED", "red"],
     State.STATE_SNIFFING: ["SNIFFING", "blue"],
+    State.STATE_WAND_GRASPED: ["WAND GRASPED", "cyan"],
+    State.STATE_WAND_RELEASED: ["WAND RELEASED", "yellow"],
 }

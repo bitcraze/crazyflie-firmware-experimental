@@ -3,3 +3,4 @@ obj-y += positions.o
 obj-y += param_log_interface.o
 obj-y += movement.o
 obj-y += persistant_log.o
+obj-y += wand_interface.o

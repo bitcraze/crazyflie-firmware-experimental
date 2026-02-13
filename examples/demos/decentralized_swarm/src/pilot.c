@@ -57,6 +57,7 @@
 #include "persistant_log.h"
 #include "movement.h"
 #include "led_control.h"
+#include "wand_interface.h"
 
 #define DEBUG_MODULE "P2P"
 #include "debug.h"
@@ -108,9 +109,22 @@ static float padX = 0.0;
 static float padY = 0.0;
 static float padZ = 0.0;
 
+static float wandLastCommandedX = 0.0f;
+static float wandLastCommandedY = 0.0f;
+static float wandLastCommandedZ = 0.0f;
+
+#define WAND_POSITION_UPDATE_THRESHOLD 0.05f
+#define WAND_LANDING_HEIGHT ((MIN_Z_BOUND + 0.15f >= 0.2f) ? (MIN_Z_BOUND + 0.15f) : 0.3f)
+
 static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
+
+static void appP2PDispatch(P2PPacket *p)
+{
+    dsP2pHandlePacket(p);
+    wandHandleP2PPacket(p);
+}
 
 // LEDs Interface
 ledseqStep_t seq_flashing_def[] = {
@@ -194,6 +208,25 @@ static void startTakeOffSequence()
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
 
+static void updatePadPosition()
+{
+    Position pad_sampler = {0.0f, 0.0f, 0.0f};
+
+    for (uint8_t i = 0; i < NUMBER_OF_PAD_SAMPLES; i++)
+    {
+        pad_sampler.x += getX();
+        pad_sampler.y += getY();
+        pad_sampler.z += getZ();
+        vTaskDelay(50);
+    }
+    MUL_VECTOR_3D_WITH_SCALAR(pad_sampler, 1.0f / NUMBER_OF_PAD_SAMPLES);
+
+    padX = pad_sampler.x;
+    padY = pad_sampler.y;
+    padZ = pad_sampler.z;
+    DEBUG_PRINT("Base position: (%f, %f, %f)\n", (double)padX, (double)padY, (double)padZ);
+}
+
 static bool shouldFlySpecialTrajectory()
 {
     int random_number = -1;
@@ -236,6 +269,7 @@ static void stateTransition(xTimerHandle timer)
 
     updateAliveTime();
     now_ms = T2M(xTaskGetTickCount());
+    wandUpdate(xTaskGetTickCount());
     switch (state)
     {
     case STATE_IDLE:
@@ -258,6 +292,21 @@ static void stateTransition(xTimerHandle timer)
         {
             ledSetRGB(CRG_LED);
             // do nothing, wait for the battery to be charged
+        }
+        else if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand grasp detected, taking control...\n");
+            if (supervisorRequestArming(true))
+            {
+                updatePadPosition();
+            disableCollisionAvoidance();
+                setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
+                wandLastCommandedX = FLT_MAX;
+                wandLastCommandedY = FLT_MAX;
+                wandLastCommandedZ = FLT_MAX;
+                state = STATE_WAND_GRASPED;
+                ledSetRGB(GREEN_LED);
+            }
         }
         else if (needMoreTakeoffQueuedCopters(state))
         {
@@ -462,6 +511,68 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
 
+    case STATE_WAND_GRASPED:
+    {
+        ledSetRGB(GREEN_LED);
+        supervisorRequestArming(true);
+        disableCollisionAvoidance();
+
+        if (!wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand released, landing...\n");
+            state = STATE_WAND_RELEASED;
+            break;
+        }
+
+        float wx = 0.0f, wy = 0.0f, wz = 0.0f;
+        wandGetSetpoint(&wx, &wy, &wz);
+
+        // Clamp to area bounds
+        if (wx < MIN_X_BOUND) wx = MIN_X_BOUND;
+        if (wx > MAX_X_BOUND) wx = MAX_X_BOUND;
+        if (wy < MIN_Y_BOUND) wy = MIN_Y_BOUND;
+        if (wy > MAX_Y_BOUND) wy = MAX_Y_BOUND;
+        if (wz < MIN_Z_BOUND) wz = MIN_Z_BOUND;
+        if (wz > MAX_Z_BOUND) wz = MAX_Z_BOUND;
+
+        float dx = wx - wandLastCommandedX;
+        float dy = wy - wandLastCommandedY;
+        float dz = wz - wandLastCommandedZ;
+        float dist = sqrtf((dx * dx) + (dy * dy) + (dz * dz));
+
+        if (dist > WAND_POSITION_UPDATE_THRESHOLD)
+        {
+            crtpCommanderHighLevelGoTo(wx, wy, wz, NO_YAW, 0.3f, false);
+            wandLastCommandedX = wx;
+            wandLastCommandedY = wy;
+            wandLastCommandedZ = wz;
+        }
+        break;
+    }
+
+    case STATE_WAND_RELEASED:
+        ledSetRGB(RED_LED);
+        if (wandIsGrasped())
+        {
+            DEBUG_PRINT("Wand re-grasped, resuming control...\n");
+            state = STATE_WAND_GRASPED;
+            break;
+        }
+
+        if (getZ() < WAND_LANDING_HEIGHT)
+        {
+            enableCollisionAvoidance();
+            setDesiredFlyingCopters(getDesiredFlyingCopters() - 1);
+            gotoChargingPad(padX, padY, padZ);
+            state = STATE_GOING_TO_PAD;
+        }
+        else
+        {
+            enableCollisionAvoidance();
+            state = STATE_HOVERING;
+        }
+        break;
+
     default:
         break;
     }
@@ -487,6 +598,8 @@ void appMain()
 
     initP2P();
     initOtherStates();
+    wandInit();
+    p2pRegisterCB(appP2PDispatch);
     ledControlInit();
     ledSetRGBW(WHITE_LED);
 

@@ -51,11 +51,10 @@ uint8_t getCopterState(uint8_t copter_id){
 }
 
 
-static void p2pcallbackHandler(P2PPacket *p) {
+void dsP2pHandlePacket(P2PPacket *p) {
     static copter_message_t rxMessage;
 
     if (p->port != P2P_PORT){
-        DEBUG_PRINT("Wrong port %u\n", p->port);
         return;
     }
 
@@ -96,7 +95,9 @@ static void p2pcallbackHandler(P2PPacket *p) {
             state == STATE_GOING_TO_TRAJECTORY_START ||
             state == STATE_HOVERING ||
             state == STATE_LANDING ||
-            state == STATE_PREPARING_FOR_LAND) {
+            state == STATE_PREPARING_FOR_LAND ||
+            state == STATE_WAND_GRASPED ||
+            state == STATE_WAND_RELEASED) {
 
             positionMeasurement_t pos_measurement;
             memcpy(&pos_measurement.pos, &rxMessage.fullState.position, sizeof(Position));
@@ -113,7 +114,7 @@ static void p2pcallbackHandler(P2PPacket *p) {
 }
 
 void initP2P() {
-    p2pRegisterCB(p2pcallbackHandler);
+    p2pRegisterCB(dsP2pHandlePacket);
 }
 
 void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
@@ -182,12 +183,19 @@ void printOtherCopters(void){
     }
 }
 
+static bool isWandState(enum State state);
+
 static bool isFlyingState(enum State state) {
-    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD;
+    return (state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD) ||
+           isWandState(state);
 }
 
 bool isCopterFlying(uint8_t copter_id){
     return isAlive(copter_id) && isFlyingState(copters[copter_id].state);
+}
+
+static bool isWandState(enum State state) {
+    return state == STATE_WAND_GRASPED || state == STATE_WAND_RELEASED;
 }
 
 static bool isTakeoffQueueingState(enum State state) {

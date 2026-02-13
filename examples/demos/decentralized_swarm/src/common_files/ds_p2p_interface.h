@@ -72,6 +72,9 @@ typedef struct {
 
 void initP2P();
 
+// Handle incoming P2P packets for the swarm protocol (port 5)
+void dsP2pHandlePacket(P2PPacket *p);
+
 void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs);
 
 uint8_t getCopterState(uint8_t copter_id);
@@ -92,6 +95,7 @@ bool isCopterFlying(uint8_t copter_id);
 uint8_t getMinimumFlyingCopterId(void);
 
 bool isAnyOtherCopterExecutingTrajectory(void);
+
 
 bool needMoreCopters(enum State ownState);
 
