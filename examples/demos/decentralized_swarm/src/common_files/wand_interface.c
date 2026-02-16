@@ -97,7 +97,13 @@ void wandHandleP2PPacket(P2PPacket *p)
 
     if (!grasped) {
         if (dist < GRASP_DIST) {
+            float prevScore = attemptScore;
             attemptScore = fminf(attemptScore + BUILD_RATE, 100.0f);
+            if (attemptScore > prevScore) {
+                // Shine orange when grasp score increases and not grasped
+                extern void ledSetRGB(uint8_t r, uint8_t g, uint8_t b);
+                ledSetRGB(0x60, 0x30, 0x00); // ORANGE_LED
+            }
         }
 
         if (attemptScore > GRASP_THRESHOLD) {
