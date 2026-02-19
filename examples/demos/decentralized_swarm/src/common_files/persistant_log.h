@@ -28,3 +28,4 @@ void updateAliveTime();
 void updateTakeOffTime();
 void updateFlightTime();
 void getTotalFlightsFromStorage();
+void storeTotalFlights();

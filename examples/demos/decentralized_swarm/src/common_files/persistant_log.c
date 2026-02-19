@@ -57,6 +57,7 @@ static uint32_t totalFlightTime_ms = 0;
 static uint32_t persistentTotalFlightTime_ms = 12000;
 
 static uint8_t resetData = 0;
+static bool pendingStorageWrite = false;
 
 static const char* PERSISTENT_FLIGHT_COUNT_STORAGE_KEY = "app/totFlight";
 static const char* PERSISTENT_FLIGHT_TIME_STORAGE_KEY = "app/totTime";
@@ -71,12 +72,16 @@ static void msToHumanTime(const uint32_t time_ms, humanTime_t* humanTime) {
     humanTime->s = time_s;
 }
 
-static void storeTotalFlights() {
+void storeTotalFlights() {
+    if (!pendingStorageWrite) {
+        return;
+    }
     storageStore(PERSISTENT_FLIGHT_COUNT_STORAGE_KEY, &persistentFlightCount, sizeof(uint32_t));
     storageStore(PERSISTENT_FLIGHT_TIME_STORAGE_KEY, &persistentTotalFlightTime_ms, sizeof(uint32_t));
     humanTime_t totalTimeHt;
     msToHumanTime(persistentTotalFlightTime_ms, &totalTimeHt);
     DEBUG_PRINT("Stored flight time %lu:%lu:%lu, flights %lu\n", totalTimeHt.h, totalTimeHt.m, totalTimeHt.s, persistentFlightCount);
+    pendingStorageWrite = false;
 }
 
 void getTotalFlightsFromStorage() {
@@ -113,7 +118,7 @@ void updateFlightTime() {
      lastFlightTime_ms = alive_time_ms - takeOffTime_ms;
      totalFlightTime_ms += lastFlightTime_ms;
      persistentTotalFlightTime_ms += lastFlightTime_ms;
-     storeTotalFlights();
+     pendingStorageWrite = true;
 }
 
 

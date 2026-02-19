@@ -500,6 +500,11 @@ void appMain()
     xTimerStart(stateTransitionTimer, 20);
 
     isInit = true;
+
+    while (1) {
+        vTaskDelay(M2T(2000));
+        storeTotalFlights();
+    }
 }
 
 LOG_GROUP_START(app)
