@@ -29,3 +29,4 @@ void updateTakeOffTime();
 void updateFlightTime();
 void getTotalFlightsFromStorage();
 void storeTotalFlights();
+void setStorageTaskHandle(TaskHandle_t handle);

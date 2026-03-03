@@ -501,8 +501,9 @@ void appMain()
 
     isInit = true;
 
+    setStorageTaskHandle(xTaskGetCurrentTaskHandle());
     while (1) {
-        vTaskDelay(M2T(2000));
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
         storeTotalFlights();
     }
 }

@@ -58,6 +58,11 @@ static uint32_t persistentTotalFlightTime_ms = 12000;
 
 static uint8_t resetData = 0;
 static bool pendingStorageWrite = false;
+static TaskHandle_t storageTaskHandle = NULL;
+
+void setStorageTaskHandle(TaskHandle_t handle) {
+    storageTaskHandle = handle;
+}
 
 static const char* PERSISTENT_FLIGHT_COUNT_STORAGE_KEY = "app/totFlight";
 static const char* PERSISTENT_FLIGHT_TIME_STORAGE_KEY = "app/totTime";
@@ -95,8 +100,11 @@ void getTotalFlightsFromStorage() {
 
 static void resetDataCallback() {
      persistentFlightCount = 0;
-     persistentTotalFlightTime_ms = 0.0f;
-     storeTotalFlights();
+     persistentTotalFlightTime_ms = 0;
+     pendingStorageWrite = true;
+     if (storageTaskHandle) {
+         xTaskNotifyGive(storageTaskHandle);
+     }
 }
 
 void updateAliveTime() {
@@ -119,6 +127,9 @@ void updateFlightTime() {
      totalFlightTime_ms += lastFlightTime_ms;
      persistentTotalFlightTime_ms += lastFlightTime_ms;
      pendingStorageWrite = true;
+     if (storageTaskHandle) {
+         xTaskNotifyGive(storageTaskHandle);
+     }
 }
 
 
