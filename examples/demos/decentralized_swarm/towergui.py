@@ -140,27 +140,44 @@ class ButtonsFrame(ttk.Frame):
         # Buttons frame
         buttons_frame = ttk.Frame(parent)
 
+        # Fly All button
+        self.fly_all_button = tk.Button(buttons_frame, text="Fly All", command=self.all_copters,
+                                        width=self.WIDTH, height=self.HEIGHT,
+                                        font=("ubuntu", 10, "bold"),
+                                        background=_from_rgb(30, 100, 210),
+                                        activebackground=_from_rgb(20, 75, 175),
+                                        activeforeground="#000")
+        self.fly_all_button.grid(row=0, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
+
         # Less copters
         self.less_button = tk.Button(buttons_frame, text="Less", command=self.less_copters,
-                                        width=self.WIDTH, height=self.HEIGHT,
-                                        background=_from_rgb(240, 20, 11),
-                                        activebackground=_from_rgb(212, 20, 11),
-                                        activeforeground="#000")
-        self.less_button.grid(row=0, column=0, padx=self.PADX, pady=self.PADY)
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(255, 140, 0),
+                                     activebackground=_from_rgb(220, 110, 0),
+                                     activeforeground="#000")
+        self.less_button.grid(row=1, column=0, padx=self.PADX, pady=self.PADY)
 
-        self._desired_label = ttk.Label(buttons_frame, text="", font=("ubuntu", 33))
-        self._desired_label.grid(row=0, column=1)
+        self._desired_label = ttk.Label(buttons_frame, text="", font=("ubuntu", 33), width=3, anchor="center")
+        self._desired_label.grid(row=1, column=1)
 
         # More copters
-        self.more_button = tk.Button(buttons_frame,
-                                          text="More",
-                                          command=self.more_copters,
-                                          width=self.WIDTH, height=self.HEIGHT,
-                                          background=_from_rgb(93, 227, 9),
-                                          activebackground=_from_rgb(93, 215, 9),
-                                          activeforeground="#000")
+        self.more_button = tk.Button(buttons_frame, text="More", command=self.more_copters,
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(34, 180, 34),
+                                     activebackground=_from_rgb(20, 150, 20),
+                                     activeforeground="#000")
+        self.more_button.grid(row=1, column=2, padx=self.PADX, pady=self.PADY)
 
-        self.more_button.grid(row=0, column=2, padx=self.PADX, pady=self.PADY)
+        # Stop button
+        self.stop_button = tk.Button(buttons_frame, text="Stop", command=self.zero_copters,
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(210, 30, 30),
+                                     activebackground=_from_rgb(175, 20, 20),
+                                     activeforeground="#fff")
+        self.stop_button.grid(row=2, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
 
         # insert buttons frame in the content
         buttons_frame.grid(row=3 + 1, column=0, columnspan=3)
