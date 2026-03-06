@@ -106,7 +106,7 @@ struct traj_eval plan_current_goal(struct planner *p, float t);
 int plan_takeoff(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t);
 
 // start a landing trajectory.
-int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t);
+int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float kp, float ki, float kd, float t);
 
 // move to a given position, then hover there.
 int plan_go_to(struct planner *p, bool relative, bool linear, struct vec hover_pos, float hover_yaw, float duration, float t);

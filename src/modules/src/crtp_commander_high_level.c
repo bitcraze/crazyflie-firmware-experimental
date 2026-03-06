@@ -112,6 +112,10 @@ static StaticSemaphore_t lockTrajBuffer;
 static float defaultTakeoffVelocity = 0.5f;
 static float defaultLandingVelocity = 0.5f;
 
+static float landingPosKp = 5.123533f;     
+static float landingPosKi = 1.905738f;
+static float landingPosKd = 1.0f;
+
 // Trajectory memory handling from the memory module
 static uint32_t handleMemGetSize(const uint8_t internal_id) { return crtpCommanderHighLevelTrajectoryMemSize(); }
 static bool handleMemRead(const uint8_t internal_id, const uint32_t memAddr, const uint8_t readLen, uint8_t* buffer);
@@ -144,6 +148,7 @@ enum TrajectoryCommand_e {
   COMMAND_GO_TO_2                 = 12,
   COMMAND_START_TRAJECTORY_2      = 13,
 };
+
 
 struct data_set_group_mask {
   uint8_t groupMask; // mask for which groups this CF belongs to
@@ -570,7 +575,7 @@ int land(const struct data_land* data)
   if (isInGroup(data->groupMask)) {
     xSemaphoreTake(lockTraj, portMAX_DELAY);
     float t = usecTimestamp() / 1e6;
-    result = plan_land(&planner, pos, yaw, data->height, 0.0f, data->duration, t);
+    result = plan_land(&planner, pos, yaw, data->height, 0.0f, data->duration, landingPosKp, landingPosKi, landingPosKd, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
@@ -592,7 +597,7 @@ int land2(const struct data_land_2* data)
       hover_yaw = yaw;
     }
 
-    result = plan_land(&planner, pos, yaw, data->height, hover_yaw, data->duration, t);
+    result = plan_land(&planner, pos, yaw, data->height, hover_yaw, data->duration, landingPosKp, landingPosKi, landingPosKd, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
@@ -621,7 +626,7 @@ int land_with_velocity(const struct data_land_with_velocity* data)
 
     float velocity = data->velocity > 0 ? data->velocity : defaultLandingVelocity;
     float duration = fabsf(height - pos.z) / velocity;
-    result = plan_land(&planner, pos, yaw, height, hover_yaw, duration, t);
+    result = plan_land(&planner, pos, yaw, height, hover_yaw, duration, landingPosKp, landingPosKi, landingPosKd, t);
     xSemaphoreGive(lockTraj);
   }
   return result;
@@ -1103,3 +1108,26 @@ PARAM_ADD_CORE(PARAM_FLOAT, vland, &defaultLandingVelocity)
 PARAM_ADD_CORE(PARAM_UINT8, groupmask, &group_mask)
 
 PARAM_GROUP_STOP(hlCommander)
+
+
+/**
+ * computes landing controller PID gains
+ */
+PARAM_GROUP_START(landingController)
+
+/**
+ * @brief Landing position proportional gain
+ */
+PARAM_ADD_CORE(PARAM_FLOAT, kp, &landingPosKp)
+
+/**
+ * @brief Landing position integral gain
+ */
+PARAM_ADD_CORE(PARAM_FLOAT, ki, &landingPosKi)
+
+/**
+ * @brief Landing position derivative gain
+ */
+PARAM_ADD_CORE(PARAM_FLOAT, kd, &landingPosKd)
+
+PARAM_GROUP_STOP(landingController)

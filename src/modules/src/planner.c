@@ -39,6 +39,7 @@ implementation of planning state machine
 #include "planner.h"
 #include "arm_math.h"
 #include "debug.h"
+#include "position_controller.h"
 
 static struct traj_eval plan_eval(struct planner *p, float t);
 
@@ -113,7 +114,15 @@ struct traj_eval plan_current_goal(struct planner *p, float t)
 	switch (p->state) {
 		case TRAJECTORY_STATE_LANDING:
 			if (plan_is_finished(p, t)) {
+#if CONFIG_PLATFORM_CF21BL
+				// hover over target to control out disturbances.
+				if ((t - p->trajectory->t_begin) >= piecewise_duration(p->trajectory) + 2.0f) {
+					p->state = TRAJECTORY_STATE_IDLE;
+					resetPosPIDParamsToPrevious();
+				}
+#else
 				p->state = TRAJECTORY_STATE_IDLE;
+#endif
 			}
 			// intentional fall-thru
 		case TRAJECTORY_STATE_FLYING:
@@ -166,7 +175,7 @@ int plan_takeoff(struct planner *p, struct vec curr_pos, float curr_yaw, float h
 	return 0;
 }
 
-int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float t)
+int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hover_height, float hover_yaw, float duration, float kp, float ki, float kd, float t)
 {
 	if (p->state == TRAJECTORY_STATE_LANDING) {
 		return 1;
@@ -178,6 +187,12 @@ int plan_land(struct planner *p, struct vec curr_pos, float curr_yaw, float hove
 	p->type = TRAJECTORY_TYPE_PIECEWISE;
 	p->planned_trajectory.t_begin = t;
 	p->trajectory = &p->planned_trajectory;
+
+#if CONFIG_PLATFORM_CF21BL
+	positionControllerChangePosPIDParams(kp, ki, kd, NAN,
+										kp, ki, kd, NAN,
+										NAN, NAN, NAN, NAN);
+#endif
 	return 0;
 }
 
