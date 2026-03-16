@@ -602,6 +602,7 @@ static void stateTransition(xTimerHandle timer)
 
         if (dist > WAND_POSITION_UPDATE_THRESHOLD)
         {
+            goto_pos = (Position){wx, wy, wz};
             crtpCommanderHighLevelGoTo(wx, wy, wz, wandHeldYaw, 0.3f, false);
             wandLastCommandedX = wx;
             wandLastCommandedY = wy;
@@ -632,6 +633,7 @@ static void stateTransition(xTimerHandle timer)
                 setDesiredFlyingCopters(desired - 1);
             }
             wandGraspedFromGround = false;
+            goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
             gotoChargingPad(padX, padY, padZ);
             state = STATE_GOING_TO_PAD;
         }
