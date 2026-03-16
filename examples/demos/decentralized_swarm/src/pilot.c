@@ -627,11 +627,7 @@ static void stateTransition(xTimerHandle timer)
         if (getZ() < WAND_LANDING_HEIGHT)
         {
             enableCollisionAvoidance();
-            uint8_t desired = getDesiredFlyingCopters();
-            if (desired > 0)
-            {
-                setDesiredFlyingCopters(desired - 1);
-            }
+            setDesiredFlyingCopters(getAutonomousFlyingCoptersCount(state));
             wandGraspedFromGround = false;
             goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
             gotoChargingPad(padX, padY, padZ);

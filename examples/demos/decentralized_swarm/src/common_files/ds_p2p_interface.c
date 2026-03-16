@@ -240,6 +240,23 @@ bool isAnyOtherCopterExecutingTrajectory(void){
     return false;
 }
 
+static int getNrOfAutonomousFlyingCopters(enum State ownState) {
+    int count = 0;
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && isFlyingState(copters[i].state) && !isWandState(copters[i].state)) {
+            count++;
+        }
+    }
+    if (isFlyingState(ownState) && !isWandState(ownState)) {
+        count++;
+    }
+    return count;
+}
+
+uint8_t getAutonomousFlyingCoptersCount(enum State ownState) {
+    return (uint8_t)getNrOfAutonomousFlyingCopters(ownState);
+}
+
 static int getNrOfFlyingCopters(enum State ownState) {
     uint8_t flying_copters = 0;
 

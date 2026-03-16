@@ -113,6 +113,8 @@ bool needLessLandingQueuedCopters(enum State ownState);
 uint8_t getDesiredFlyingCopters();
 void setDesiredFlyingCopters(uint8_t desired);
 
+uint8_t getAutonomousFlyingCoptersCount(enum State ownState);
+
 bool isForceTakeoffEnabled();
 void setForceTakeoff(uint8_t force);
 
