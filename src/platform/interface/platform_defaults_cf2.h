@@ -55,6 +55,11 @@
     #endif
 #endif
 // Thrust curve coefficients (per motor) and minimum and maximal thrust per motor
+// We have v_motor = v_battery * PWM / 65535.0 (i.e., motor voltage in volts)
+// thrust (per motor in Newton) = VMOTOR2THRUST0 
+//                              + VMOTOR2THRUST1 * v_motor
+//                              + VMOTOR2THRUST2 * v_motor * v_motor
+//                              + VMOTOR2THRUST3 * v_motor * v_motor * v_motor 
 // Note: The maximum thrust is a trade-off between consistency of thrust over all battery levels
 // and maximum performance with a full battery. Increase this value at your own risk. More info
 // in #1526 or this blog post: 

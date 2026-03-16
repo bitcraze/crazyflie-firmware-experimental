@@ -383,6 +383,21 @@ config DECK_LOCO_2D_POSITION_HEIGHT
     depends on DECK_LOCO_2D_POSITION
     default 1.2
 
+choice
+    prompt "SPI clock speed (high speed mode)"
+    depends on DECK_LOCO
+    default DECK_LOCO_SPI_SPEED_21MHZ
+    help
+        SPI clock speed used when communicating with the DW1000 in PLL mode.
+
+    config DECK_LOCO_SPI_SPEED_21MHZ
+        bool "21 MHz"
+
+    config DECK_LOCO_SPI_SPEED_12MHZ
+        bool "11.5 MHz"
+
+endchoice
+
 config DECK_MULTIRANGER
     bool "Support the Multi-ranger deck"
     default y
