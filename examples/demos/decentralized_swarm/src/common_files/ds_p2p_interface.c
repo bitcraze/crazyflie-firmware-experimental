@@ -318,6 +318,12 @@ void setDesiredFlyingCopters(uint8_t desired) {
                             LOG_ADD(LOG_UINT8, state, &copters[i].state)\
                             LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\
                             LOG_ADD(LOG_UINT8, counter, &copters[i].counter)\
+                            LOG_ADD(LOG_FLOAT, x, &copters[i].position.x)\
+                            LOG_ADD(LOG_FLOAT, y, &copters[i].position.y)\
+                            LOG_ADD(LOG_FLOAT, z, &copters[i].position.z)\
+                            LOG_ADD(LOG_FLOAT, goto_x, &copters[i].goto_position.x)\
+                            LOG_ADD(LOG_FLOAT, goto_y, &copters[i].goto_position.y)\
+                            LOG_ADD(LOG_FLOAT, goto_z, &copters[i].goto_position.z)\
                             LOG_GROUP_STOP(id_i)
 
 add_copter_log(1)

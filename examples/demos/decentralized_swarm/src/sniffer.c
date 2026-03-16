@@ -70,6 +70,9 @@ static void broadcastData(xTimerHandle timer) {
         fullState.position.x = 0.0f;
         fullState.position.y = 0.0f;
         fullState.position.z = 0.0f;
+        fullState.goto_position.x = 0.0f;
+        fullState.goto_position.y = 0.0f;
+        fullState.goto_position.z = 0.0f;
 
         broadcastToPeers(&fullState, nowMs);
     }

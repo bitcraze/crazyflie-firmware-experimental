@@ -101,6 +101,7 @@ Position positions_to_go[] = {
 };
 
 static Position my_pos;
+static Position goto_pos;
 
 static float previous[3];
 static float padX = 0.0;
@@ -165,6 +166,7 @@ static void broadcastData(xTimerHandle timer)
     fullState.position.x = getX();
     fullState.position.y = getY();
     fullState.position.z = getZ();
+    fullState.goto_position = goto_pos;
 
     broadcastToPeers(&fullState, nowMs);
 }
@@ -330,12 +332,14 @@ static void stateTransition(xTimerHandle timer)
             if (shouldFlySpecialTrajectory())
             {
                 DEBUG_PRINT("Special trajectory\n");
+                goto_pos = (Position){CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT};
                 gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
                 state = STATE_GOING_TO_TRAJECTORY_START;
             }
             else
             {
                 PositionWithYaw new_pos = RANDOMIZATION_METHOD(&my_pos);
+                goto_pos = (Position){new_pos.x, new_pos.y, new_pos.z};
                 DEBUG_PRINT("Normal new waypoint (%.2f, %.2f, %.2f)\n", (double)new_pos.x, (double)new_pos.y, (double)new_pos.z);
                 gotoNextWaypoint(new_pos.x, new_pos.y, new_pos.z, new_pos.yaw, DELTA_DURATION);
                 state = STATE_GOING_TO_RANDOM_POINT;

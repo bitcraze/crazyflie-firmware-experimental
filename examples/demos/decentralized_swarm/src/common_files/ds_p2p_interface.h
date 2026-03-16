@@ -54,6 +54,7 @@ typedef struct {
     uint8_t battery_voltage; //normalized to 0-255 (0-3.3V)
     uint32_t timestamp;
     Position position;
+    Position goto_position;
 } copter_full_state_t;
 
 typedef struct {
