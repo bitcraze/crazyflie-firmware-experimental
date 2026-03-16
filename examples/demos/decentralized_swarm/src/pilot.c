@@ -228,6 +228,7 @@ static void stateTransition(xTimerHandle timer)
                             state == STATE_EXECUTING_TRAJECTORY))
     {
         DEBUG_PRINT("Battery low, landing\n");
+        goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
         gotoChargingPad(padX, padY, padZ);
         state = STATE_GOING_TO_PAD;
         ledSetRGB(RED_LED);
@@ -383,6 +384,7 @@ static void stateTransition(xTimerHandle timer)
         else if (now_ms > random_time_for_next_event_ms)
         {
             DEBUG_PRINT("Going to pad...\n");
+            goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
             gotoChargingPad(padX, padY, padZ);
             state = STATE_GOING_TO_PAD;
         }
@@ -444,6 +446,7 @@ static void stateTransition(xTimerHandle timer)
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
             DEBUG_PRINT("Over pad, stabilizing position\n");
+            goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
             gotoChargingPad(padX, padY, padZ);
             stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
             state = STATE_GOING_TO_PAD;
