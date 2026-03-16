@@ -32,6 +32,7 @@
 // Flight Settings
 #define TAKE_OFF_HEIGHT 1.5f
 #define INITIAL_DESIRED_FLYING_COPTERS 0
+#define INITIAL_FORCE_TAKEOFF false
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
 
 // Randomizing takeoff times

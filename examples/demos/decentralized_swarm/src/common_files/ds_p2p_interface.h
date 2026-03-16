@@ -67,6 +67,7 @@ typedef struct {
     int32_t ageOfControlDataMs;
     uint8_t isControlDataValid;
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
+    uint8_t forceTakeoff; // If set to 1, bypass CHARGED_FOR_TAKEOFF_VOLTAGE and only check !isBatLow()
     uint32_t magicNumber;
 } copter_message_t;
 
@@ -111,5 +112,8 @@ bool needLessLandingQueuedCopters(enum State ownState);
 
 uint8_t getDesiredFlyingCopters();
 void setDesiredFlyingCopters(uint8_t desired);
+
+bool isForceTakeoffEnabled();
+void setForceTakeoff(uint8_t force);
 
 #endif // P2P_INTERFACE_H
