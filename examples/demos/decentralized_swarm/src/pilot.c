@@ -292,12 +292,7 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
-        if (!chargedForTakeoff())
-        {
-            ledSetRGB(CRG_LED);
-            // do nothing, wait for the battery to be charged
-        }
-        else if (wandIsGrasped())
+        if (wandIsGrasped())
         {
             DEBUG_PRINT("Wand grasp detected from ground, taking control...\n");
             if (supervisorRequestArming(true))
@@ -319,6 +314,11 @@ static void stateTransition(xTimerHandle timer)
                             chargedForTakeoff(), (double)getVoltage(), supervisorIsArmed(), supervisorIsFlying(),
                             crtpCommanderHighLevelIsBlocked(), isBatLow(), getDesiredFlyingCopters(), (unsigned)state);
             }
+        }
+        else if (!chargedForTakeoff())
+        {
+            ledSetRGB(CRG_LED);
+            // do nothing, wait for the battery to be charged
         }
         else if (needMoreTakeoffQueuedCopters(state))
         {
