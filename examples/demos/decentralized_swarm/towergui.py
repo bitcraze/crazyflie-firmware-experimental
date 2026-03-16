@@ -149,36 +149,6 @@ class ButtonsFrame(ttk.Frame):
                                         activeforeground="#000")
         self.fly_all_button.grid(row=0, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
 
-        # Less copters
-        self.less_button = tk.Button(buttons_frame, text="Less", command=self.less_copters,
-                                     width=self.WIDTH, height=self.HEIGHT,
-                                     font=("ubuntu", 10, "bold"),
-                                     background=_from_rgb(255, 140, 0),
-                                     activebackground=_from_rgb(220, 110, 0),
-                                     activeforeground="#000")
-        self.less_button.grid(row=1, column=0, padx=self.PADX, pady=self.PADY)
-
-        self._desired_label = ttk.Label(buttons_frame, text="", font=("ubuntu", 33), width=3, anchor="center")
-        self._desired_label.grid(row=1, column=1)
-
-        # More copters
-        self.more_button = tk.Button(buttons_frame, text="More", command=self.more_copters,
-                                     width=self.WIDTH, height=self.HEIGHT,
-                                     font=("ubuntu", 10, "bold"),
-                                     background=_from_rgb(34, 180, 34),
-                                     activebackground=_from_rgb(20, 150, 20),
-                                     activeforeground="#000")
-        self.more_button.grid(row=1, column=2, padx=self.PADX, pady=self.PADY)
-
-        # Stop button
-        self.stop_button = tk.Button(buttons_frame, text="Stop", command=self.zero_copters,
-                                     width=self.WIDTH, height=self.HEIGHT,
-                                     font=("ubuntu", 10, "bold"),
-                                     background=_from_rgb(210, 30, 30),
-                                     activebackground=_from_rgb(175, 20, 20),
-                                     activeforeground="#fff")
-        self.stop_button.grid(row=2, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
-
         # Force takeoff checkbox
         self.force_takeoff_var = tk.BooleanVar()
         self.force_takeoff_check = tk.Checkbutton(
@@ -188,7 +158,37 @@ class ButtonsFrame(ttk.Frame):
             command=self.toggle_force_takeoff,
             font=("ubuntu", 12)
         )
-        self.force_takeoff_check.grid(row=1, column=0, columnspan=3, pady=(self.PADY, 0))
+        self.force_takeoff_check.grid(row=1, column=0, columnspan=3, padx=self.PADX, pady=(0, self.PADY), sticky="ew")
+
+        # Less copters
+        self.less_button = tk.Button(buttons_frame, text="Less", command=self.less_copters,
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(255, 140, 0),
+                                     activebackground=_from_rgb(220, 110, 0),
+                                     activeforeground="#000")
+        self.less_button.grid(row=2, column=0, padx=self.PADX, pady=self.PADY)
+
+        self._desired_label = ttk.Label(buttons_frame, text="", font=("ubuntu", 33), width=3, anchor="center")
+        self._desired_label.grid(row=2, column=1)
+
+        # More copters
+        self.more_button = tk.Button(buttons_frame, text="More", command=self.more_copters,
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(34, 180, 34),
+                                     activebackground=_from_rgb(20, 150, 20),
+                                     activeforeground="#000")
+        self.more_button.grid(row=2, column=2, padx=self.PADX, pady=self.PADY)
+
+        # Stop button
+        self.stop_button = tk.Button(buttons_frame, text="Stop", command=self.zero_copters,
+                                     width=self.WIDTH, height=self.HEIGHT,
+                                     font=("ubuntu", 10, "bold"),
+                                     background=_from_rgb(210, 30, 30),
+                                     activebackground=_from_rgb(175, 20, 20),
+                                     activeforeground="#fff")
+        self.stop_button.grid(row=3, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
 
         # insert buttons frame in the content
         buttons_frame.grid(row=3 + 1, column=0, columnspan=3)
