@@ -44,7 +44,7 @@
 // Go to next waypoint
 #define WP_THRESHOLD              0.02f  //distance threshold to consider a waypoint reached
 #define WP_VEL_THRESHOLD          0.2f //velocity threshold to consider a waypoint reached
-#define REACHED_WP_TIMEOUT        4000 //ms
+#define REACHED_WP_TIMEOUT        10000 //ms
 #define COPTER_FLYING_ABOVE_THRESHOLD 0.5f //radius of cylinder that defines if a copter is flying above
 
 
