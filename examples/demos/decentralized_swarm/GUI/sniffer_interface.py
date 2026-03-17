@@ -56,6 +56,7 @@ class SnifferInterface:
         self._console_buffer = ""
 
         self.desired_cfs = 0
+        self.max_wand = 255
 
     def _console_incoming(self, console_text):
         # print each message in one line
@@ -108,6 +109,7 @@ class SnifferInterface:
 
         self._log_actions_conf = LogConfig(name='Actions', period_in_ms=1 / self.LOG_ACTIONS_FREQUENCY * 1000)
         self._log_actions_conf.add_variable('ds.desired')
+        self._log_actions_conf.add_variable('ds.maxWand')
         self.cf.log.add_config(self._log_actions_conf)
         self._log_actions_conf.data_received_cb.add_callback(self.log_actions)
         time.sleep(0.1)  # sleep to provide time for the other log
@@ -128,6 +130,7 @@ class SnifferInterface:
 
     def log_actions(self, timestamp, data, logconf):
         self.desired_cfs = int(data['ds.desired'])
+        self.max_wand = int(data['ds.maxWand'])
 
     def send_report(self):
         if self.report_socket is None or self.connection_successful is None:
@@ -148,7 +151,8 @@ class SnifferInterface:
 
             actions_data = {
                 'id': "action",
-                'desired': self.desired_cfs
+                'desired': self.desired_cfs,
+                'max_wand': self.max_wand
             }
 
             report.append(actions_data)
@@ -175,12 +179,13 @@ class SnifferInterface:
             "zero": self.zero,
             "all": self.all,
             "force_takeoff": self.toggle_force_takeoff,
+            "set_max_wand": self.set_max_wand,
         }
 
         try:
             report = self.command_socket.recv_json()
             function_to_call = commands_map[report['command']]
-            function_to_call()
+            function_to_call(report)
 
         except zmq.ZMQError as e:
             if e.errno == zmq.EAGAIN:
@@ -191,20 +196,23 @@ class SnifferInterface:
     def disconnect(self):
         self.cf.close_link()
 
-    def more(self):
+    def more(self, report=None):
         self.cf.param.set_value('app.more', 1)
 
-    def less(self):
+    def less(self, report=None):
         self.cf.param.set_value('app.less', 1)
 
-    def zero(self):
+    def zero(self, report=None):
         self.cf.param.set_value('app.zero', 1)
 
-    def all(self):
+    def all(self, report=None):
         self.cf.param.set_value('app.all', 1)
 
-    def toggle_force_takeoff(self):
+    def toggle_force_takeoff(self, report=None):
         self.cf.param.set_value('app.forceTakeoff', 1)
+
+    def set_max_wand(self, report):
+        self.cf.param.set_value('app.maxWand', report['value'])
 
 class snifferThread(threading.Thread):
     def __init__(self, *args, **kwargs):

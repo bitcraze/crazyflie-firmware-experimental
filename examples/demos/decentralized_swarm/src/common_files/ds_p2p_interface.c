@@ -42,6 +42,7 @@ copter_full_state_t copters[MAX_ADDRESS];
 // Higher level control
 static uint8_t desiredFlyingCopters = INITIAL_DESIRED_FLYING_COPTERS;
 static uint8_t forceTakeoff = INITIAL_FORCE_TAKEOFF;
+static uint8_t maxWandGrasped = 255;
 static bool isControlDataSetYet = false;
 static int32_t controlDataTimeMs = 0;  // Valid if isControlDataSetYet == true
 
@@ -83,6 +84,7 @@ void dsP2pHandlePacket(P2PPacket *p) {
             controlDataTimeMs = newControlDataTimeMs;
             desiredFlyingCopters = rxMessage.desiredFlyingCopters;
             forceTakeoff = rxMessage.forceTakeoff;
+            maxWandGrasped = rxMessage.maxWandGrasped;
             isControlDataSetYet = true;
         }
     }
@@ -130,6 +132,7 @@ void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
     if (isControlDataSetYet) {
         txMessage.desiredFlyingCopters = desiredFlyingCopters;
         txMessage.forceTakeoff = forceTakeoff;
+        txMessage.maxWandGrasped = maxWandGrasped;
         txMessage.ageOfControlDataMs = nowMs - controlDataTimeMs;
     }
 
@@ -350,6 +353,36 @@ void setForceTakeoff(uint8_t force) {
     controlDataTimeMs = T2M(xTaskGetTickCount());
 }
 
+static int getNrOfWandGraspedCopters(enum State ownState) {
+    int count = 0;
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && isWandState(copters[i].state)) {
+            count++;
+        }
+    }
+    if (isWandState(ownState)) {
+        count++;
+    }
+    return count;
+}
+
+uint8_t getMaxWandGrasped() {
+    return maxWandGrasped;
+}
+
+void setMaxWandGrasped(uint8_t max) {
+    maxWandGrasped = max;
+    isControlDataSetYet = true;
+    controlDataTimeMs = T2M(xTaskGetTickCount());
+}
+
+bool canReceiveWandSignal(enum State ownState) {
+    if (isWandState(ownState)) {
+        return true;  // Already grasped, keep tracking the wand
+    }
+    return getNrOfWandGraspedCopters(ownState) < maxWandGrasped;
+}
+
 //LOGS
 
 #define add_copter_log(i)   LOG_GROUP_START(id_##i)\
@@ -376,4 +409,5 @@ add_copter_log(9)
 
 LOG_GROUP_START(ds)
 LOG_ADD(LOG_UINT8, desired, &desiredFlyingCopters)
+LOG_ADD(LOG_UINT8, maxWand, &maxWandGrasped)
 LOG_GROUP_STOP(ds)

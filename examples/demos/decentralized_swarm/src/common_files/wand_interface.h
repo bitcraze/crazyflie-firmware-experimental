@@ -15,5 +15,11 @@ void wandUpdate(uint32_t nowTicks);
 
 bool wandIsGrasped(void);
 
+// Returns the current grasp attempt score (0.0 to 100.0). >0 means drone is in wand range.
+float wandGetAttemptScore(void);
+
 // Returns the current wand target in world coordinates
 void wandGetSetpoint(float *x, float *y, float *z);
+
+// Enable or disable wand signal processing. When disabled, wand is ignored and score is reset.
+void wandSetEnabled(bool enabled);

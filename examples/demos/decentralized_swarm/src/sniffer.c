@@ -107,6 +107,12 @@ static void allCopters() {
     broadcastDesiredFlyingCopters(255);
 }
 
+static uint8_t maxWandVal;
+static void setMaxWand() {
+    setMaxWandGrasped(maxWandVal);
+    endBroadcastTime = T2M(xTaskGetTickCount()) + 1000;
+}
+
 static uint8_t forceTakeoffVal;
 static void toggleForceTakeoff() {
     uint8_t current = isForceTakeoffEnabled() ? 0 : 1;
@@ -137,6 +143,7 @@ PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, less, &lessCoptersVal, &lessCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, zero, &zeroCoptersVal, &zeroCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, all, &allCoptersVal, &allCopters)
 PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, forceTakeoff, &forceTakeoffVal, &toggleForceTakeoff)
+PARAM_ADD_WITH_CALLBACK(PARAM_UINT8, maxWand, &maxWandVal, &setMaxWand)
 PARAM_GROUP_STOP(app)
 
 

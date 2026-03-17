@@ -190,6 +190,23 @@ class ButtonsFrame(ttk.Frame):
                                      activeforeground="#fff")
         self.stop_button.grid(row=3, column=0, columnspan=3, padx=self.PADX, pady=self.PADY, sticky="ew")
 
+        # Max Grasped row
+        self._current_max_wand = 255
+        max_wand_frame = ttk.Frame(buttons_frame)
+        max_wand_frame.grid(row=4, column=0, columnspan=3, pady=(0, self.PADY))
+
+        ttk.Label(max_wand_frame, text="Max Grasped:", font=("ubuntu", 12)).pack(side=tk.LEFT, padx=(self.PADX, 4))
+        self._max_wand_value_label = ttk.Label(max_wand_frame, text="255", font=("ubuntu", 12, "bold"), width=3, anchor="center")
+        self._max_wand_value_label.pack(side=tk.LEFT, padx=(0, 12))
+        tk.Button(max_wand_frame, text="None", command=self.max_wand_none,
+                  font=("ubuntu", 10, "bold"), width=6).pack(side=tk.LEFT, padx=2)
+        tk.Button(max_wand_frame, text="Less", command=self.max_wand_less,
+                  font=("ubuntu", 10, "bold"), width=6).pack(side=tk.LEFT, padx=2)
+        tk.Button(max_wand_frame, text="More", command=self.max_wand_more,
+                  font=("ubuntu", 10, "bold"), width=6).pack(side=tk.LEFT, padx=2)
+        tk.Button(max_wand_frame, text="All", command=self.max_wand_all,
+                  font=("ubuntu", 10, "bold"), width=6).pack(side=tk.LEFT, padx=(2, self.PADX))
+
         # insert buttons frame in the content
         buttons_frame.grid(row=3 + 1, column=0, columnspan=3)
 
@@ -220,6 +237,29 @@ class ButtonsFrame(ttk.Frame):
 
     def toggle_force_takeoff(self):
         self._send_command("force_takeoff")
+
+    def _send_max_wand(self, value):
+        value = max(0, min(255, value))
+        try:
+            self.socket.send_json({"command": "set_max_wand", "value": value}, zmq.NOBLOCK)
+        except Exception as e:
+            print(Fore.RED + "Error sending report: {}".format(e), Fore.RESET)
+
+    def max_wand_none(self):
+        self._send_max_wand(0)
+
+    def max_wand_less(self):
+        self._send_max_wand(self._current_max_wand - 1)
+
+    def max_wand_more(self):
+        self._send_max_wand(self._current_max_wand + 1)
+
+    def max_wand_all(self):
+        self._send_max_wand(255)
+
+    def update_max_wand(self, value):
+        self._current_max_wand = value
+        self._max_wand_value_label.config(text=str(value))
 
 
 sniffer_thread = snifferThread()
@@ -292,6 +332,7 @@ def receive_thread():
                 if data['id'] == "action":
                     desired = data['desired']
                     buttons.update_desired(desired)
+                    buttons.update_max_wand(data['max_wand'])
                     print(f"Desired: {desired}")
                 else:
                     # -1 because index starts at 0 and all flying copters have adrreses >=

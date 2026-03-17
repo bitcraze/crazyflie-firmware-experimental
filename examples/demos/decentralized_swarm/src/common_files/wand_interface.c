@@ -25,6 +25,7 @@ typedef struct {
 
 static float attemptScore = 0.0f;
 static bool grasped = false;
+static bool wandEnabled = true;
 static uint32_t lastPacketTime = 0;
 static float graspRange = 0.0f;
 static WandLinePacket lastPkt;
@@ -59,8 +60,20 @@ void wandInit(void)
     memset(&lastPkt, 0, sizeof(lastPkt));
 }
 
+void wandSetEnabled(bool enabled)
+{
+    if (!enabled) {
+        attemptScore = 0.0f;
+    }
+    wandEnabled = enabled;
+}
+
 void wandHandleP2PPacket(P2PPacket *p)
 {
+    if (!wandEnabled) {
+        return;
+    }
+
     if (p->port != WAND_P2P_PORT) {
         return;
     }
@@ -97,13 +110,9 @@ void wandHandleP2PPacket(P2PPacket *p)
 
     if (!grasped) {
         if (dist < GRASP_DIST) {
-            float prevScore = attemptScore;
             attemptScore = fminf(attemptScore + BUILD_RATE, 100.0f);
-            if (attemptScore > prevScore) {
-                // Shine orange when grasp score increases and not grasped
-                extern void ledSetRGB(uint8_t r, uint8_t g, uint8_t b);
-                ledSetRGB(0x60, 0x30, 0x00); // ORANGE_LED
-            }
+            extern void ledSetRGB(uint8_t r, uint8_t g, uint8_t b);
+            ledSetRGB(0x60, 0x30, 0x00); // ORANGE_LED
         }
 
         if (attemptScore > GRASP_THRESHOLD) {
@@ -124,11 +133,20 @@ void wandUpdate(uint32_t nowTicks)
         attemptScore = 0.0f;
         DEBUG_PRINT("RELEASED (lost wand signal)\n");
     }
+
+    if (!grasped && attemptScore > 0.0f && (nowTicks - lastPacketTime > M2T(800))) {
+        attemptScore = 0.0f;
+    }
 }
 
 bool wandIsGrasped(void)
 {
     return grasped;
+}
+
+float wandGetAttemptScore(void)
+{
+    return attemptScore;
 }
 
 void wandGetSetpoint(float *x, float *y, float *z)

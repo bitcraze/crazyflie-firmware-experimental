@@ -273,6 +273,7 @@ static void stateTransition(xTimerHandle timer)
 
     updateAliveTime();
     now_ms = T2M(xTaskGetTickCount());
+    wandSetEnabled(canReceiveWandSignal(state));
     wandUpdate(xTaskGetTickCount());
     switch (state)
     {
@@ -292,6 +293,12 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
+        if (!chargedForTakeoff()) {
+            ledSetRGB(CRG_LED);
+        } else {
+            ledSetRGB(GREEN_LED);
+        }
+
         if (wandIsGrasped())
         {
             DEBUG_PRINT("Wand grasp detected from ground, taking control...\n");
@@ -317,7 +324,6 @@ static void stateTransition(xTimerHandle timer)
         }
         else if (!chargedForTakeoff())
         {
-            ledSetRGB(CRG_LED);
             // do nothing, wait for the battery to be charged
         }
         else if (needMoreTakeoffQueuedCopters(state))

@@ -68,6 +68,7 @@ typedef struct {
     uint8_t isControlDataValid;
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
     uint8_t forceTakeoff; // If set to 1, bypass CHARGED_FOR_TAKEOFF_VOLTAGE and only check !isBatLow()
+    uint8_t maxWandGrasped; // Max number of drones that can be wand-grasped simultaneously. 255 = unlimited.
     uint32_t magicNumber;
 } copter_message_t;
 
@@ -117,5 +118,9 @@ uint8_t getAutonomousFlyingCoptersCount(enum State ownState);
 
 bool isForceTakeoffEnabled();
 void setForceTakeoff(uint8_t force);
+
+uint8_t getMaxWandGrasped();
+void setMaxWandGrasped(uint8_t max);
+bool canReceiveWandSignal(enum State ownState);
 
 #endif // P2P_INTERFACE_H
