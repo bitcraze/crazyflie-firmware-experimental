@@ -50,6 +50,7 @@ float getVoltage();
 bool isCharging();
 bool isLighthouseAvailable();
 void enableHighlevelCommander();
+void resetKalmanEstimator();
 
 void enableCollisionAvoidance();
 void disableCollisionAvoidance();

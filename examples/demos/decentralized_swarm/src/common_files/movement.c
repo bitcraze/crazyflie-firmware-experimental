@@ -69,6 +69,7 @@ bool outOfBounds(Position my_pos) {
 }
 
 void resetLockData() {
+    resetKalmanEstimator();
     lockWriteIndex = 0;
     for (uint32_t i = 0; i < LOCK_LENGTH; i++) {
       lockData[i][0] = FLT_MAX;
@@ -109,7 +110,7 @@ bool hasLock() {
       lYMax = fmaxf(lYMax, lockData[i][1]);
       lZMax = fmaxf(lZMax, lockData[i][2]);
 
-      lXMin = fminf(lXMax, lockData[i][0]);
+      lXMin = fminf(lXMin, lockData[i][0]);
       lYMin = fminf(lYMin, lockData[i][1]);
       lZMin = fminf(lZMin, lockData[i][2]);
     }

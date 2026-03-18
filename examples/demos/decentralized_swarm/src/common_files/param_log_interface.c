@@ -26,6 +26,7 @@
  */
 
 #include "param_log_interface.h"
+#include "task.h"
 
 //App parameters
 
@@ -60,6 +61,7 @@ static paramVarId_t paramIdCollisionAvoidanceBBoxMaxZ;
 static paramVarId_t paramIdCollisionAvoidanceBBoxMinX;
 static paramVarId_t paramIdCollisionAvoidanceBBoxMinY;
 static paramVarId_t paramIdCollisionAvoidanceBBoxMinZ;
+static paramVarId_t paramIdKalmanResetEstimation;
 
 // getting  parameters
 float getX() { return (float) logGetFloat(logIdStateEstimateX); }
@@ -79,6 +81,12 @@ bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.
 
 
 void enableHighlevelCommander() { paramSetInt(paramIdCommanderEnHighLevel, 1); }
+
+void resetKalmanEstimator() {
+    paramSetInt(paramIdKalmanResetEstimation, 1);
+    vTaskDelay(M2T(100));
+    paramSetInt(paramIdKalmanResetEstimation, 0);
+}
 
 
 void enableCollisionAvoidance() {
@@ -146,6 +154,7 @@ void initParamLogInterface(){
     paramIdCollisionAvoidanceBBoxMinX = paramGetVarId("colAv", "bboxMinX");
     paramIdCollisionAvoidanceBBoxMinY = paramGetVarId("colAv", "bboxMinY");
     paramIdCollisionAvoidanceBBoxMinZ = paramGetVarId("colAv", "bboxMinZ");
+    paramIdKalmanResetEstimation = paramGetVarId("kalman", "resetEstimation");
 
     initLogIds();
 }

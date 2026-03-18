@@ -291,6 +291,11 @@ static void stateTransition(xTimerHandle timer)
             DEBUG_PRINT("Position lock acquired, ready for take off..\n");
             state = STATE_WAIT_FOR_TAKE_OFF;
         }
+        else if ((now_ms - position_lock_start_time_ms) > POSITION_LOCK_TIMEOUT)
+        {
+            DEBUG_PRINT("Position lock timeout, retrying...\n");
+            state = STATE_IDLE;
+        }
         break;
     case STATE_WAIT_FOR_TAKE_OFF: // This is the main state when not flying
         if (!chargedForTakeoff()) {
@@ -369,9 +374,10 @@ static void stateTransition(xTimerHandle timer)
                 ledSetRGB(RED_LED);
             }
         }
-        else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove(my_pos))
+        else if (now_ms > random_time_for_next_event_ms && noCopterFlyingAbove(my_pos) && hasLock())
         {
             DEBUG_PRINT("Taking off...\n");
+            updatePadPosition();
             startTakeOffSequence();
             updateTakeOffTime();
             state = STATE_TAKING_OFF;
