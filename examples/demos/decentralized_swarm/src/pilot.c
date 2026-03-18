@@ -256,7 +256,7 @@ static void stateTransition(xTimerHandle timer)
     my_pos.y = getY();
     my_pos.z = getZ();
 
-    if (supervisorIsCrashed())
+    if (supervisorIsCrashed() || supervisorIsTumbled())
     {
         state = STATE_CRASHED;
     }
@@ -574,7 +574,8 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
     case STATE_CRASHED:
-        if (!(supervisorIsCrashed()))
+        supervisorRequestArming(false);
+        if (!supervisorIsCrashed() && !supervisorIsTumbled())
         {
             DEBUG_PRINT("Crash recovery successful, going to wait for position lock\n");
             resetLockData();
