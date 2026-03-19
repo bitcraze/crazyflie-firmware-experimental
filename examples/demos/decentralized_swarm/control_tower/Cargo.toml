@@ -1,0 +1,15 @@
+[package]
+name = "swarm-control-tower"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+slint = "1.14"
+glow = "0.16"
+crazyradio = { git = "https://github.com/bitcraze/crazyradio-rs.git", branch = "ataffanel/sniffer", features = ["async"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+
+[build-dependencies]
+slint-build = "1.14"
