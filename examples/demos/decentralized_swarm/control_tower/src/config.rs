@@ -24,6 +24,32 @@ pub fn settings_active_area() -> ActiveArea {
     }
 }
 
+/// Scan `config_dir` for any YAML file that contains a `geos:` lighthouse section.
+/// Returns the path if exactly one match is found; prints an error and returns None if multiple are found.
+pub fn find_lighthouse_yaml(config_dir: &Path) -> Option<std::path::PathBuf> {
+    let dir = std::fs::read_dir(config_dir).ok()?;
+    let mut candidates: Vec<std::path::PathBuf> = dir
+        .filter_map(|e| e.ok())
+        .map(|e| e.path())
+        .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("yaml"))
+        .collect();
+    candidates.sort(); // deterministic order
+    let matches: Vec<std::path::PathBuf> = candidates.into_iter()
+        .filter(|p| std::fs::read_to_string(p).map(|t| t.contains("geos:")).unwrap_or(false))
+        .collect();
+    match matches.len() {
+        0 => None,
+        1 => Some(matches.into_iter().next().unwrap()),
+        _ => {
+            eprintln!("ERROR: Multiple lighthouse YAML files found in '{}'. Please keep only one:", config_dir.display());
+            for p in &matches {
+                eprintln!("  - {}", p.display());
+            }
+            None
+        }
+    }
+}
+
 pub fn load_lighthouse_geometry(yaml_path: &str, config_dir: &Path) -> Vec<BaseStation> {
     let full_path = if Path::new(yaml_path).is_absolute() {
         yaml_path.to_string()

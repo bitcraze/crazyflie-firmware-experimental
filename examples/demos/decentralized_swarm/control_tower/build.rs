@@ -10,7 +10,7 @@ fn main() {
     let text = std::fs::read_to_string(&settings_path)
         .expect("Failed to read ../src/common_files/settings.h");
 
-    println!("cargo:rustc-env=LIGHTHOUSE_YAML=../config/Lighthouse_Cage.yaml");
+    println!("cargo:rustc-env=LIGHTHOUSE_DIR=../config");
 
     for (define, env_key) in &[
         ("MIN_X_BOUND", "SETTINGS_MIN_X_BOUND"),

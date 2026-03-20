@@ -173,10 +173,17 @@ struct BroadcastCmd {
 fn main() {
     let radio_config = parse_args();
 
-    // Bounds and lighthouse path supplied by build.rs (repo-specific)
     let active_area = Some(config::settings_active_area());
-    let base_stations = config::load_lighthouse_geometry(
-        env!("LIGHTHOUSE_YAML"), std::path::Path::new("."));
+    let lighthouse_dir = std::path::Path::new(env!("LIGHTHOUSE_DIR"));
+    let base_stations = config::find_lighthouse_yaml(lighthouse_dir)
+        .map(|p| {
+            eprintln!("Auto-detected lighthouse file: {}", p.display());
+            config::load_lighthouse_geometry(&p.to_string_lossy(), std::path::Path::new(""))
+        })
+        .unwrap_or_else(|| {
+            eprintln!("No lighthouse YAML found in {}", lighthouse_dir.display());
+            Vec::new()
+        });
 
     slint::BackendSelector::new()
         .require_opengl_es()
