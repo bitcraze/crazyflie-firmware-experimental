@@ -9,6 +9,9 @@ pub const MAGIC_NUMBER: u32 = 0xbc471117;
 pub const MAX_COPTERS: usize = 10;
 pub const ALIVE_TIMEOUT_MS: u64 = 1000;
 pub const WAND_TIMEOUT_MS: u64 = 1500;
+/// Sentinel value meaning "no emergency stop" in the emergencyStop field.
+/// 0xFF = stop all, 0x00–0x09 = stop specific drone ID, 0xFE = no stop.
+pub const EMERGENCY_STOP_NONE: u8 = 0xFE;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -33,6 +36,7 @@ pub enum CopterState {
     Sniffing = 17,
     WandGrasped = 18,
     WandReleased = 19,
+    Locked = 20,
     Unknown = 255,
 }
 
@@ -59,6 +63,7 @@ impl CopterState {
             17 => Self::Sniffing,
             18 => Self::WandGrasped,
             19 => Self::WandReleased,
+            20 => Self::Locked,
             _ => Self::Unknown,
         }
     }
@@ -85,6 +90,7 @@ impl CopterState {
             Self::Sniffing => "Sniffer",
             Self::WandGrasped => "Wand Grasped",
             Self::WandReleased => "Wand Released",
+            Self::Locked => "LOCKED",
             Self::Unknown => "Unknown",
         }
     }
@@ -114,8 +120,9 @@ impl CopterState {
             Self::CheckCharging => [0.6, 0.3, 0.9],
             Self::RepositionOnPad => [0.7, 0.4, 0.8],
 
-            // Error - red
+            // Error/locked - red
             Self::Crashed => [1.0, 0.1, 0.1],
+            Self::Locked => [1.0, 0.0, 0.0],
 
             // Wand states - cyan/teal
             Self::WandGrasped => [0.0, 0.9, 0.7],
@@ -146,12 +153,16 @@ pub struct CopterFullState {
     pub max_wand_grasped: u8,
 }
 
-/// Build a P2P broadcast packet to set desiredFlyingCopters and maxWandGrasped.
+/// Build a P2P broadcast packet to set desiredFlyingCopters, maxWandGrasped and emergencyStop.
 ///
-/// Format matches real firmware: [0xFF, 0x80|P2P_PORT, copter_message_t(44 bytes)]
+/// Format matches real firmware: [0xFF, 0x80|P2P_PORT, copter_message_t(48 bytes)]
 /// copter_message_t is naturally aligned (no packed attribute).
-pub fn build_control_packet(desired_flying: u8, force_takeoff: bool, max_wand_grasped: u8) -> Vec<u8> {
-    let mut pkt = Vec::with_capacity(46);
+/// Adding emergencyStop (u8) before magicNumber (u32) introduces 3 bytes of padding
+/// to keep magicNumber 4-byte aligned, bringing the struct from 44 to 48 bytes.
+///
+/// emergency_stop encoding: 0=none, 1-9=stop specific drone ID, 0xFF=stop all.
+pub fn build_control_packet(desired_flying: u8, force_takeoff: bool, max_wand_grasped: u8, emergency_stop: u8) -> Vec<u8> {
+    let mut pkt = Vec::with_capacity(50);
 
     // ESB P2P header: 0xFF = CRTP P2P marker, 0x80 = P2P flag on port byte
     pkt.push(0xFF);
@@ -182,6 +193,9 @@ pub fn build_control_packet(desired_flying: u8, force_takeoff: bool, max_wand_gr
     pkt.push(if force_takeoff { 1 } else { 0 });
     // maxWandGrasped (u8)
     pkt.push(max_wand_grasped);
+    // emergencyStop (u8) + 3 bytes natural alignment padding before magicNumber
+    pkt.push(emergency_stop);
+    pkt.extend_from_slice(&[0u8; 3]);
     // magicNumber (u32)
     pkt.extend_from_slice(&MAGIC_NUMBER.to_le_bytes());
 
@@ -256,7 +270,7 @@ pub fn parse_sniffer_payload(payload: &[u8]) -> Option<CopterFullState> {
     let has_goto = msg_data.len() >= 32;
 
     // desiredFlyingCopters and maxWandGrasped offsets depend on alignment:
-    //   Aligned (44-byte msg): desiredFlyingCopters=37, forceTakeoff=38, maxWandGrasped=39, magic=40
+    //   Aligned (48-byte msg): desiredFlyingCopters=37, forceTakeoff=38, maxWandGrasped=39, emergencyStop=40, magic=44
     //   Packed  (30-byte msg): desiredFlyingCopters=25, magic=26 (no forceTakeoff/maxWandGrasped)
     let (desired_flying, max_wand_grasped) = if has_goto {
         // Naturally aligned

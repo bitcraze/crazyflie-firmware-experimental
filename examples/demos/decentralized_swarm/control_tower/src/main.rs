@@ -170,6 +170,13 @@ struct BroadcastCmd {
     max_wand_grasped: u8,
 }
 
+/// Emergency stop command.
+struct StopCmd {
+    target: Option<usize>, // None = all drones, Some(id) = specific drone
+    desired_flying: u8,    // 0 for stop-all, current value for single-drone stop
+    max_wand_grasped: u8,  // preserve current value
+}
+
 fn main() {
     let radio_config = parse_args();
 
@@ -206,6 +213,9 @@ fn main() {
 
     // Command channel for desired_flying broadcasts
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<BroadcastCmd>();
+
+    // Emergency stop channel
+    let (stop_tx, stop_rx) = mpsc::unbounded_channel::<StopCmd>();
 
     // Wire up control buttons
     {
@@ -299,6 +309,31 @@ fn main() {
         });
     }
 
+    // Wire up emergency stop callbacks
+    {
+        let tx = stop_tx.clone();
+        let app_ref = app.as_weak();
+        app.on_emergency_stop_all(move || {
+            if let Some(app) = app_ref.upgrade() {
+                let max_wand = app.get_max_wand_grasped() as u8;
+                eprintln!("[UI] Emergency stop ALL");
+                let _ = tx.send(StopCmd { target: None, desired_flying: 0, max_wand_grasped: max_wand });
+            }
+        });
+    }
+    {
+        let tx = stop_tx.clone();
+        let app_ref = app.as_weak();
+        app.on_emergency_stop(move |copter_id| {
+            if let Some(app) = app_ref.upgrade() {
+                let desired = app.get_desired_flying() as u8;
+                let max_wand = app.get_max_wand_grasped() as u8;
+                eprintln!("[UI] Emergency stop CF#{}", copter_id);
+                let _ = tx.send(StopCmd { target: Some(copter_id as usize), desired_flying: desired, max_wand_grasped: max_wand });
+            }
+        });
+    }
+
     // Wire up clear-trail callback
     {
         let state = shared_state.clone();
@@ -317,7 +352,7 @@ fn main() {
     let radio_state = shared_state.clone();
     let radio_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(radio_sniffer_task(radio_state, radio_config, cmd_rx, shutdown_rx));
+        rt.block_on(radio_sniffer_task(radio_state, radio_config, cmd_rx, stop_rx, shutdown_rx));
     });
 
     // Set up rendering notifier
@@ -674,6 +709,7 @@ async fn radio_sniffer_task(
     state: SharedCopterState,
     config: RadioConfig,
     mut cmd_rx: mpsc::UnboundedReceiver<BroadcastCmd>,
+    mut stop_rx: mpsc::UnboundedReceiver<StopCmd>,
     mut shutdown: watch::Receiver<bool>,
 ) {
     loop {
@@ -692,7 +728,7 @@ async fn radio_sniffer_task(
             }
         };
 
-        let res = run_sniffer(cr, &state, &config, &mut cmd_rx, &mut shutdown).await;
+        let res = run_sniffer(cr, &state, &config, &mut cmd_rx, &mut stop_rx, &mut shutdown).await;
         state.lock().unwrap().radio_connected = false;
         if let Err(e) = res {
             eprintln!("Sniffer error: {:?}. Reconnecting in 2s...", e);
@@ -710,6 +746,7 @@ async fn run_sniffer(
     state: &SharedCopterState,
     config: &RadioConfig,
     cmd_rx: &mut mpsc::UnboundedReceiver<BroadcastCmd>,
+    stop_rx: &mut mpsc::UnboundedReceiver<StopCmd>,
     shutdown: &mut watch::Receiver<bool>,
 ) -> Result<(), crazyradio::Error> {
     cr.set_channel(crazyradio::Channel::from_number(config.channel)?)?;
@@ -806,7 +843,7 @@ async fn run_sniffer(
                 }
             }
             Some(cmd) = cmd_rx.recv() => {
-                let packet = protocol::build_control_packet(cmd.desired_flying, cmd.force_takeoff, cmd.max_wand_grasped);
+                let packet = protocol::build_control_packet(cmd.desired_flying, cmd.force_takeoff, cmd.max_wand_grasped, protocol::EMERGENCY_STOP_NONE);
                 eprintln!("Broadcasting desired_flying={} force_takeoff={} len:{} data:{:02X?}",
                     cmd.desired_flying, cmd.force_takeoff, packet.len(), &packet);
                 // Send burst for reliability (10 packets over ~1s)
@@ -818,6 +855,23 @@ async fn run_sniffer(
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
                 eprintln!("Broadcast burst complete");
+            }
+            Some(cmd) = stop_rx.recv() => {
+                let emergency_stop: u8 = match cmd.target {
+                    None => 0xFF,
+                    Some(id) => id as u8,
+                };
+                let packet = protocol::build_control_packet(cmd.desired_flying, false, cmd.max_wand_grasped, emergency_stop);
+                eprintln!("[STOP] Broadcasting emergency stop target=0x{:02X}", emergency_stop);
+                // Send burst for reliability
+                for i in 0..10 {
+                    if let Err(e) = sender.send_broadcast(&config.address, &packet).await {
+                        eprintln!("[STOP] Broadcast error at attempt {}: {:?}", i, e);
+                        break;
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+                eprintln!("[STOP] Done");
             }
             _ = shutdown.changed() => {
                 break 'sniffer;

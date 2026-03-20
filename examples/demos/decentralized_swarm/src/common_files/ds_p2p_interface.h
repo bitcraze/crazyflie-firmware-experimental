@@ -69,10 +69,11 @@ typedef struct {
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
     uint8_t forceTakeoff; // If set to 1, bypass CHARGED_FOR_TAKEOFF_VOLTAGE and only check !isBatLow()
     uint8_t maxWandGrasped; // Max number of drones that can be wand-grasped simultaneously. 255 = unlimited.
+    uint8_t emergencyStop; // 0=none, 1-9=stop specific drone ID, 0xFF=stop all
     uint32_t magicNumber;
 } copter_message_t;
 
-void initP2P();
+void initP2P(uint8_t own_id);
 
 // Handle incoming P2P packets for the swarm protocol (port 5)
 void dsP2pHandlePacket(P2PPacket *p);
@@ -122,5 +123,7 @@ void setForceTakeoff(uint8_t force);
 uint8_t getMaxWandGrasped();
 void setMaxWandGrasped(uint8_t max);
 bool canReceiveWandSignal(enum State ownState);
+
+bool isEmergencyStopTriggered(void);
 
 #endif // P2P_INTERFACE_H

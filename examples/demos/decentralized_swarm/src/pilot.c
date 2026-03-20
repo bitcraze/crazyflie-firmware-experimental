@@ -256,7 +256,12 @@ static void stateTransition(xTimerHandle timer)
     my_pos.y = getY();
     my_pos.z = getZ();
 
-    if (supervisorIsCrashed() || supervisorIsTumbled())
+    if (isEmergencyStopTriggered())
+    {
+        supervisorRequestArming(false);
+        state = STATE_LOCKED;
+    }
+    else if (supervisorIsCrashed() || supervisorIsTumbled())
     {
         state = STATE_CRASHED;
     }
@@ -677,7 +682,7 @@ void appMain()
     ledseqRegisterSequence(&seq_estim_stuck);
     ledseqRegisterSequence(&seq_crash);
 
-    initP2P();
+    initP2P(my_id);
     initOtherStates();
     wandInit();
     p2pRegisterCB(appP2PDispatch);

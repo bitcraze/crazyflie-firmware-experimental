@@ -71,6 +71,8 @@ export component AppWindow inherits Window {
     callback request-all-wand();
     callback request-none-wand();
     callback clear-trail(int);
+    callback emergency-stop(int);
+    callback emergency-stop-all();
 
     HorizontalLayout {
         // Side panel - copter list (left)
@@ -172,6 +174,115 @@ export component AppWindow inherits Window {
                     }
                 }
 
+                // Emergency Stop All
+                Rectangle {
+                    height: 34px;
+                    border-radius: 4px;
+                    background: estop-all-touch.has-hover ? #901818 : #c02020;
+
+                    estop-all-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { estop-confirm.show(); }
+                    }
+
+                    Text {
+                        width: 100%;
+                        height: 100%;
+                        text: "EMERGENCY STOP ALL";
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: #ffffff;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    estop-confirm := PopupWindow {
+                        x: 0px;
+                        y: 40px;
+                        width: 240px;
+
+                        Rectangle {
+                            width: 240px;
+                            background: Palette.background;
+                            border-width: 2px;
+                            border-color: #c02020;
+                            border-radius: 4px;
+
+                            VerticalLayout {
+                                padding: 12px;
+                                spacing: 8px;
+
+                                Text {
+                                    text: "All flying drones will fall from the sky.";
+                                    font-size: 11px;
+                                    color: #e04040;
+                                    wrap: word-wrap;
+                                }
+                                Text {
+                                    text: "Are you sure?";
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: Palette.foreground;
+                                }
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+
+                                    Rectangle {
+                                        height: 28px;
+                                        horizontal-stretch: 1;
+                                        border-radius: 3px;
+                                        background: confirm-touch.has-hover ? #901818 : #c02020;
+
+                                        confirm-touch := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.emergency-stop-all();
+                                                estop-confirm.close();
+                                            }
+                                        }
+
+                                        Text {
+                                            width: 100%;
+                                            height: 100%;
+                                            text: "STOP ALL";
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            color: #ffffff;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        height: 28px;
+                                        horizontal-stretch: 1;
+                                        border-radius: 3px;
+                                        background: cancel-touch.has-hover ? Palette.background.darker(0.1) : Palette.background.darker(0.03);
+                                        border-width: 1px;
+                                        border-color: Palette.border;
+
+                                        cancel-touch := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => { estop-confirm.close(); }
+                                        }
+
+                                        Text {
+                                            width: 100%;
+                                            height: 100%;
+                                            text: "Cancel";
+                                            font-size: 11px;
+                                            color: Palette.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Rectangle {
                     height: 1px;
                     background: Palette.border;
@@ -217,6 +328,7 @@ export component AppWindow inherits Window {
 
                             VerticalLayout {
                                 padding: 4px;
+                                spacing: 2px;
 
                                 Rectangle {
                                     height: 28px;
@@ -235,6 +347,32 @@ export component AppWindow inherits Window {
                                         text: "Clear trail";
                                         font-size: 12px;
                                         color: Palette.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 1px;
+                                    background: Palette.border.transparentize(0.5);
+                                }
+
+                                Rectangle {
+                                    height: 28px;
+                                    border-radius: 3px;
+                                    background: estop-touch.has-hover ? #c02020 : transparent;
+
+                                    estop-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => {
+                                            root.emergency-stop(copter.id);
+                                        }
+                                    }
+
+                                    Text {
+                                        x: 8px;
+                                        text: "Emergency Stop";
+                                        font-size: 12px;
+                                        color: estop-touch.has-hover ? #ffffff : #e04040;
                                         vertical-alignment: center;
                                     }
                                 }

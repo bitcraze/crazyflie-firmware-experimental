@@ -124,7 +124,7 @@ void appMain()
 {
     DEBUG_PRINT("Running Decentralized swarm sniffer ...\n");
 
-    initP2P();
+    initP2P(0);
     initOtherStates();
 
     broadcastTimer = xTimerCreate("SendPosTimer", M2T(BROADCAST_PERIOD_MS), pdTRUE, NULL, broadcastData);

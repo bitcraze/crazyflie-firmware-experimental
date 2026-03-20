@@ -47,6 +47,8 @@ static bool isControlDataSetYet = false;
 static int32_t controlDataTimeMs = 0;  // Valid if isControlDataSetYet == true
 
 static uint8_t counter = 0;
+static uint8_t own_id = 0;
+static bool emergencyStopTriggered = false;
 
 uint8_t getCopterState(uint8_t copter_id){
     return copters[copter_id].state;
@@ -89,6 +91,11 @@ void dsP2pHandlePacket(P2PPacket *p) {
         }
     }
 
+    if (rxMessage.emergencyStop != 0xFE &&
+        (rxMessage.emergencyStop == 0xFF || rxMessage.emergencyStop == own_id)) {
+        emergencyStopTriggered = true;
+    }
+
     // If not a message from the sniffer, send the position to the peer localization system to handle collision avoidance
     if (received_id > 0) {
         enum State state = rxMessage.fullState.state;
@@ -117,8 +124,13 @@ void dsP2pHandlePacket(P2PPacket *p) {
     }
 }
 
-void initP2P() {
+void initP2P(uint8_t id) {
+    own_id = id;
     p2pRegisterCB(dsP2pHandlePacket);
+}
+
+bool isEmergencyStopTriggered(void) {
+    return emergencyStopTriggered;
 }
 
 void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
@@ -136,6 +148,7 @@ void broadcastToPeers(const copter_full_state_t* state, const uint32_t nowMs) {
         txMessage.ageOfControlDataMs = nowMs - controlDataTimeMs;
     }
 
+    txMessage.emergencyStop = 0xFE; // no emergency stop
     txMessage.magicNumber = THE_MAGIC_NUMBER;
 
     packet.port = P2P_PORT;
