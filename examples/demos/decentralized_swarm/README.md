@@ -110,6 +110,31 @@ The build system automatically:
 - Writes APP_TYPE to `build/.app_type` to trigger proper dependency tracking
 - Skips unnecessary rebuilds when APP_TYPE hasn't changed
 
+## Lighthouse Configuration
+
+The `write-geo-all.py` script uploads a lighthouse geometry YAML file to all pilot drones and verifies they all received the same configuration. Sniffer drones are always skipped automatically.
+
+Place your lighthouse geometry YAML file (exported from the Crazyflie client) in the `config/` folder - the name can be anything.
+
+```bash
+# Write to all pilot drones, then verify
+uv run write-geo-all.py config/my_cage.yaml --all
+
+# Write to a range of drones, then verify
+uv run write-geo-all.py config/my_cage.yaml --range 1-6
+
+# Write to specific drones, then verify
+uv run write-geo-all.py config/my_cage.yaml --ids 1 2 3
+
+# Verify only (no write)
+uv run write-geo-all.py --verify --all
+```
+
+The script automatically:
+- Filters out sniffer drones
+- Verifies that every drone received the same geometry (position and orientation of each base station)
+- Reports mismatches per base station if any are found
+
 ## GUI
 
 Run the tower GUI for swarm monitoring and control:
