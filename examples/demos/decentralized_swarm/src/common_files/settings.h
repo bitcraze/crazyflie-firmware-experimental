@@ -78,14 +78,14 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 20000 //ms
 
 // BOUNDS DEFINITIONS
-#define MIN_X_BOUND -1.36f
-#define MAX_X_BOUND 1.72f
+#define MIN_X_BOUND -0.33f
+#define MAX_X_BOUND 1.22f
 
-#define MIN_Y_BOUND -1.66f
-#define MAX_Y_BOUND 1.35f
+#define MIN_Y_BOUND -1.15f
+#define MAX_Y_BOUND 1.25f
 
 #define MIN_Z_BOUND 0.3f
-#define MAX_Z_BOUND  2.3f
+#define MAX_Z_BOUND  1.8f
 
 // getRandomPositionOnCircle or getRandomPositionOnBox
 // #define RANDOMIZATION_METHOD getRandomPositionOnCircle
