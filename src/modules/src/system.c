@@ -56,6 +56,7 @@
 #include "usblink.h"
 #include "mem.h"
 #include "crtp_mem.h"
+#include "crtp_supervisor.h"
 #include "proximity.h"
 #include "watchdog.h"
 #include "queuemonitor.h"
@@ -120,6 +121,7 @@ void systemInit(void)
   debugInit();
   crtpInit();
   consoleInit();
+  crtpSupervisorInit();
 
   DEBUG_PRINT("----------------------------\n");
   DEBUG_PRINT("%s is up and running!\n", platformConfigGetDeviceTypeName());
@@ -362,6 +364,15 @@ void systemRequestShutdown()
   SyslinkPacket slp;
 
   slp.type = SYSLINK_PM_ONOFF_SWITCHOFF;
+  slp.length = 0;
+  syslinkSendPacket(&slp);
+}
+
+void systemRequestShutdownSTM()
+{
+  SyslinkPacket slp;
+
+  slp.type = SYSLINK_PM_ONOFF_STM_OFF;
   slp.length = 0;
   syslinkSendPacket(&slp);
 }
