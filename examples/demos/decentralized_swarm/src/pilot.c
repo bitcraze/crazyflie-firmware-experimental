@@ -123,6 +123,7 @@ static logVarId_t idYaw;
 static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
+static uint32_t queued_start_time_ms = 0;
 
 static void appP2PDispatch(P2PPacket *p)
 {
@@ -334,6 +335,7 @@ static void stateTransition(xTimerHandle timer)
         else if (needMoreTakeoffQueuedCopters(state))
         {
             DEBUG_PRINT("More copters needed, entering queue...\n");
+            queued_start_time_ms = now_ms;
             state = STATE_QUEUED_FOR_TAKE_OFF;
             ledSetRGB(ORANGE_LED);
         }
@@ -351,7 +353,7 @@ static void stateTransition(xTimerHandle timer)
             state = STATE_WAIT_FOR_TAKE_OFF;
             ledSetRGB(RED_LED);
         }
-        else if (needMoreCopters(state))
+        else if (needMoreCopters(state) && (now_ms - queued_start_time_ms >= 2 * BROADCAST_PERIOD_MS))
         {
             DEBUG_PRINT("More copters needed, preparing for take off...\n");
             if (supervisorRequestArming(true))
