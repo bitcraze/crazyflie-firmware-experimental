@@ -170,11 +170,77 @@ struct BroadcastCmd {
     max_wand_grasped: u8,
 }
 
+#[derive(Clone, Debug)]
+enum PowerCmd { Reboot, Sleep, Wake }
+
+enum SnifferExit {
+    Shutdown,
+    Error(crazyradio::Error),
+    Power(PowerCmd),
+}
+
+// nRF51 bootloader-level commands (same as swarmkeeper)
+const BOOTLOADER_TARGET_NRF51: u8 = 0xFE;
+const BOOTLOADER_CMD_SYS_OFF:   u8 = 0x02;
+const BOOTLOADER_CMD_SYS_ON:    u8 = 0x03;
+const BOOTLOADER_CMD_RESET_INIT: u8 = 0xFF;
+const BOOTLOADER_CMD_RESET:     u8 = 0xF0;
+
+async fn send_bootloader_cmd(
+    link_context: &crazyflie_link::LinkContext,
+    uri: &str,
+    cmd: u8,
+    data: &[u8],
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let link = link_context.open_link(uri).await?;
+    let mut packet = vec![0xFF, BOOTLOADER_TARGET_NRF51, cmd];
+    packet.extend_from_slice(data);
+    link.send_packet(packet.into()).await?;
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    Ok(())
+}
+
+async fn execute_power_cmd(pilot_uris: &[String], cmd: PowerCmd) {
+    if pilot_uris.is_empty() {
+        eprintln!("[POWER] No pilot URIs configured — skipping.");
+        return;
+    }
+    // Brief delay to let the sniffer release the USB Crazyradio before we claim it.
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    let link_context = std::sync::Arc::new(crazyflie_link::LinkContext::new());
+    let mut join_set = tokio::task::JoinSet::new();
+    for uri in pilot_uris.iter().cloned() {
+        let lc = link_context.clone();
+        let cmd = cmd.clone();
+        join_set.spawn(async move {
+            let result = match cmd {
+                PowerCmd::Sleep  => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_OFF, &[]).await,
+                PowerCmd::Wake   => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_ON,  &[]).await,
+                PowerCmd::Reboot => {
+                    if let Err(e) = send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_RESET_INIT, &[]).await {
+                        eprintln!("[POWER] reset-init failed for {}: {}", uri, e);
+                        return;
+                    }
+                    send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_RESET, &[0x01]).await
+                        .map_err(|e| { eprintln!("[POWER] reset failed for {}: {}", uri, e); e }).ok();
+                    return;
+                }
+            };
+            if let Err(e) = result {
+                eprintln!("[POWER] command failed for {}: {}", uri, e);
+            }
+        });
+    }
+    while join_set.join_next().await.is_some() {}
+    eprintln!("[POWER] Done.");
+}
+
 fn main() {
     let radio_config = parse_args();
 
     let active_area = Some(config::settings_active_area());
     let lighthouse_dir = std::path::Path::new(env!("LIGHTHOUSE_DIR"));
+    let pilot_uris = config::load_pilot_uris(lighthouse_dir);
     let base_stations = config::find_lighthouse_yaml(lighthouse_dir)
         .map(|p| {
             eprintln!("Auto-detected lighthouse file: {}", p.display());
@@ -206,6 +272,8 @@ fn main() {
 
     // Command channel for desired_flying broadcasts
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<BroadcastCmd>();
+    // Power command channel (reboot / sleep / wake)
+    let (power_tx, power_rx) = mpsc::unbounded_channel::<PowerCmd>();
 
     // Wire up control buttons
     {
@@ -299,6 +367,29 @@ fn main() {
         });
     }
 
+    // Wire up power management callbacks
+    {
+        let tx = power_tx.clone();
+        app.on_reboot_all(move || {
+            eprintln!("[UI] Reboot all");
+            let _ = tx.send(PowerCmd::Reboot);
+        });
+    }
+    {
+        let tx = power_tx.clone();
+        app.on_sleep_all(move || {
+            eprintln!("[UI] Sleep all");
+            let _ = tx.send(PowerCmd::Sleep);
+        });
+    }
+    {
+        let tx = power_tx.clone();
+        app.on_wake_all(move || {
+            eprintln!("[UI] Wake all");
+            let _ = tx.send(PowerCmd::Wake);
+        });
+    }
+
     // Wire up clear-trail callback
     {
         let state = shared_state.clone();
@@ -317,7 +408,7 @@ fn main() {
     let radio_state = shared_state.clone();
     let radio_thread = std::thread::spawn(move || {
         let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(radio_sniffer_task(radio_state, radio_config, cmd_rx, shutdown_rx));
+        rt.block_on(radio_sniffer_task(radio_state, radio_config, pilot_uris, cmd_rx, power_rx, shutdown_rx));
     });
 
     // Set up rendering notifier
@@ -673,7 +764,9 @@ fn main() {
 async fn radio_sniffer_task(
     state: SharedCopterState,
     config: RadioConfig,
+    pilot_uris: Vec<String>,
     mut cmd_rx: mpsc::UnboundedReceiver<BroadcastCmd>,
+    mut power_rx: mpsc::UnboundedReceiver<PowerCmd>,
     mut shutdown: watch::Receiver<bool>,
 ) {
     loop {
@@ -692,16 +785,29 @@ async fn radio_sniffer_task(
             }
         };
 
-        let res = run_sniffer(cr, &state, &config, &mut cmd_rx, &mut shutdown).await;
-        state.lock().unwrap().radio_connected = false;
-        if let Err(e) = res {
-            eprintln!("Sniffer error: {:?}. Reconnecting in 2s...", e);
-            tokio::select! {
-                _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {}
-                _ = shutdown.changed() => break,
+        match run_sniffer(cr, &state, &config, &mut cmd_rx, &mut power_rx, &mut shutdown).await {
+            SnifferExit::Shutdown => {
+                state.lock().unwrap().radio_connected = false;
+                break;
+            }
+            SnifferExit::Error(e) => {
+                state.lock().unwrap().radio_connected = false;
+                eprintln!("Sniffer error: {:?}. Reconnecting in 2s...", e);
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(2)) => {}
+                    _ = shutdown.changed() => break,
+                }
+            }
+            SnifferExit::Power(cmd) => {
+                state.lock().unwrap().radio_connected = false;
+                eprintln!("[POWER] Executing {:?}...", cmd);
+                execute_power_cmd(&pilot_uris, cmd).await;
+                // Brief pause before re-opening the radio in sniffer mode.
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
         }
     }
+    let _ = slint::quit_event_loop();
     eprintln!("Radio task stopped.");
 }
 
@@ -710,11 +816,15 @@ async fn run_sniffer(
     state: &SharedCopterState,
     config: &RadioConfig,
     cmd_rx: &mut mpsc::UnboundedReceiver<BroadcastCmd>,
+    power_rx: &mut mpsc::UnboundedReceiver<PowerCmd>,
     shutdown: &mut watch::Receiver<bool>,
-) -> Result<(), crazyradio::Error> {
-    cr.set_channel(crazyradio::Channel::from_number(config.channel)?)?;
-    cr.set_datarate(config.datarate)?;
-    cr.set_address(&config.address)?;
+) -> SnifferExit {
+    macro_rules! try_radio {
+        ($e:expr) => { match $e { Ok(v) => v, Err(e) => return SnifferExit::Error(e.into()) } };
+    }
+    try_radio!(cr.set_channel(try_radio!(crazyradio::Channel::from_number(config.channel))));
+    try_radio!(cr.set_datarate(config.datarate));
+    try_radio!(cr.set_address(&config.address));
 
     let rate_str = match config.datarate {
         crazyradio::Datarate::Dr250K => "250K",
@@ -725,7 +835,7 @@ async fn run_sniffer(
         "Entering sniffer mode on channel {}, {}, address {:02X?}...",
         config.channel, rate_str, config.address
     );
-    let (receiver, sender) = cr.enter_sniffer_mode_async().await?;
+    let (receiver, sender) = try_radio!(cr.enter_sniffer_mode_async().await);
 
     state.lock().unwrap().radio_connected = true;
     eprintln!("Sniffer mode active. Listening for swarm broadcasts...");
@@ -733,6 +843,10 @@ async fn run_sniffer(
     let mut pkt_count: u64 = 0;
     let mut parsed_count: u64 = 0;
     let mut result: Result<(), crazyradio::Error> = Ok(());
+    let mut pending_power: Option<PowerCmd> = None;
+
+    let ctrl_c = tokio::signal::ctrl_c();
+    tokio::pin!(ctrl_c);
 
     'sniffer: loop {
         tokio::select! {
@@ -819,7 +933,16 @@ async fn run_sniffer(
                 }
                 eprintln!("Broadcast burst complete");
             }
+            Some(cmd) = power_rx.recv() => {
+                eprintln!("[POWER] Received {:?}, pausing sniffer...", cmd);
+                pending_power = Some(cmd);
+                break 'sniffer;
+            }
             _ = shutdown.changed() => {
+                break 'sniffer;
+            }
+            _ = &mut ctrl_c => {
+                eprintln!("\nCtrl+C received, shutting down...");
                 break 'sniffer;
             }
         }
@@ -831,5 +954,11 @@ async fn run_sniffer(
     let _ = receiver.close().await;
     eprintln!("Sniffer mode exited.");
 
-    result
+    if let Some(cmd) = pending_power {
+        return SnifferExit::Power(cmd);
+    }
+    match result {
+        Ok(()) => SnifferExit::Shutdown,
+        Err(e) => SnifferExit::Error(e),
+    }
 }

@@ -1,6 +1,43 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+/// Read drones_config.yaml from `config_dir` and return URIs of pilot drones.
+pub fn load_pilot_uris(config_dir: &Path) -> Vec<String> {
+    let path = config_dir.join("drones_config.yaml");
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("Failed to read {}: {}", path.display(), e);
+            return Vec::new();
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct DroneEntry {
+        uri: String,
+        app_type: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct DronesConfig {
+        drones: Vec<DroneEntry>,
+    }
+
+    match serde_yaml::from_str::<DronesConfig>(&text) {
+        Ok(cfg) => {
+            let uris: Vec<String> = cfg.drones.into_iter()
+                .filter(|d| d.app_type == "pilot")
+                .map(|d| d.uri)
+                .collect();
+            eprintln!("Loaded {} pilot URIs from {}", uris.len(), path.display());
+            uris
+        }
+        Err(e) => {
+            eprintln!("Failed to parse {}: {}", path.display(), e);
+            Vec::new()
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct ActiveArea {
     pub min_x: f32,

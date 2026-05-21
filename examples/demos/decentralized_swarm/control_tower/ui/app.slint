@@ -71,6 +71,9 @@ export component AppWindow inherits Window {
     callback request-all-wand();
     callback request-none-wand();
     callback clear-trail(int);
+    callback reboot-all();
+    callback sleep-all();
+    callback wake-all();
 
     HorizontalLayout {
         // Side panel - copter list (left)
@@ -169,6 +172,170 @@ export component AppWindow inherits Window {
                         text: "None";
                         horizontal-stretch: 1;
                         clicked => { root.request-none-wand(); }
+                    }
+                }
+
+                // Power management
+                HorizontalLayout {
+                    spacing: 4px;
+                    height: 32px;
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: Palette.border;
+                        background: reboot-touch.has-hover ? Palette.background.darker(0.12) : Palette.background.darker(0.04);
+
+                        reboot-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { reboot-confirm.show(); }
+                        }
+                        Text {
+                            width: 100%; height: 100%;
+                            text: "Reboot";
+                            font-size: 12px;
+                            color: Palette.foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        reboot-confirm := PopupWindow {
+                            x: 0px; y: 36px; width: 220px;
+                            Rectangle {
+                                width: 220px;
+                                background: Palette.background;
+                                border-width: 2px;
+                                border-color: Palette.border;
+                                border-radius: 4px;
+                                VerticalLayout {
+                                    padding: 12px; spacing: 8px;
+                                    Text {
+                                        text: "Reboot all drones?";
+                                        font-size: 11px; font-weight: 700;
+                                        color: Palette.foreground;
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Rectangle {
+                                            height: 28px; horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            background: ok-reboot-touch.has-hover ? Palette.background.darker(0.15) : Palette.background.darker(0.06);
+                                            border-width: 1px; border-color: Palette.border;
+                                            ok-reboot-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.reboot-all(); reboot-confirm.close(); }
+                                            }
+                                            Text {
+                                                width: 100%; height: 100%;
+                                                text: "Reboot";
+                                                font-size: 11px; font-weight: 700;
+                                                color: Palette.foreground;
+                                                horizontal-alignment: center; vertical-alignment: center;
+                                            }
+                                        }
+                                        Rectangle {
+                                            height: 28px; horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            background: cancel-reboot-touch.has-hover ? Palette.background.darker(0.1) : Palette.background;
+                                            border-width: 1px; border-color: Palette.border;
+                                            cancel-reboot-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { reboot-confirm.close(); }
+                                            }
+                                            Text {
+                                                width: 100%; height: 100%;
+                                                text: "Cancel";
+                                                font-size: 11px;
+                                                color: Palette.foreground;
+                                                horizontal-alignment: center; vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: Palette.border;
+                        background: sleep-touch.has-hover ? Palette.background.darker(0.12) : Palette.background.darker(0.04);
+
+                        sleep-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { sleep-confirm.show(); }
+                        }
+                        Text {
+                            width: 100%; height: 100%;
+                            text: "Sleep";
+                            font-size: 12px;
+                            color: Palette.foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                        sleep-confirm := PopupWindow {
+                            x: 0px; y: 36px; width: 220px;
+                            Rectangle {
+                                width: 220px;
+                                background: Palette.background;
+                                border-width: 2px;
+                                border-color: Palette.border;
+                                border-radius: 4px;
+                                VerticalLayout {
+                                    padding: 12px; spacing: 8px;
+                                    Text {
+                                        text: "Sleep all drones?";
+                                        font-size: 11px; font-weight: 700;
+                                        color: Palette.foreground;
+                                    }
+                                    HorizontalLayout {
+                                        spacing: 8px;
+                                        Rectangle {
+                                            height: 28px; horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            background: ok-sleep-touch.has-hover ? Palette.background.darker(0.15) : Palette.background.darker(0.06);
+                                            border-width: 1px; border-color: Palette.border;
+                                            ok-sleep-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { root.sleep-all(); sleep-confirm.close(); }
+                                            }
+                                            Text {
+                                                width: 100%; height: 100%;
+                                                text: "Sleep";
+                                                font-size: 11px; font-weight: 700;
+                                                color: Palette.foreground;
+                                                horizontal-alignment: center; vertical-alignment: center;
+                                            }
+                                        }
+                                        Rectangle {
+                                            height: 28px; horizontal-stretch: 1;
+                                            border-radius: 3px;
+                                            background: cancel-sleep-touch.has-hover ? Palette.background.darker(0.1) : Palette.background;
+                                            border-width: 1px; border-color: Palette.border;
+                                            cancel-sleep-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => { sleep-confirm.close(); }
+                                            }
+                                            Text {
+                                                width: 100%; height: 100%;
+                                                text: "Cancel";
+                                                font-size: 11px;
+                                                color: Palette.foreground;
+                                                horizontal-alignment: center; vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        text: "Wake";
+                        horizontal-stretch: 1;
+                        clicked => { root.wake-all(); }
                     }
                 }
 
