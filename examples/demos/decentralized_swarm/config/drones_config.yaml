@@ -23,7 +23,7 @@ platforms:
 drones:
   # Sniffer drone (ID 0)
   - id: 0
-    uri: radio://0/90/2M/ABAD1DEA00
+    uri: radio://0/65/2M/ABAD1DEA00
     platform: cf2
     app_type: sniffer
 
