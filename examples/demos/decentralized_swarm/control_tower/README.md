@@ -50,13 +50,21 @@ Requires [Crazyradio 2.0 firmware 5.4 or later](https://github.com/bitcraze/craz
 Follow the [getting started guide](https://www.bitcraze.io/documentation/tutorials/getting-started-with-crazyradio-2-0/#enter-bootloader-mode) to flash the firmware to your Crazyradio 2.0.
 
 
-### 4. Build
+### 4. System libraries (Ubuntu)
+
+These packages need to be installed:
+
+```bash
+sudo apt install -y pkg-config libusb-1.0-0-dev libwayland-dev libfontconfig-dev libgl-dev libegl-dev
+```
+
+### 5. Build
 
 ```bash
 cargo build --release
 ```
 
-### 5. Run
+### 6. Run
 
 ```bash
 # Default: channel 80, 2M datarate, address E7E7E7E7E7
