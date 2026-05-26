@@ -34,6 +34,7 @@
 #define INITIAL_DESIRED_FLYING_COPTERS 0
 #define INITIAL_FORCE_TAKEOFF false
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
+#define LOW_BATTERY_VOLTAGE 3.4f // Voltage below which a flying drone initiates landing. The firmware default is ~3.2 V.
 
 // Randomizing takeoff times
 #define TAKE_OFF_TIME_MAX 8000

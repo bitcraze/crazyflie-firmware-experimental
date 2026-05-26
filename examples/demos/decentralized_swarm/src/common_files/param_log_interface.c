@@ -74,7 +74,7 @@ float getVelMagnitude() { return sqrtf(getVx()*getVx() + getVy()*getVy() + getVz
 float getVarPX() { return logGetFloat(logIdKalmanVarPX); }
 float getVarPY() { return logGetFloat(logIdKalmanVarPY); }
 float getVarPZ() { return logGetFloat(logIdKalmanVarPZ); }
-bool isBatLow() { return logGetInt(logIdPmState) == lowPower; }
+bool isBatLow() { return getVoltage() < LOW_BATTERY_VOLTAGE; }
 float getVoltage() { return logGetFloat(logIdVBat); }
 bool isCharging() { return logGetInt(logIdPmState) == charging; }
 bool isLighthouseAvailable() { return logGetFloat(logIdlighthouseEstBs0Rt) >= 0.0f || logGetFloat(logIdlighthouseEstBs1Rt) >= 0.0f; }
