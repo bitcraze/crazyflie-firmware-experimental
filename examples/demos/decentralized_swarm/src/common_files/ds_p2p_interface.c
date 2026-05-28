@@ -326,14 +326,19 @@ bool isExcessQueuedCopter(enum State ownState, uint8_t ownId) {
 
     if (slotsNeeded <= 0) return true;
 
-    int lowerIdQueued = 0;
+    uint8_t ownVoltage = compressVoltage(getVoltage());
+
+    int higherPriorityQueued = 0;
     for (int i = 1; i < MAX_ADDRESS; i++) {
-        if (isCopterTakeoffQueued(i) && i < ownId) {
-            lowerIdQueued++;
+        if (isCopterTakeoffQueued(i)) {
+            uint8_t peerVoltage = copters[i].battery_voltage;
+            if (peerVoltage > ownVoltage || (peerVoltage == ownVoltage && i < ownId)) {
+                higherPriorityQueued++;
+            }
         }
     }
 
-    return lowerIdQueued >= slotsNeeded;
+    return higherPriorityQueued >= slotsNeeded;
 }
 
 bool needMoreLandingQueuedCopters(enum State ownState) {
