@@ -105,7 +105,7 @@ bool needLessCopters(enum State ownState);
 
 bool needMoreTakeoffQueuedCopters(enum State ownState);
 
-bool needLessTakeoffQueuedCopters(enum State ownState);
+bool isExcessQueuedCopter(enum State ownState, uint8_t ownId);
 
 bool needMoreLandingQueuedCopters(enum State ownState);
 

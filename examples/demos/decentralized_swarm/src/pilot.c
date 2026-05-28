@@ -347,9 +347,9 @@ static void stateTransition(xTimerHandle timer)
             state = STATE_WAIT_FOR_TAKE_OFF;
             ledSetRGB(RED_LED);
         }
-        else if (needLessTakeoffQueuedCopters(state))
+        else if (isExcessQueuedCopter(state, my_id))
         {
-            DEBUG_PRINT("Too many copters in queue, leaving queue...\n");
+            DEBUG_PRINT("Excess copter in queue, leaving queue...\n");
             state = STATE_WAIT_FOR_TAKE_OFF;
             ledSetRGB(RED_LED);
         }

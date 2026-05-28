@@ -320,8 +320,20 @@ bool needMoreTakeoffQueuedCopters(enum State ownState) {
     return getNrOfTakeoffQueuedCopters(ownState) + getNrOfFlyingCopters(ownState) < desiredFlyingCopters;
 }
 
-bool needLessTakeoffQueuedCopters(enum State ownState){
-    return getNrOfTakeoffQueuedCopters(ownState) + getNrOfFlyingCopters(ownState) > desiredFlyingCopters;
+bool isExcessQueuedCopter(enum State ownState, uint8_t ownId) {
+    int flying = getNrOfFlyingCopters(ownState);
+    int slotsNeeded = (int)desiredFlyingCopters - flying;
+
+    if (slotsNeeded <= 0) return true;
+
+    int lowerIdQueued = 0;
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isCopterTakeoffQueued(i) && i < ownId) {
+            lowerIdQueued++;
+        }
+    }
+
+    return lowerIdQueued >= slotsNeeded;
 }
 
 bool needMoreLandingQueuedCopters(enum State ownState) {
