@@ -79,10 +79,10 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 20000 //ms
 
 // BOUNDS DEFINITIONS
-#define MIN_X_BOUND -0.33f
-#define MAX_X_BOUND 1.22f
+#define MIN_X_BOUND -0.74f
+#define MAX_X_BOUND 0.74f
 
-#define MIN_Y_BOUND -1.15f
+#define MIN_Y_BOUND -1.25f
 #define MAX_Y_BOUND 1.25f
 
 #define MIN_Z_BOUND 0.3f
