@@ -12,7 +12,7 @@
 
 #define WAND_P2P_PORT 0x01
 
-#define GRASP_DIST 0.3f
+#define GRASP_DIST 0.15f
 #define GRASP_THRESHOLD 30.0f
 #define BUILD_RATE 3.0f
 #define LOSS_TIMEOUT_MS 1500
