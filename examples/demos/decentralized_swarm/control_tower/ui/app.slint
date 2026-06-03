@@ -74,6 +74,9 @@ export component AppWindow inherits Window {
     callback reboot-all();
     callback sleep-all();
     callback wake-all();
+    callback reboot-copter(int);
+    callback sleep-copter(int);
+    callback wake-copter(int);
 
     HorizontalLayout {
         // Side panel - copter list (left)
@@ -400,6 +403,65 @@ export component AppWindow inherits Window {
                                     Text {
                                         x: 8px;
                                         text: "Clear trail";
+                                        font-size: 12px;
+                                        color: Palette.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Rectangle { height: 1px; background: Palette.border; }
+
+                                Rectangle {
+                                    height: 28px;
+                                    border-radius: 3px;
+                                    background: copter-sleep-touch.has-hover ? Palette.accent-background : transparent;
+
+                                    copter-sleep-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.sleep-copter(copter.id); }
+                                    }
+
+                                    Text {
+                                        x: 8px;
+                                        text: "Sleep";
+                                        font-size: 12px;
+                                        color: Palette.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 28px;
+                                    border-radius: 3px;
+                                    background: copter-wake-touch.has-hover ? Palette.accent-background : transparent;
+
+                                    copter-wake-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.wake-copter(copter.id); }
+                                    }
+
+                                    Text {
+                                        x: 8px;
+                                        text: "Wake";
+                                        font-size: 12px;
+                                        color: Palette.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 28px;
+                                    border-radius: 3px;
+                                    background: copter-reboot-touch.has-hover ? Palette.accent-background : transparent;
+
+                                    copter-reboot-touch := TouchArea {
+                                        mouse-cursor: pointer;
+                                        clicked => { root.reboot-copter(copter.id); }
+                                    }
+
+                                    Text {
+                                        x: 8px;
+                                        text: "Reboot";
                                         font-size: 12px;
                                         color: Palette.foreground;
                                         vertical-alignment: center;

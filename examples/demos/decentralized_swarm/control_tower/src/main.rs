@@ -171,7 +171,11 @@ struct BroadcastCmd {
 }
 
 #[derive(Clone, Debug)]
-enum PowerCmd { Reboot, Sleep, Wake }
+enum PowerCmd {
+    Reboot(Option<usize>),  // None = all pilots, Some(id) = specific drone
+    Sleep(Option<usize>),
+    Wake(Option<usize>),
+}
 
 enum SnifferExit {
     Shutdown,
@@ -200,8 +204,21 @@ async fn send_bootloader_cmd(
     Ok(())
 }
 
-async fn execute_power_cmd(pilot_uris: &[String], cmd: PowerCmd) {
-    if pilot_uris.is_empty() {
+async fn execute_power_cmd(pilot_uris: &std::collections::HashMap<usize, String>, cmd: PowerCmd) {
+    let target = match &cmd {
+        PowerCmd::Reboot(t) | PowerCmd::Sleep(t) | PowerCmd::Wake(t) => t,
+    };
+    let uris: Vec<String> = match target {
+        None => pilot_uris.values().cloned().collect(),
+        Some(id) => match pilot_uris.get(id) {
+            Some(uri) => vec![uri.clone()],
+            None => {
+                eprintln!("[POWER] No URI for copter #{}", id);
+                return;
+            }
+        }
+    };
+    if uris.is_empty() {
         eprintln!("[POWER] No pilot URIs configured — skipping.");
         return;
     }
@@ -209,14 +226,14 @@ async fn execute_power_cmd(pilot_uris: &[String], cmd: PowerCmd) {
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
     let link_context = std::sync::Arc::new(crazyflie_link::LinkContext::new());
     let mut join_set = tokio::task::JoinSet::new();
-    for uri in pilot_uris.iter().cloned() {
+    for uri in uris {
         let lc = link_context.clone();
         let cmd = cmd.clone();
         join_set.spawn(async move {
             let result = match cmd {
-                PowerCmd::Sleep  => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_OFF, &[]).await,
-                PowerCmd::Wake   => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_ON,  &[]).await,
-                PowerCmd::Reboot => {
+                PowerCmd::Sleep(_)  => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_OFF, &[]).await,
+                PowerCmd::Wake(_)   => send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_SYS_ON,  &[]).await,
+                PowerCmd::Reboot(_) => {
                     if let Err(e) = send_bootloader_cmd(&lc, &uri, BOOTLOADER_CMD_RESET_INIT, &[]).await {
                         eprintln!("[POWER] reset-init failed for {}: {}", uri, e);
                         return;
@@ -372,21 +389,42 @@ fn main() {
         let tx = power_tx.clone();
         app.on_reboot_all(move || {
             eprintln!("[UI] Reboot all");
-            let _ = tx.send(PowerCmd::Reboot);
+            let _ = tx.send(PowerCmd::Reboot(None));
         });
     }
     {
         let tx = power_tx.clone();
         app.on_sleep_all(move || {
             eprintln!("[UI] Sleep all");
-            let _ = tx.send(PowerCmd::Sleep);
+            let _ = tx.send(PowerCmd::Sleep(None));
         });
     }
     {
         let tx = power_tx.clone();
         app.on_wake_all(move || {
             eprintln!("[UI] Wake all");
-            let _ = tx.send(PowerCmd::Wake);
+            let _ = tx.send(PowerCmd::Wake(None));
+        });
+    }
+    {
+        let tx = power_tx.clone();
+        app.on_reboot_copter(move |id| {
+            eprintln!("[UI] Reboot CF#{}", id);
+            let _ = tx.send(PowerCmd::Reboot(Some(id as usize)));
+        });
+    }
+    {
+        let tx = power_tx.clone();
+        app.on_sleep_copter(move |id| {
+            eprintln!("[UI] Sleep CF#{}", id);
+            let _ = tx.send(PowerCmd::Sleep(Some(id as usize)));
+        });
+    }
+    {
+        let tx = power_tx.clone();
+        app.on_wake_copter(move |id| {
+            eprintln!("[UI] Wake CF#{}", id);
+            let _ = tx.send(PowerCmd::Wake(Some(id as usize)));
         });
     }
 
@@ -764,7 +802,7 @@ fn main() {
 async fn radio_sniffer_task(
     state: SharedCopterState,
     config: RadioConfig,
-    pilot_uris: Vec<String>,
+    pilot_uris: std::collections::HashMap<usize, String>,
     mut cmd_rx: mpsc::UnboundedReceiver<BroadcastCmd>,
     mut power_rx: mpsc::UnboundedReceiver<PowerCmd>,
     mut shutdown: watch::Receiver<bool>,
