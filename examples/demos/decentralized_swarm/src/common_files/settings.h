@@ -30,7 +30,7 @@
 #define EXECUTE_TRAJ true
 
 // Flight Settings
-#define TAKE_OFF_HEIGHT 1.5f
+#define TAKE_OFF_HEIGHT 1.2f
 #define INITIAL_DESIRED_FLYING_COPTERS 0
 #define INITIAL_FORCE_TAKEOFF false
 #define CHARGED_FOR_TAKEOFF_VOLTAGE 4.0f
@@ -80,11 +80,11 @@
 #define REACHED_CHARGING_PAD_TIMEOUT 20000 //ms
 
 // BOUNDS DEFINITIONS
-#define MIN_X_BOUND -1.21f
-#define MAX_X_BOUND 1.25f
+#define MIN_X_BOUND -1.19f
+#define MAX_X_BOUND 1.22f
 
-#define MIN_Y_BOUND -0.66f
-#define MAX_Y_BOUND 0.88f
+#define MIN_Y_BOUND -0.68f
+#define MAX_Y_BOUND 0.85f
 
 #define MIN_Z_BOUND 0.3f
 #define MAX_Z_BOUND  1.5f
@@ -112,7 +112,7 @@
 #define CENTER_Y_BOX ((MIN_Y_BOX + MAX_Y_BOX) / 2.0f)
 
 #define MIN_Z_BOX (TAKE_OFF_HEIGHT - 0.2f)
-#define MAX_Z_BOX (TAKE_OFF_HEIGHT + 0.5f)
+#define MAX_Z_BOX (MAX_Z_BOUND - RANDOM_BOX_MARGIN)
 
 // Random trajectory execution
 #define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory
