@@ -54,3 +54,7 @@ stlink-v2-test.cfg
 cache
 
 tools/dependency/web/data.js
+
+# Clangd
+compile_commands.json
+.cache/**
