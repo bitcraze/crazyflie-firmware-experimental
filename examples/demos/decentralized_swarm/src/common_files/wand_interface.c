@@ -144,6 +144,12 @@ bool wandIsGrasped(void)
     return grasped;
 }
 
+void wandForceRelease(void)
+{
+    grasped = false;
+    attemptScore = 0.0f;
+}
+
 float wandGetAttemptScore(void)
 {
     return attemptScore;

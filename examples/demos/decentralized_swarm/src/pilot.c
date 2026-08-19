@@ -124,6 +124,7 @@ static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
 static uint32_t queued_start_time_ms = 0;
+static uint32_t wand_pending_start_ms = 0;
 
 static void appP2PDispatch(P2PPacket *p)
 {
@@ -307,26 +308,9 @@ static void stateTransition(xTimerHandle timer)
 
         if (wandIsGrasped())
         {
-            DEBUG_PRINT("Wand grasp detected from ground, taking control...\n");
-            if (supervisorRequestArming(true))
-            {
-                updatePadPosition();
-                disableCollisionAvoidance();
-                setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
-                wandGraspedFromGround = true;
-                wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
-                wandLastCommandedX = FLT_MAX;
-                wandLastCommandedY = FLT_MAX;
-                wandLastCommandedZ = FLT_MAX;
-                state = STATE_WAND_GRASPED;
-                ledSetRGB(GREEN_LED);
-            }
-            else
-            {
-                DEBUG_PRINT("Wand grasped but arming denied (charged=%d, vbat=%.2f, armed=%d, flying=%d, hlBlocked=%d, batLow=%d, desired=%u, state=%u)\n",
-                            chargedForTakeoff(), (double)getVoltage(), supervisorIsArmed(), supervisorIsFlying(),
-                            crtpCommanderHighLevelIsBlocked(), isBatLow(), getDesiredFlyingCopters(), (unsigned)state);
-            }
+            DEBUG_PRINT("Wand grasp detected from ground, waiting to confirm winner...\n");
+            wand_pending_start_ms = now_ms;
+            state = STATE_WAND_GRASPED_PENDING;
         }
         else if (!chargedForTakeoff())
         {
@@ -586,6 +570,41 @@ static void stateTransition(xTimerHandle timer)
         }
         break;
 
+    case STATE_WAND_GRASPED_PENDING:
+        ledSetRGB(ORANGE_LED);
+        if (!wandIsGrasped())
+        {
+            state = STATE_WAIT_FOR_TAKE_OFF;
+        }
+        else if (now_ms - wand_pending_start_ms >= 2 * BROADCAST_PERIOD_MS)
+        {
+            if (shouldYieldWandGrasp(state, my_id))
+            {
+                DEBUG_PRINT("Yielding wand grasp to lower-ID drone\n");
+                wandForceRelease();
+                state = STATE_WAIT_FOR_TAKE_OFF;
+            }
+            else if (supervisorRequestArming(true))
+            {
+                updatePadPosition();
+                disableCollisionAvoidance();
+                setDesiredFlyingCopters(getDesiredFlyingCopters() + 1);
+                wandGraspedFromGround = true;
+                wandHeldYaw = logGetFloat(idYaw) * (M_PI_F / 180.0f);
+                wandLastCommandedX = FLT_MAX;
+                wandLastCommandedY = FLT_MAX;
+                wandLastCommandedZ = FLT_MAX;
+                state = STATE_WAND_GRASPED;
+                ledSetRGB(GREEN_LED);
+            }
+            else
+            {
+                DEBUG_PRINT("Wand confirmed but arming denied (charged=%d, vbat=%.2f)\n",
+                            chargedForTakeoff(), (double)getVoltage());
+            }
+        }
+        break;
+
     case STATE_WAND_GRASPED:
     {
         ledSetRGB(GREEN_LED);
@@ -594,8 +613,17 @@ static void stateTransition(xTimerHandle timer)
 
         if (!wandIsGrasped())
         {
-            DEBUG_PRINT("Wand released, landing...\n");
+            DEBUG_PRINT("Wand released\n");
             state = STATE_WAND_RELEASED;
+            break;
+        }
+
+        if (shouldYieldWandGrasp(state, my_id))
+        {
+            DEBUG_PRINT("Yielding wand grasp to lower-ID drone\n");
+            wandForceRelease();
+            enableCollisionAvoidance();
+            state = STATE_HOVERING;
             break;
         }
 

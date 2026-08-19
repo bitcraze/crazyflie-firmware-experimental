@@ -23,3 +23,6 @@ void wandGetSetpoint(float *x, float *y, float *z);
 
 // Enable or disable wand signal processing. When disabled, wand is ignored and score is reset.
 void wandSetEnabled(bool enabled);
+
+// Force-clear the grasped flag and score (use when yielding the grasp to another drone).
+void wandForceRelease(void);

@@ -42,7 +42,7 @@ copter_full_state_t copters[MAX_ADDRESS];
 // Higher level control
 static uint8_t desiredFlyingCopters = INITIAL_DESIRED_FLYING_COPTERS;
 static uint8_t forceTakeoff = INITIAL_FORCE_TAKEOFF;
-static uint8_t maxWandGrasped = 255;
+static uint8_t maxWandGrasped = 1;
 static bool isControlDataSetYet = false;
 static int32_t controlDataTimeMs = 0;  // Valid if isControlDataSetYet == true
 
@@ -193,7 +193,8 @@ static bool isWandState(enum State state);
 
 static bool isFlyingState(enum State state) {
     return (state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD) ||
-           isWandState(state);
+           state == STATE_WAND_GRASPED || state == STATE_WAND_RELEASED;
+    // STATE_WAND_GRASPED_PENDING is excluded: drone has not armed yet
 }
 
 bool isCopterFlying(uint8_t copter_id){
@@ -201,7 +202,7 @@ bool isCopterFlying(uint8_t copter_id){
 }
 
 static bool isWandState(enum State state) {
-    return state == STATE_WAND_GRASPED || state == STATE_WAND_RELEASED;
+    return state == STATE_WAND_GRASPED || state == STATE_WAND_RELEASED || state == STATE_WAND_GRASPED_PENDING;
 }
 
 static bool isTakeoffQueueingState(enum State state) {
@@ -398,6 +399,26 @@ bool canReceiveWandSignal(enum State ownState) {
         return true;  // Already grasped, keep tracking the wand
     }
     return getNrOfWandGraspedCopters(ownState) < maxWandGrasped;
+}
+
+bool shouldYieldWandGrasp(enum State ownState, uint8_t myId) {
+    if (getNrOfWandGraspedCopters(ownState) <= maxWandGrasped) {
+        return false;
+    }
+
+    // Flying drones (WAND_GRASPED/RELEASED) have priority over ground drones (WAND_GRASPED_PENDING).
+    // Within the same tier, lower ID wins.
+    // A peer "beats" us if: it is flying and we are not, OR same tier and lower ID.
+    bool ownIsFlying = (ownState == STATE_WAND_GRASPED || ownState == STATE_WAND_RELEASED);
+    int beatsUs = 0;
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (!isAlive(i) || !isWandState(copters[i].state)) continue;
+        bool peerIsFlying = (copters[i].state == STATE_WAND_GRASPED || copters[i].state == STATE_WAND_RELEASED);
+        if ((peerIsFlying && !ownIsFlying) || (peerIsFlying == ownIsFlying && i < myId)) {
+            beatsUs++;
+        }
+    }
+    return beatsUs >= maxWandGrasped;
 }
 
 //LOGS

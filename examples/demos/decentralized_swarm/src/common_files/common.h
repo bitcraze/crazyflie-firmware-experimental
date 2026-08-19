@@ -51,5 +51,6 @@ enum State {
     STATE_SNIFFING = 17,
     STATE_WAND_GRASPED = 18,
     STATE_WAND_RELEASED = 19,
+    STATE_WAND_GRASPED_PENDING = 20, // Wand detected on ground; waiting to confirm we are the winner before arming
     STATE_UNKNOWN = 255,
 };

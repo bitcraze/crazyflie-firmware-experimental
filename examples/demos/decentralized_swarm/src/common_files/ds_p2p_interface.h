@@ -122,5 +122,6 @@ void setForceTakeoff(uint8_t force);
 uint8_t getMaxWandGrasped();
 void setMaxWandGrasped(uint8_t max);
 bool canReceiveWandSignal(enum State ownState);
+bool shouldYieldWandGrasp(enum State ownState, uint8_t myId);
 
 #endif // P2P_INTERFACE_H

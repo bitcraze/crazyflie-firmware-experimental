@@ -71,7 +71,7 @@ cargo build --release
 cargo run --release
 
 # Custom radio settings
-cargo run --release -- --radio 0 --channel 90 --address FFE7E7E7E7
+cargo run --release -- --radio 0 --channel 65 --address FFE7E7E7E7
 ```
 
 ### Command-line options
