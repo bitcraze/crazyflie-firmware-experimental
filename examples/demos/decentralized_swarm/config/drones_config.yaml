@@ -23,53 +23,53 @@ platforms:
 drones:
   # Sniffer drone (ID 0)
   - id: 0
-    uri: radio://0/65/2M/ABAD1DEA00
+    uri: radio://0/90/2M/ABAD1DEA00
     platform: cf2
     app_type: sniffer
 
   # Brushless pilot drones (IDs 1-6)
   - id: 1
-    uri: radio://0/65/2M/ABAD1DEA01
+    uri: radio://0/90/2M/ABAD1DEA01
     platform: cf21bl
     app_type: pilot
 
   - id: 2
-    uri: radio://0/65/2M/ABAD1DEA02
+    uri: radio://0/90/2M/ABAD1DEA02
     platform: cf21bl
     app_type: pilot
 
   - id: 3
-    uri: radio://0/65/2M/ABAD1DEA03
+    uri: radio://0/90/2M/ABAD1DEA03
     platform: cf21bl
     app_type: pilot
 
   - id: 4
-    uri: radio://0/65/2M/ABAD1DEA04
+    uri: radio://0/90/2M/ABAD1DEA04
     platform: cf21bl
     app_type: pilot
 
   - id: 5
-    uri: radio://0/65/2M/ABAD1DEA05
+    uri: radio://0/90/2M/ABAD1DEA05
     platform: cf21bl
     app_type: pilot
 
   - id: 6
-    uri: radio://0/65/2M/ABAD1DEA06
+    uri: radio://0/90/2M/ABAD1DEA06
     platform: cf21bl
     app_type: pilot
 
   # Standard pilot drones (IDs 7-9)
   - id: 7
-    uri: radio://0/65/2M/ABAD1DEA07
+    uri: radio://0/90/2M/ABAD1DEA07
     platform: cf21bl
     app_type: pilot
 
   - id: 8
-    uri: radio://0/65/2M/ABAD1DEA08
+    uri: radio://0/90/2M/ABAD1DEA08
     platform: cf21bl
     app_type: pilot
 
   - id: 9
-    uri: radio://0/65/2M/ABAD1DEA09
+    uri: radio://0/90/2M/ABAD1DEA09
     platform: cf21bl
     app_type: pilot
