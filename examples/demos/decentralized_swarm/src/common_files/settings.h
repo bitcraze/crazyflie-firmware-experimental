@@ -115,6 +115,10 @@
 #define SPECIAL_TRAJ_PROBABILITY 0.1f //probability of executing the special trajectory
 #define SPECIAL_TRAJ_START_HEIGHT 0.7f
 
+// Trajectory waiting zone (below and to the side)
+#define WAITING_RADIUS 1.5f  // meters from trajectory center
+#define WAITING_HEIGHT 1.4f
+
 //utils
 #define BROADCAST_PERIOD_MS (1000 / BROADCAST_FREQUENCY_HZ)
 #define CALC_NEXT_PERIOD_MS (1000 / CALC_NEXT_FREQUENCY_HZ)

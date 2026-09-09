@@ -77,6 +77,12 @@ static void p2pcallbackHandler(P2PPacket *p) {
     memcpy(&copters[received_id], &rxMessage.fullState, sizeof(copter_full_state_t));
     copters[received_id].timestamp = nowMs;
 
+    // Calculate clock offset: peer_time - local_time
+    // This tells us how much ahead or behind the peer is
+    copters[received_id].clock_offset = (int32_t)rxMessage.fullState.timestamp - (int32_t)nowMs;
+
+    // Note: Trajectory synchronization data already copied via memcpy above (in fullState)
+
     if (rxMessage.isControlDataValid) {
         int32_t newControlDataTimeMs = nowMs - rxMessage.ageOfControlDataMs;
         if ( ! isControlDataSetYet || newControlDataTimeMs > controlDataTimeMs) {
@@ -170,20 +176,48 @@ float decompressVoltage(uint8_t voltage){
 }
 
 void printOtherCopters(void){
+    uint32_t global_now = getGlobalTime();
+    int32_t median_offset = getMedianClockOffset();
+    
+    DEBUG_PRINT("=== Swarm Status (Global Time: %lu, Median Offset: %ld ms) ===\n", 
+               global_now, median_offset);
+    
     for (int i = 0; i < MAX_ADDRESS; i++) {
         if (copters[i].state != STATE_UNKNOWN){
             if (!peerLocalizationIsIDActive(i)){
-                DEBUG_PRINT("Copter %d is not active\n",i);
+                DEBUG_PRINT("  [%d] Not active\n", i);
             }else{
                 peerLocalizationOtherPosition_t *pos = peerLocalizationGetPositionByID(i);
-                DEBUG_PRINT("Copter %d : %.2f , %.2f , %.2f --> %d with latest counter %d \n",i,(double)pos->pos.x,(double)pos->pos.y,(double)pos->pos.z,copters[i].state,copters[i].counter);
+                if (pos == NULL) {
+                    DEBUG_PRINT("  [%d] State:%d (no position data)\n", i, copters[i].state);
+                    continue;
+                }
+
+                // Basic info
+                DEBUG_PRINT("  [%d] Pos:(%.2f,%.2f,%.2f) State:%d Counter:%d",
+                           i, (double)pos->pos.x, (double)pos->pos.y, (double)pos->pos.z,
+                           copters[i].state, copters[i].counter);
+                
+                // Clock offset
+                DEBUG_PRINT(" ClkOff:%ld", copters[i].clock_offset);
+                
+                // Trajectory sync info
+                if (copters[i].trajectory_slot != 0) {
+                    int32_t time_to_start = (int32_t)(copters[i].trajectory_start_time_global - global_now);
+                    DEBUG_PRINT(" Slot:%d T:%ld", copters[i].trajectory_slot, time_to_start);
+                }
+                
+                DEBUG_PRINT("\n");
             }
         }
     }
+    DEBUG_PRINT("========================================\n");
 }
 
 static bool isFlyingState(enum State state) {
-    return state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD;
+    return (state > STATE_PREPARING_FOR_TAKE_OFF && state < STATE_WAITING_AT_PAD) ||
+           (state == STATE_CLAIMING_TRAJECTORY_SLOT) ||
+           (state == STATE_WAITING_FOR_TRAJECTORY_START);
 }
 
 bool isCopterFlying(uint8_t copter_id){
@@ -312,13 +346,213 @@ void setDesiredFlyingCopters(uint8_t desired) {
     controlDataTimeMs = T2M(xTaskGetTickCount());
 }
 
+// Trajectory synchronization implementation
+
+// Configuration parameters (will be exposed via param interface)
+static uint8_t max_simultaneous_trajectories = 2;
+uint32_t trajectory_timing_tolerance_ms = 200;  // Non-static for external access
+
+uint8_t getMaxSimultaneousTrajectories(void) {
+    return max_simultaneous_trajectories;
+}
+
+bool isAnyoneExecutingTrajectory(void) {
+    for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && copters[i].trajectory_slot != 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool isTrajectoryZoneOccupied(uint32_t current_global_time) {
+    // Check if any drone is spatially in the trajectory zone right now
+    // The trajectory zone is centered at (CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT)
+    const float ZONE_RADIUS = 0.5f;  // meters
+    
+    for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+        if (!isAlive(i)) {
+            continue;
+        }
+        
+        // Check if drone is in trajectory-related state
+        if (copters[i].state == STATE_GOING_TO_TRAJECTORY_START ||
+            copters[i].state == STATE_EXECUTING_TRAJECTORY) {
+            return true;
+        }
+        
+        // Also check spatial proximity to trajectory start point
+        float dx = copters[i].position.x - CENTER_X_BOX;
+        float dy = copters[i].position.y - CENTER_Y_BOX;
+        float distance = sqrtf(dx * dx + dy * dy);
+        
+        if (distance < ZONE_RADIUS) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+bool findAvailableSlot(uint32_t current_global_time, uint8_t *out_slot, uint32_t *out_start_time) {
+    extern float getTrajectoryDuration();  // From movement.c
+
+    // Validate max_simultaneous_trajectories to prevent division by zero
+    if (max_simultaneous_trajectories == 0) {
+        DEBUG_PRINT("ERROR: max_simultaneous_trajectories is 0\n");
+        return false;
+    }
+
+    uint32_t trajectory_duration_ms = (uint32_t)(getTrajectoryDuration() * 1000.0f);
+    uint32_t slot_offset = trajectory_duration_ms / max_simultaneous_trajectories;
+    
+    // Collect active slots
+    typedef struct {
+        uint8_t slot;
+        uint32_t start_time;
+        bool active;
+    } SlotInfo;
+    
+    SlotInfo active_slots[MAX_ADDRESS];
+    uint8_t active_count = 0;
+    
+    for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i) && copters[i].trajectory_slot != 0) {
+            if (active_count >= MAX_ADDRESS) {
+                DEBUG_PRINT("ERROR: Too many active slots (%d), cannot track all\n", active_count);
+                break;
+            }
+            active_slots[active_count].slot = copters[i].trajectory_slot;
+            active_slots[active_count].start_time = copters[i].trajectory_start_time_global;
+            active_slots[active_count].active = true;
+            active_count++;
+            DEBUG_PRINT("Active slot: ID=%d, slot=%d, start_time=%lu\n",
+                       i, copters[i].trajectory_slot, copters[i].trajectory_start_time_global);
+        }
+    }
+    
+    DEBUG_PRINT("Finding slot: %d active slots, duration=%lu ms, offset=%lu ms\n",
+               active_count, trajectory_duration_ms, slot_offset);
+
+    // Check which slots are occupied
+    bool slot_occupied[MAX_ADDRESS] = {false};
+    uint32_t slot_start_times[MAX_ADDRESS] = {0};
+
+    for (uint8_t j = 0; j < active_count; j++) {
+        uint8_t slot = active_slots[j].slot;
+        if (slot > 0 && slot <= max_simultaneous_trajectories) {
+            slot_occupied[slot] = true;
+            slot_start_times[slot] = active_slots[j].start_time;
+        }
+    }
+
+    // If all slots are free, only allow claiming slot 1
+    if (active_count == 0) {
+        *out_slot = 1;
+        *out_start_time = current_global_time + 3000;  // 3s prep buffer
+        DEBUG_PRINT("All slots free, allocated slot 1, start in 3000 ms\n");
+        return true;
+    }
+
+    // Find slot 1 (must be occupied if we're here)
+    if (!slot_occupied[1]) {
+        DEBUG_PRINT("ERROR: Expected slot 1 to be occupied but it's not\n");
+        return false;
+    }
+
+    uint32_t slot_1_start_time = slot_start_times[1];
+
+    // Find the next free slot in sequence
+    for (uint8_t candidate_slot = 2; candidate_slot <= max_simultaneous_trajectories; candidate_slot++) {
+        // Check if this slot is free
+        if (slot_occupied[candidate_slot]) {
+            continue;  // Slot taken, try next
+        }
+
+        // Check if previous slot is occupied (must follow sequence)
+        if (!slot_occupied[candidate_slot - 1]) {
+            DEBUG_PRINT("Cannot claim slot %d: previous slot %d is not occupied\n",
+                       candidate_slot, candidate_slot - 1);
+            continue;
+        }
+
+        // Calculate required start time for this slot
+        // Slot N starts at: slot_1_start_time + (N-1) * slot_offset
+        uint32_t required_start_time = slot_1_start_time + ((candidate_slot - 1) * slot_offset);
+
+        // Check if we can still make this start time (need 3s prep buffer)
+        int32_t time_until_start = (int32_t)(required_start_time - current_global_time);
+
+        if (time_until_start < 4000) {
+            DEBUG_PRINT("Cannot claim slot %d: required start in %ld ms (need 4000 ms)\n",
+                       candidate_slot, time_until_start);
+            return false;  // Too late, can't claim any slot
+        }
+
+        // We can claim this slot!
+        *out_slot = candidate_slot;
+        *out_start_time = required_start_time;
+        DEBUG_PRINT("Allocated slot %d, start in %ld ms (required time)\n",
+                   candidate_slot, time_until_start);
+        return true;
+    }
+
+    DEBUG_PRINT("No available slots found (all occupied or sequence broken)\n");
+    return false;  // No available slots
+}
+
+// Clock synchronization implementation
+
+// Helper function to compare int32_t values for qsort
+static int compare_int32(const void *a, const void *b) {
+    int32_t val_a = *(const int32_t *)a;
+    int32_t val_b = *(const int32_t *)b;
+    if (val_a < val_b) return -1;
+    if (val_a > val_b) return 1;
+    return 0;
+}
+
+int32_t getMedianClockOffset() {
+    int32_t offsets[MAX_ADDRESS];
+    uint8_t count = 0;
+
+    // Collect offsets from all alive peers
+    for (int i = 1; i < MAX_ADDRESS; i++) {
+        if (isAlive(i)) {
+            offsets[count] = copters[i].clock_offset;
+            count++;
+        }
+    }
+
+    if (count == 0) {
+        return 0; // No peers, no offset
+    }
+
+    // Sort the offsets
+    qsort(offsets, count, sizeof(int32_t), compare_int32);
+
+    // Return median
+    if (count % 2 == 1) {
+        return offsets[count / 2];
+    } else {
+        // Average of two middle elements
+        return (offsets[count / 2 - 1] + offsets[count / 2]) / 2;
+    }
+}
+
+uint32_t getGlobalTime() {
+    uint32_t local_time = T2M(xTaskGetTickCount());
+    int32_t median_offset = getMedianClockOffset();
+    return local_time + median_offset;
+}
+
 //LOGS
 
 #define add_copter_log(i)   LOG_GROUP_START(id_##i)\
                             LOG_ADD(LOG_UINT8, state, &copters[i].state)\
                             LOG_ADD(LOG_UINT8, voltage, &copters[i].battery_voltage)\
                             LOG_ADD(LOG_UINT8, counter, &copters[i].counter)\
-                            LOG_GROUP_STOP(id_i)
+                            LOG_GROUP_STOP(id_##i)
 
 add_copter_log(1)
 add_copter_log(2)
@@ -332,4 +566,11 @@ add_copter_log(9)
 
 LOG_GROUP_START(ds)
 LOG_ADD(LOG_UINT8, desired, &desiredFlyingCopters)
+LOG_ADD(LOG_INT32, clockOffset, &copters[0].clock_offset)  // Our own clock offset (0 for self)
 LOG_GROUP_STOP(ds)
+
+// Trajectory synchronization parameters
+PARAM_GROUP_START(trajSync)
+PARAM_ADD(PARAM_UINT8, maxSlots, &max_simultaneous_trajectories)
+PARAM_ADD(PARAM_UINT32, tolerance, &trajectory_timing_tolerance_ms)
+PARAM_GROUP_STOP(trajSync)

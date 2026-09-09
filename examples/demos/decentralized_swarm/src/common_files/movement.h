@@ -64,6 +64,10 @@ bool noCopterFlyingAbove(Position my_pos);
 
 void startTrajectory(Position my_pos);
 
+float getTrajectoryDuration();
+
+void getWaitingPosition(uint8_t slot, uint8_t max_slots, float *x, float *y, float *z);
+
 Position getTrajectoryStart();
 
 void defineTrajectory();

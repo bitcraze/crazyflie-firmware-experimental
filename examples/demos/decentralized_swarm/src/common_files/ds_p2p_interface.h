@@ -40,6 +40,7 @@
 #include "radiolink.h"
 #include "peer_localization.h"
 #include "settings.h"
+#include "movement.h"
 
 #define MAX_ADDRESS 10
 
@@ -54,6 +55,13 @@ typedef struct {
     uint8_t battery_voltage; //normalized to 0-255 (0-3.3V)
     uint32_t timestamp;
     Position position;
+
+    // Clock synchronization
+    int32_t clock_offset; // Offset from our local time (ms)
+
+    // Trajectory synchronization
+    uint8_t trajectory_slot;  // 0 = not flying, 1-N = slot number
+    uint32_t trajectory_start_time_global;  // When this drone starts trajectory, in global time
 } copter_full_state_t;
 
 typedef struct {
@@ -67,6 +75,8 @@ typedef struct {
     uint8_t isControlDataValid;
     uint8_t desiredFlyingCopters; // If set to 0, all will land and enter idle state. Set to >0 to start app.
     uint32_t magicNumber;
+
+    // Note: Trajectory synchronization fields are in fullState, not duplicated here
 } copter_message_t;
 
 void initP2P();
@@ -106,5 +116,19 @@ bool needLessLandingQueuedCopters(enum State ownState);
 
 uint8_t getDesiredFlyingCopters();
 void setDesiredFlyingCopters(uint8_t desired);
+
+// Clock synchronization
+uint32_t getGlobalTime();
+int32_t getMedianClockOffset();
+
+// Trajectory synchronization
+bool isAnyoneExecutingTrajectory(void);
+bool isTrajectoryZoneOccupied(uint32_t current_global_time);
+bool findAvailableSlot(uint32_t current_global_time, uint8_t *out_slot, uint32_t *out_start_time);
+uint8_t getMaxSimultaneousTrajectories(void);
+
+// External access to peer states and config
+extern copter_full_state_t copters[MAX_ADDRESS];
+extern uint32_t trajectory_timing_tolerance_ms;
 
 #endif // P2P_INTERFACE_H

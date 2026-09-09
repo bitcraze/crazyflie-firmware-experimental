@@ -28,6 +28,15 @@
 #include "movement.h"
 
 static Position next_wp;
+
+// Calculate waiting position for a given slot in a circle around trajectory center
+void getWaitingPosition(uint8_t slot, uint8_t max_slots, float *x, float *y, float *z) {
+    // Distribute slots evenly around a circle
+    float angle = (2.0f * 3.14159265f * (slot - 1)) / max_slots;  // slot 1-N maps to 0-2π
+    *x = CENTER_X_BOX + WAITING_RADIUS * cosf(angle);
+    *y = CENTER_Y_BOX + WAITING_RADIUS * sinf(angle);
+    *z = 0.5f;
+}
 static float lockData[LOCK_LENGTH][3];
 static uint32_t lockWriteIndex;
 static uint32_t timeOfReachingWaypointTimeoutms;
@@ -109,7 +118,7 @@ bool hasLock() {
       lYMax = fmaxf(lYMax, lockData[i][1]);
       lZMax = fmaxf(lZMax, lockData[i][2]);
 
-      lXMin = fminf(lXMax, lockData[i][0]);
+      lXMin = fminf(lXMin, lockData[i][0]);
       lYMin = fminf(lYMin, lockData[i][1]);
       lZMin = fminf(lZMin, lockData[i][2]);
     }
@@ -183,13 +192,25 @@ static float getSequenceTime(struct poly4d sequence[], int count) {
   	return totalDuration;
 }
 
+float getTrajectoryDuration() {
+	const float timescale = 2.0f;
+	float base_duration = getSequenceTime(sequence, sizeof(sequence) / sizeof(struct poly4d));
+	return base_duration * timescale;
+}
+
 void startTrajectory(Position my_pos){
-	const uint8_t timescale = 2;
+	const float timescale = 2.0f;
 
 	memcpy(&next_wp, &my_pos, sizeof(Position));
-	float duration = getSequenceTime(sequence,sizeof(sequence) / sizeof(struct poly4d));
-	timeOfReachingWaypointTimeoutms = T2M(xTaskGetTickCount()) + duration + 6*1000 ;
-	DEBUG_PRINT("Starting trajectory with duration %f\n", (double) duration);
+	// Use actual trajectory duration (with timescale applied)
+	float duration = getTrajectoryDuration();
+	// Timeout = duration (in ms) + 6s safety buffer (prevents stuck state if trajectory fails)
+	timeOfReachingWaypointTimeoutms = T2M(xTaskGetTickCount()) + (uint32_t)(duration * 1000.0f) + 6000;
+
+	float base_duration = getSequenceTime(sequence, sizeof(sequence) / sizeof(struct poly4d));
+	DEBUG_PRINT("Trajectory: %d pieces, base=%.2fs, timescale=%.1f, total=%.2fs (timeout: %.2fs)\n",
+	           sizeof(sequence) / sizeof(struct poly4d), (double)base_duration, (double)timescale,
+	           (double)duration, (double)duration + 6.0);
 
   const bool relative = true;
 	crtpCommanderHighLevelStartTrajectory(traj_id, timescale, relative, false);

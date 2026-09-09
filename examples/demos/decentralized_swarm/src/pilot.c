@@ -109,6 +109,16 @@ static uint32_t now_ms = 0;
 static uint32_t position_lock_start_time_ms = 0;
 static uint32_t random_time_for_next_event_ms = 0;
 
+// Trajectory synchronization state
+static uint8_t claimed_trajectory_slot = 0;
+static uint32_t claimed_start_time_global = 0;
+static uint8_t last_flown_slot = 0;
+static uint32_t last_trajectory_end_time = 0;
+static uint32_t claiming_start_time_ms = 0;
+
+// Trajectory probability boost parameter
+static float trajectory_join_probability_boost = 0.60f;
+
 // LEDs Interface
 ledseqStep_t seq_flashing_def[] = {
     {true, LEDSEQ_WAITMS(50)},
@@ -163,6 +173,10 @@ static void broadcastData(xTimerHandle timer)
     fullState.position.x = getX();
     fullState.position.y = getY();
     fullState.position.z = getZ();
+    
+    // Trajectory synchronization data
+    fullState.trajectory_slot = claimed_trajectory_slot;
+    fullState.trajectory_start_time_global = claimed_start_time_global;
 
     broadcastToPeers(&fullState, nowMs);
 }
@@ -190,21 +204,48 @@ static void startTakeOffSequence()
     crtpCommanderHighLevelTakeoff(padZ + TAKE_OFF_HEIGHT, 1.0);
 }
 
-static bool shouldFlySpecialTrajectory()
+static bool shouldAttemptTrajectory()
 {
-    int random_number = -1;
-
-    if (SPECIAL_TRAJ_PROBABILITY > 0.0f)
-    {
-        int special_traj_prob_length = (int)(1.0f / SPECIAL_TRAJ_PROBABILITY);
-        random_number = rand() % special_traj_prob_length;
-        // DEBUG_PRINT("special_traj_prob_length %i\n", special_traj_prob_length);
-        // DEBUG_PRINT("Random number: %i\n", random_number);
+    if (!EXECUTE_TRAJ) {
+        return false;
     }
 
-    uint8_t minimumFlyingCopterId = getMinimumFlyingCopterId();
-    bool noOneElseIsFlyingTrajectory = !isAnyOtherCopterExecutingTrajectory();
-    return (EXECUTE_TRAJ && (random_number == 0) && (my_id <= minimumFlyingCopterId) && noOneElseIsFlyingTrajectory);
+    // Don't attempt if already claimed a slot (Bug #17 fix)
+    if (claimed_trajectory_slot != 0) {
+        return false;
+    }
+
+    // Base probability: 10% (SPECIAL_TRAJ_PROBABILITY)
+    // If someone else flying: add boost (default 20% → 30% total)
+    float probability = SPECIAL_TRAJ_PROBABILITY;
+    if (isAnyoneExecutingTrajectory()) {
+        probability += trajectory_join_probability_boost;
+    }
+
+    // Check probability
+    if (probability >= 1.0f) {
+        // 100% probability, always attempt
+    } else {
+        int random_threshold = (int)(1.0f / probability);
+        if (random_threshold < 1) random_threshold = 1;  // Safety check (Bug #28 fix)
+        int random_number = rand() % random_threshold;
+
+        if (random_number != 0) {
+            return false;  // Probability check failed
+        }
+    }
+
+    // Try to find available slot (slot system handles coordination)
+    uint8_t slot;
+    uint32_t start_time;
+    if (findAvailableSlot(getGlobalTime(), &slot, &start_time)) {
+        claimed_trajectory_slot = slot;
+        claimed_start_time_global = start_time;
+        DEBUG_PRINT("Claiming slot %d at global time %lu\n", slot, start_time);
+        return true;
+    }
+
+    return false;  // No available slots
 }
 
 static void stateTransition(xTimerHandle timer)
@@ -318,16 +359,23 @@ static void stateTransition(xTimerHandle timer)
         if (needMoreLandingQueuedCopters(state))
         {
             DEBUG_PRINT("More copters than desired are flying while hovering, need to land\n");
+            // Release any claimed trajectory slot (Bug #26 fix)
+            if (claimed_trajectory_slot != 0) {
+                DEBUG_PRINT("Releasing claimed slot %d due to landing requirement\n", claimed_trajectory_slot);
+                claimed_trajectory_slot = 0;
+                claimed_start_time_global = 0;
+            }
             random_time_for_next_event_ms = get_next_random_timeout(now_ms);
             state = STATE_PREPARING_FOR_LAND;
         }
         else
         {
-            if (shouldFlySpecialTrajectory())
+            if (shouldAttemptTrajectory())
             {
-                DEBUG_PRINT("Special trajectory\n");
-                gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT, NO_YAW, DELTA_DURATION);
-                state = STATE_GOING_TO_TRAJECTORY_START;
+                DEBUG_PRINT("Attempting trajectory, claiming slot %d at global time %lu (start: %lu)\n", 
+                           claimed_trajectory_slot, getGlobalTime(), claimed_start_time_global);
+                claiming_start_time_ms = now_ms;
+                state = STATE_CLAIMING_TRAJECTORY_SLOT;
             }
             else
             {
@@ -338,21 +386,143 @@ static void stateTransition(xTimerHandle timer)
             }
         }
         break;
+    case STATE_CLAIMING_TRAJECTORY_SLOT:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
+
+        // Wait for gossip propagation (500ms = 5 broadcast cycles at 10 Hz)
+        // Balances responsiveness with robustness to packet loss
+        if (now_ms - claiming_start_time_ms > 500)
+        {
+            // Check for conflicts (another drone claimed same slot/time)
+            bool has_conflict = false;
+            uint8_t conflicting_id = 0;
+            
+            for (uint8_t i = 1; i < MAX_ADDRESS; i++) {
+                if (i == my_id || !isAlive(i)) {
+                    continue;
+                }
+                
+                // Check if same slot claimed
+                if (copters[i].trajectory_slot == claimed_trajectory_slot) {
+                    // Same slot: times must be at least 0.9x trajectory duration apart
+                    // (allows next cycle to start before previous fully completes)
+                    extern float getTrajectoryDuration();
+                    uint32_t min_separation_ms = (uint32_t)(getTrajectoryDuration() * 900.0f);  // 0.9x in ms
+                    int32_t time_diff = (int32_t)(copters[i].trajectory_start_time_global - claimed_start_time_global);
+
+                    if (abs(time_diff) < (int32_t)min_separation_ms) {
+                        has_conflict = true;
+                        conflicting_id = i;
+                        DEBUG_PRINT("Slot conflict: ID %d also claimed slot %d (time diff: %ld ms < min %lu ms)\n",
+                                   i, claimed_trajectory_slot, time_diff, min_separation_ms);
+                        break;
+                    }
+                }
+            }
+            
+            if (has_conflict) {
+                if (my_id < conflicting_id) {
+                    // We win, proceed to waiting position
+                    DEBUG_PRINT("Slot conflict with ID %d, we win (ID %d < %d)\n", conflicting_id, my_id, conflicting_id);
+                    
+                    // Move to our waiting position
+                    float wait_x, wait_y, wait_z;
+                    getWaitingPosition(claimed_trajectory_slot, getMaxSimultaneousTrajectories(), 
+                                      &wait_x, &wait_y, &wait_z);
+                    DEBUG_PRINT("Moving to waiting position (%.2f, %.2f, %.2f)\n", 
+                               (double)wait_x, (double)wait_y, (double)wait_z);
+                    gotoNextWaypoint(wait_x, wait_y, wait_z, NO_YAW, DELTA_DURATION);
+                    state = STATE_WAITING_FOR_TRAJECTORY_START;
+                } else {
+                    // We lose, back off
+                    DEBUG_PRINT("Slot conflict with ID %d, we lose (ID %d > %d), backing off\n", 
+                               conflicting_id, my_id, conflicting_id);
+                    claimed_trajectory_slot = 0;
+                    claimed_start_time_global = 0;
+                    state = STATE_HOVERING;
+                }
+            } else {
+                // No conflict, move to waiting position
+                DEBUG_PRINT("No slot conflict, moving to waiting position\n");
+                
+                float wait_x, wait_y, wait_z;
+                getWaitingPosition(claimed_trajectory_slot, getMaxSimultaneousTrajectories(), 
+                                  &wait_x, &wait_y, &wait_z);
+                DEBUG_PRINT("Moving to waiting position (%.2f, %.2f, %.2f)\n", 
+                           (double)wait_x, (double)wait_y, (double)wait_z);
+                gotoNextWaypoint(wait_x, wait_y, wait_z, NO_YAW, DELTA_DURATION);
+                state = STATE_WAITING_FOR_TRAJECTORY_START;
+            }
+        }
+        break;
+    case STATE_WAITING_FOR_TRAJECTORY_START:
+        ledSetColorFromXYZ(getX(), getY(), getZ());
+        {
+            uint32_t global_now = getGlobalTime();
+            uint32_t time_to_reach_start = 3000;  // 3s to reach trajectory start from waiting position
+            int32_t time_until_start = (int32_t)(claimed_start_time_global - global_now);
+
+            // Moving toward waiting position, but check timing regardless of position
+            // Check if it's time to move to trajectory start
+            if (global_now >= claimed_start_time_global - time_to_reach_start) {
+                DEBUG_PRINT("Time to start (T-%ld ms), moving to trajectory start for slot %d\n",
+                           time_until_start, claimed_trajectory_slot);
+                gotoNextWaypoint(CENTER_X_BOX, CENTER_Y_BOX, SPECIAL_TRAJ_START_HEIGHT,
+                               NO_YAW, DELTA_DURATION);
+                state = STATE_GOING_TO_TRAJECTORY_START;
+            } else if (time_until_start % 5000 < 100) {
+                // Debug: print every 5 seconds while waiting
+                DEBUG_PRINT("Waiting at position, T-%ld ms until start\n", time_until_start);
+            }
+        }
+        break;
     case STATE_GOING_TO_TRAJECTORY_START:
         ledSetColorFromXYZ(getX(), getY(), getZ());
-        if (reachedNextWaypoint(my_pos))
         {
-            DEBUG_PRINT("Reached trajectory start\n");
-            startTrajectory(my_pos);
-            disableCollisionAvoidance();
-            state = STATE_EXECUTING_TRAJECTORY;
+            uint32_t global_now = getGlobalTime();
+            bool at_position = reachedNextWaypoint(my_pos);  // Includes timeout fallback
+
+            // Must reach position AND time must have arrived
+            if (at_position && global_now >= claimed_start_time_global) {
+                DEBUG_PRINT("Starting trajectory at slot %d (global time: %lu)\n",
+                           claimed_trajectory_slot, global_now);
+                startTrajectory(my_pos);
+                disableCollisionAvoidance();
+                state = STATE_EXECUTING_TRAJECTORY;
+            } else {
+                // Check for problems
+                int32_t wait_time = claimed_start_time_global - global_now;
+                if (wait_time > 5000) {
+                    // Something wrong, abort
+                    DEBUG_PRINT("Warning: Start time too far in future (%ld ms), aborting\n", wait_time);
+                    claimed_trajectory_slot = 0;
+                    enableCollisionAvoidance();
+                    state = STATE_HOVERING;
+                } else if (!at_position && global_now >= claimed_start_time_global) {
+                    // Time arrived but not at position - this shouldn't happen with 3s buffer
+                    DEBUG_PRINT("Warning: Start time reached but not at position, aborting slot %d\n",
+                               claimed_trajectory_slot);
+                    claimed_trajectory_slot = 0;
+                    enableCollisionAvoidance();
+                    state = STATE_HOVERING;
+                }
+            }
         }
         break;
     case STATE_EXECUTING_TRAJECTORY:
         ledSetColorFromXYZ(BLUE_LED);
         if (crtpCommanderHighLevelIsTrajectoryFinished())
         {
-            DEBUG_PRINT("Finished trajectory execution\n");
+            DEBUG_PRINT("Finished trajectory execution in slot %d\n", claimed_trajectory_slot);
+            
+            // Record for immediate re-flight detection
+            last_flown_slot = claimed_trajectory_slot;
+            last_trajectory_end_time = getGlobalTime();
+            
+            // Free the slot
+            claimed_trajectory_slot = 0;
+            claimed_start_time_global = 0;
+            
             enableCollisionAvoidance();
             state = STATE_HOVERING;
         }
@@ -498,6 +668,12 @@ void appMain()
 
 LOG_GROUP_START(app)
 LOG_ADD(LOG_UINT8, state, &state)
+LOG_ADD(LOG_UINT8, trajSlot, &claimed_trajectory_slot)
+LOG_ADD(LOG_UINT32, trajStart, &claimed_start_time_global)
 LOG_GROUP_STOP(app)
+
+PARAM_GROUP_START(trajSync)
+PARAM_ADD(PARAM_FLOAT, joinBoost, &trajectory_join_probability_boost)
+PARAM_GROUP_STOP(trajSync)
 
 #endif // BUILD_PILOT_APP
