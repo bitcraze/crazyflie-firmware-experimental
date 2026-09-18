@@ -86,7 +86,7 @@
 #define MIN_Y_BOUND -1.58f
 #define MAX_Y_BOUND 1.47f
 
-#define MIN_Z_BOUND 0.1f
+#define MIN_Z_BOUND 0.3f
 #define MAX_Z_BOUND 2.0f
 
 // getRandomPositionOnCircle or getRandomPositionOnBox
