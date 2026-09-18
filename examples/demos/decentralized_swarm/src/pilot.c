@@ -540,13 +540,21 @@ static void stateTransition(xTimerHandle timer)
             }
             else if (noCopterFlyingAbove(my_pos))
             {
-                if (supervisorRequestArming(true)){
-                vTaskDelay(500);
-                DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
-                crtpCommanderHighLevelTakeoff(padZ + (LANDING_HEIGHT), 1.0);
-                state = STATE_REPOSITION_ON_PAD;
+                if (supervisorRequestArming(true))
+                {
+
+                    if (!crtpCommanderHighLevelIsBlocked() &&
+                        commandAccepted(crtpCommanderHighLevelTakeoff(padZ + (LANDING_HEIGHT), 1.0)))
+                    {
+                        DEBUG_PRINT("Not charging. Try to reposition on pad.\n");
+                        state = STATE_REPOSITION_ON_PAD;
+                    }
+                    else
+                    {
+                        DEBUG_PRINT("Reposition takeoff rejected by commander, will retry\n");
+                    }
+                }
             }
-        }
         }
         break;
     case STATE_REPOSITION_ON_PAD:
@@ -554,9 +562,15 @@ static void stateTransition(xTimerHandle timer)
         {
             DEBUG_PRINT("Over pad, stabilizing position\n");
             goto_pos = (Position){padX, padY, padZ + LANDING_HEIGHT};
-            gotoChargingPad(padX, padY, padZ);
-            stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
-            state = STATE_GOING_TO_PAD;
+            if (gotoChargingPad(padX, padY, padZ))
+            {
+                stabilizeEndTime_ms = now_ms + STABILIZE_TIMEOUT;
+                state = STATE_GOING_TO_PAD;
+            }
+            else
+            {
+                DEBUG_PRINT("Reposition go-to-pad rejected by commander, will retry\n");
+            }
         }
         break;
     case STATE_CRASHED:

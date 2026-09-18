@@ -49,7 +49,12 @@ void gotoNextWaypoint(float x, float y, float z, float yaw, float duration);
 // This function will move the Crazyflie to the next waypoint via the high level commander.
 // It is used as a function because it works with the reachedNextWaypoint() since
 // crtpCommanderHighLevelIsTrajectoryFinished() is not working properly with the collision avoidance enabled.
-void gotoChargingPad(float x, float y, float z);
+// Returns false if the command was rejected by the high level commander (e.g. EBUSY while blocked/arming).
+bool gotoChargingPad(float x, float y, float z);
+
+// True if a high level commander result code (e.g. from gotoChargingPad() or crtpCommanderHighLevelTakeoff())
+// indicates the command was actually accepted, rather than rejected (e.g. EBUSY while arming/blocked).
+bool commandAccepted(int result);
 
 bool reachedNextWaypoint(Position my_pos);
 
