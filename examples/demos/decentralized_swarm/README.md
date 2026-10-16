@@ -156,3 +156,5 @@ Further information bout the collision avoidance algorithm can be found on the o
 ## Limitations
 
 Since P2P communication happens asynchronously on the radio, this example does not work well when connecting a PC to the Crazyflies via the Radio. This is a fundamental limitation of the current P2P implementation. You should only connect the Crazyflies to start and terminate the swarm but the suggested way of interaction with the swarm is through the sniffer and GUI.
+
+To use the radio normally with a pilot, set the parameter `demo.enabled` to 0. This stops the demo and the P2P broadcasting, and the copter stays on the ground with a white LED. Set it back to 1 (the default after a reboot) to rejoin the swarm. It is meant for copters on the ground: a copter that is flying keeps flying and broadcasting until it has landed.

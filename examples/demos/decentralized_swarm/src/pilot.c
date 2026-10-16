@@ -126,6 +126,10 @@ static uint32_t random_time_for_next_event_ms = 0;
 static uint32_t queued_start_time_ms = 0;
 static uint32_t wand_pending_start_ms = 0;
 
+// Set demo.enabled to 0 to stop the demo (and the P2P broadcasting) while on the ground
+static uint8_t demoEnabled = 1;
+static bool demoStopped = false;
+
 static void appP2PDispatch(P2PPacket *p)
 {
     dsP2pHandlePacket(p);
@@ -174,6 +178,11 @@ uint32_t get_next_random_timeout(uint32_t now_ms)
 // timers
 static void broadcastData(xTimerHandle timer)
 {
+    if (demoStopped)
+    {
+        return;
+    }
+
     uint32_t nowMs = T2M(xTaskGetTickCount());
 
     copter_full_state_t fullState;
@@ -250,8 +259,43 @@ static bool shouldFlySpecialTrajectory()
     return (EXECUTE_TRAJ && (random_number == 0) && (my_id <= minimumFlyingCopterId) && noOneElseIsFlyingTrajectory);
 }
 
+static bool isOnGround(enum State s)
+{
+    return s == STATE_IDLE ||
+           s == STATE_WAIT_FOR_POSITION_LOCK ||
+           s == STATE_WAIT_FOR_TAKE_OFF ||
+           s == STATE_QUEUED_FOR_TAKE_OFF ||
+           s == STATE_PREPARING_FOR_TAKE_OFF ||
+           s == STATE_CHECK_CHARGING ||
+           s == STATE_CRASHED ||
+           s == STATE_WAND_GRASPED_PENDING;
+}
+
 static void stateTransition(xTimerHandle timer)
 {
+    // Disabling only takes effect on the ground, a flying copter keeps going until it has landed
+    if (demoStopped)
+    {
+        if (!demoEnabled)
+        {
+            return;
+        }
+        DEBUG_PRINT("Demo enabled, restarting\n");
+        demoStopped = false;
+        state = STATE_IDLE;
+    }
+    else if (!demoEnabled && isOnGround(state))
+    {
+        DEBUG_PRINT("Demo disabled, stopping\n");
+        supervisorRequestArming(false);
+        wandForceRelease();
+        wandSetEnabled(false);
+        ledSetRGBW(WHITE_LED);
+        state = STATE_IDLE;
+        demoStopped = true;
+        return;
+    }
+
     // In the following checks , sequence of checks is important
 
     my_pos.x = getX();
@@ -756,5 +800,9 @@ void appMain()
 LOG_GROUP_START(app)
 LOG_ADD(LOG_UINT8, state, &state)
 LOG_GROUP_STOP(app)
+
+PARAM_GROUP_START(demo)
+PARAM_ADD(PARAM_UINT8, enabled, &demoEnabled)
+PARAM_GROUP_STOP(demo)
 
 #endif // BUILD_PILOT_APP
